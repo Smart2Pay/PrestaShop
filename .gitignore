@@ -1,0 +1,7 @@
+/*
+!.gitignore
+!modules/
+
+modules/*
+!modules/s2p/
+!modules/s2pmybank/
