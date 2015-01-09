@@ -12,10 +12,19 @@ class S2pReturnHandlerModuleFrontController extends ModuleFrontController
     {
         parent::initContent();
 
-        $returnStatus = (int) Tools::getValue('returnStatus', 0);
+        $moduleSettings = $this->module->getSettings();
+
+        $returnMessages = array(
+            2 => $moduleSettings['s2p-message-success'],
+            3 => $moduleSettings['s2p-message-canceled'],
+            4 => $moduleSettings['s2p-message-failed'],
+            7 => $moduleSettings['s2p-message-pending']
+        );
+
+        $returnStatus = (int) Tools::getValue('data', 0);
 
         $this->context->smarty->assign(array(
-            'returnStatus' => $returnStatus
+            'message' => $returnMessages[$returnStatus]
         ));
 
         $this->setTemplate('returnPage.tpl');

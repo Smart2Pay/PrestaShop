@@ -161,15 +161,12 @@ class S2p extends PaymentModule
 
         // Load current value
         foreach ($this->getConfigFormInputNames() as $name) {
-            print_r($name . "\r\n");
 
             if ($name == 's2p-log') {
                 $value = $this->getLogs(true);
             } else {
                 $value = Configuration::get($name);
             }
-
-            print_r($value . "\r\n");
 
             $helper->fields_value[$name] = $value;
         }
@@ -213,6 +210,9 @@ class S2p extends PaymentModule
          */
         foreach ($this->getConfigFormInputs() as $setting) {
             switch ($setting['name']) {
+                case 's2p-log':
+                    // Log is here only to show data in page input, Data is stored within a s2p* table @see $this->installDatabase()
+                    break;
                 case 's2p-new-order-status':
                     Configuration::updateValue($setting['name'], $stateID);
                     break;
@@ -293,9 +293,9 @@ class S2p extends PaymentModule
             $settings[$settingName] = Configuration::get($settingName);
         }
 
-        $moduleSettings['signature'] = $settings['s2p-signature-' . $settings['s2p-env']];
-        $moduleSettings['mid'] = $settings['s2p-mid-' . $settings['s2p-env']];
-        $moduleSettings['postURL'] = $settings['s2p-post-url-' . $settings['s2p-env']];
+        $settings['signature'] = $settings['s2p-signature-' . $settings['s2p-env']];
+        $settings['mid'] = $settings['s2p-mid-' . $settings['s2p-env']];
+        $settings['postURL'] = $settings['s2p-post-url-' . $settings['s2p-env']];
 
         return $settings;
     }
@@ -355,8 +355,6 @@ class S2p extends PaymentModule
         $logs = Db::getInstance()->executeS(
             "SELECT * FROM `" . _DB_PREFIX_ . "smart2pay_logs` ORDER BY log_created DESC"
         );
-
-        print_r($logs);
 
         if (!$reduceToString) {
             return $logs;
