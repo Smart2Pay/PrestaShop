@@ -352,7 +352,7 @@ class S2p extends PaymentModule
      * @return array|string
      */
     public function getLogs($reduceToString = false) {
-        $logs = Db::getInstance()->executeS(
+        $logs = Db::getInstance()->ExecuteS(
             "SELECT * FROM `" . _DB_PREFIX_ . "smart2pay_logs` ORDER BY log_created DESC"
         );
 
@@ -385,12 +385,12 @@ class S2p extends PaymentModule
         $line = $backtrace[0]['line'];
 
         $query = "INSERT INTO `" . _DB_PREFIX_ . "smart2pay_logs`
-                    (log_message, log_type, log_source_file, log_source_file_line)
+                    (log_data, log_type, log_source_file, log_source_file_line)
                   VALUES
-                    ('" . $message . "', '" . $type . "', '" . $file . ", '" . $line . "')
+                    ('" . $message . "', '" . $type . "', '" . $file . "', '" . $line . "')
         ";
 
-        Db::getInstance()->execute($query);
+        Db::getInstance()->Execute($query);
     }
 
     /**

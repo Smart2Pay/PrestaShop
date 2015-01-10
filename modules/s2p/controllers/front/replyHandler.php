@@ -139,7 +139,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                 // NotificationType IS payment
                 if (strtolower($response['NotificationType']) == 'payment') {
                     // prepare string for 'da hash
-                    $responseHashString = "notificationTypePaymentPaymentId" . $response['PaymentID'] . $payMethod->method_config['signature'];
+                    $responseHashString = "notificationTypePaymentPaymentId" . $response['PaymentID'] . $moduleSettings['signature'];
                     // prepare response data
                     $responseData = array(
                         'NotificationType' => 'Payment',
