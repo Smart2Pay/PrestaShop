@@ -155,6 +155,9 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
         } catch (Exception $e) {
             $this->module->writeLog($e->getMessage(), 'exception');
         }
+
         $this->module->writeLog('::: END HANDLE RESPONSE <<<', 'info');
+
+        die();
     }
 }
