@@ -12,46 +12,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
     {
         parent::initContent();
 
-//        echo "zzz";
-
-        $order = new Order(7);
-        $cart = new Cart($order->id_cart);
-        $currency = new Currency($cart->id_currency);
-
-        //print_r($order);
-        //print_r($cart);
-        print_r($currency->iso_code);
-        //print_r(Cart::getTotalCart($order->id_cart));
-
-        // Create new OrderHistory
-        $history = new OrderHistory();
-        $history->id_order = $order->id;
-        //$history->id_employee = (int)$this->context->employee->id;
-
-        $use_existings_payment = false;
-        if (!$order->hasInvoice())
-            $use_existings_payment = true;
-        $history->changeIdOrderState(22, $order, $use_existings_payment);
-        $history->add();
-
-        $this->module->writeLog('>>> START s2p reply :::', 'info');
-        $raw_input = file_get_contents("php://input");
-        parse_str($raw_input, $response);
-        $this->module->writeLog($response, 'info');
-        $this->module->writeLog('::: END s2p reply <<<', 'info');
-
-        die();
-
-        $context = $this->context;
         $this->module->writeLog('>>> START HANDLE RESPONSE :::', 'info');
-
-// get assets
-        /* @var Mage_Sales_Model_Order $order
-         * @var Smart2Pay_Globalpay_Model_Pay $payMethod
-         */
-        $s2pHelper = Mage::helper('globalpay/helper');
-        $payMethod = Mage::getModel('globalpay/pay');
-        $order = Mage::getModel('sales/order');
 
         $moduleSettings = $this->module->getSettings();
 
@@ -77,7 +38,10 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
             $this->module->writeLog('NotificationRecevied:\"' . $raw_input . '\"', 'info');
 
-            // Message is intact
+            /*
+             * Message is intact
+             *
+             */
             if ($this->module->computeSHA256Hash($recomposedHashString) == $response['Hash']) {
 
                 $this->module->writeLog('Hashes match', 'info');
@@ -89,15 +53,19 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                 /*
                  * Check status ID
+                 *
                  */
                 switch ($response['StatusID']) {
                     // Status = success
                     case "2":
-                        // cheking amount  and currency
+                        /*
+                         * Check amount  and currency
+                         */
                         $orderAmount = number_format($cart->getOrderTotal(), 2, '.', '') * 100;
                         $orderCurrency = $currency->iso_code;
 
                         if (strcmp($orderAmount, $response['Amount']) == 0 && $orderCurrency == $response['Currency']) {
+                            $this->module->writeLog('Order has been paid', 'info');
                             //!>> $order->addStatusHistoryComment('Smart2Pay :: order has been paid. [MethodID:' . $response['MethodID'] . ']', $payMethod->method_config['order_status_on_2']);
 
                             /*
@@ -142,24 +110,27 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                         break;
                     // Status = canceled
                     case 3:
-                        $order->addStatusHistoryComment('Smart2Pay :: payment has been canceled.', $payMethod->method_config['order_status_on_3']);
+                        /*$order->addStatusHistoryComment('Smart2Pay :: payment has been canceled.', $payMethod->method_config['order_status_on_3']);
                         if ($order->canCancel()) {
                             $order->cancel();
                         } else {
                             $this->module->writeLog('Can not cancel the order', 'warning');
-                        }
+                        }*/
                         break;
                     // Status = failed
                     case 4:
-                        $order->addStatusHistoryComment('Smart2Pay :: payment has failed.', $payMethod->method_config['order_status_on_4']);
+                        $this->module->writeLog('Payment failed', 'info');
+//                        $order->addStatusHistoryComment('Smart2Pay :: payment has failed.', $payMethod->method_config['order_status_on_4']);
                         break;
                     // Status = expired
                     case 5:
-                        $order->addStatusHistoryComment('Smart2Pay :: payment has expired.', $payMethod->method_config['order_status_on_5']);
+                        $this->module->writeLog('Payment expired', 'info');
+//                        $order->addStatusHistoryComment('Smart2Pay :: payment has expired.', $payMethod->method_config['order_status_on_5']);
                         break;
 
                     default:
-                        $order->addStatusHistoryComment('Smart2Pay status "' . $response['StatusID'] . '" occurred.', $payMethod->method_config['order_status']);
+                        $this->module->writeLog('Payment status unknown', 'info');
+//                        $order->addStatusHistoryComment('Smart2Pay status "' . $response['StatusID'] . '" occurred.', $payMethod->method_config['order_status']);
                         break;
                 }
 
