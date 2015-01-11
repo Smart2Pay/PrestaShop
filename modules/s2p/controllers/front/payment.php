@@ -23,7 +23,13 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
 
         $moduleSettings = $this->module->getSettings();
 
-        $this->module->validateOrder($cart->id, $moduleSettings['s2p-new-order-status'], 0, $this->module->displayName);
+        $this->module->validateOrder(
+            $cart->id,
+            $moduleSettings['s2p-new-order-status'],
+            0,
+            $this->module->displayName,
+            null
+        );
 
         $orderID = $context->cart->id;
         $paymentMethodID = (int) Tools::getValue('methodID', 0);

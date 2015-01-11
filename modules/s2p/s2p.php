@@ -171,7 +171,9 @@ class S2p extends PaymentModule
             $helper->fields_value[$name] = $value;
         }
 
-        return $helper->generateForm($fields_form);
+        $form = $helper->generateForm($fields_form);
+
+        return $form;
     }
 
     /**
@@ -391,6 +393,37 @@ class S2p extends PaymentModule
         ";
 
         Db::getInstance()->Execute($query);
+    }
+
+    /**
+     * Change order status
+     *
+     * @param int $orderId
+     * @param int $statusId
+     *
+     * @return bool
+     */
+    public function changeOrderStatus($orderId, $statusId)
+    {
+        $order = new Order((int) $orderId);
+        $orderState = new OrderState((int) $statusId);
+
+        if (!Validate::isLoadedObject($order)) {
+            $this->writeLog("Can not change apply order state #" . $orderState . " to order #" . $orderId . " - Order state can not be loaded");
+            return false;
+        }
+
+        if (!Validate::isLoadedObject($orderState)) {
+            $this->writeLog("Can not change apply order state #" . $orderState . " to order #" . $orderId . " - Order can not be loaded");
+            return false;
+        }
+
+        $history = new OrderHistory();
+        $history->id_order = (int)$order->id;
+        $history->changeIdOrderState(23, (int)($order->id));
+        $history->add();
+
+        return true;
     }
 
     /**
@@ -1645,6 +1678,10 @@ class S2p extends PaymentModule
                 'rows' => '10',
                 'label' => $this->l('Log'),
                 'name' => 's2p-log',
+                'options' => array(
+
+                ),
+                'style' => 'color: green',
                 'required' => false,
                 'disabled' => true
             )
