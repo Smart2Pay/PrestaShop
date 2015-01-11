@@ -56,11 +56,6 @@ class S2p extends PaymentModule
                 $isValid = true;
                 $skipValidation = false;
 
-                if ($input['name'] == 's2p-log') {
-                    $skipValidation = true;
-                    $isValid = false;
-                }
-
                 if ($formValues['s2p-env'] == 'test'
                     && in_array($input['name'], array('s2p-signature-live', 's2p-post-url-live', 's2p-mid-live'))
                 ) {
@@ -161,19 +156,13 @@ class S2p extends PaymentModule
 
         // Load current value
         foreach ($this->getConfigFormInputNames() as $name) {
-
-            if ($name == 's2p-log') {
-                $value = $this->getLogs(true);
-            } else {
-                $value = Configuration::get($name);
-            }
-
-            $helper->fields_value[$name] = $value;
+            $helper->fields_value[$name] = Configuration::get($name);
         }
 
-        $form = $helper->generateForm($fields_form);
+        $this->context->controller->addCSS(_MODULE_DIR_ . $this->name . '/css/style.css');
 
-        return $form;
+        return $helper->generateForm($fields_form)
+            . $this->getLogsHTML();
     }
 
     /**
@@ -212,9 +201,6 @@ class S2p extends PaymentModule
          */
         foreach ($this->getConfigFormInputs() as $setting) {
             switch ($setting['name']) {
-                case 's2p-log':
-                    // Log is here only to show data in page input, Data is stored within a s2p* table @see $this->installDatabase()
-                    break;
                 case 's2p-new-order-status':
                     Configuration::updateValue($setting['name'], $stateID);
                     break;
@@ -347,6 +333,20 @@ class S2p extends PaymentModule
     }
 
     /**
+     * Get module's logs wrapped in HTML tags (mainly used to be printed within admin configuration view of the module)
+     *
+     * @return mixed
+     */
+    public function getLogsHTML()
+    {
+        $this->context->smarty->assign(array(
+            'logs' => $this->getLogs()
+        ));
+
+        return $this->fetchTemplate('/views/templates/admin/logs.tpl');
+    }
+
+    /**
      * Get logs
      *
      * @param bool $reduceToString  When set to true it returns a string instead of an array
@@ -355,7 +355,7 @@ class S2p extends PaymentModule
      */
     public function getLogs($reduceToString = false) {
         $logs = Db::getInstance()->ExecuteS(
-            "SELECT * FROM `" . _DB_PREFIX_ . "smart2pay_logs` ORDER BY log_created DESC"
+            "SELECT * FROM `" . _DB_PREFIX_ . "smart2pay_logs` ORDER BY log_created DESC, log_id DESC"
         );
 
         if (!$reduceToString) {
@@ -424,6 +424,33 @@ class S2p extends PaymentModule
         $history->add();
 
         return true;
+    }
+
+    /**
+     * Fetch template method - cross version implementation
+     *
+     * @param $name
+     *
+     * @return mixed
+     */
+    public function fetchTemplate($name)
+    {
+        if (version_compare(_PS_VERSION_, '1.4', '<'))
+            $this->context->smarty->currentTemplate = $name;
+        elseif (version_compare(_PS_VERSION_, '1.5', '<'))
+        {
+            $views = 'views/templates/';
+            if (@filemtime(dirname(__FILE__).'/'.$name))
+                return $this->display(__FILE__, $name);
+            elseif (@filemtime(dirname(__FILE__).'/'.$views.'hook/'.$name))
+                return $this->display(__FILE__, $views.'hook/'.$name);
+            elseif (@filemtime(dirname(__FILE__).'/'.$views.'front/'.$name))
+                return $this->display(__FILE__, $views.'front/'.$name);
+            elseif (@filemtime(dirname(__FILE__).'/'.$views.'admin/'.$name))
+                return $this->display(__FILE__, $views.'admin/'.$name);
+        }
+
+        return $this->display(__FILE__, $name);
     }
 
     /**
@@ -1672,18 +1699,6 @@ class S2p extends PaymentModule
                     'name' => 'name'
                 ),
                 '_default' => 0
-            ),
-            array(
-                'type' => 'textarea',
-                'rows' => '10',
-                'label' => $this->l('Log'),
-                'name' => 's2p-log',
-                'options' => array(
-
-                ),
-                'style' => 'color: green',
-                'required' => false,
-                'disabled' => true
             )
         );
     }

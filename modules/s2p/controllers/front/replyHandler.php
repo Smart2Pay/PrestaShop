@@ -36,7 +36,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
             $recomposedHashString .= $moduleSettings['signature'];
 
-            $this->module->writeLog('NotificationRecevied:\"' . $raw_input . '\"', 'info');
+            $this->module->writeLog('NotificationRecevied: "' . $raw_input . '"', 'info');
 
             /*
              * Message is intact
@@ -66,6 +66,12 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                         if (strcmp($orderAmount, $response['Amount']) == 0 && $orderCurrency == $response['Currency']) {
                             $this->module->writeLog('Order has been paid', 'info');
+
+                            /*
+                             * $order = new Order(10);
+                             * $order->addOrderPayment(23.48, 's2pmybank');
+                             */
+
                             //!>> $order->addStatusHistoryComment('Smart2Pay :: order has been paid. [MethodID:' . $response['MethodID'] . ']', $payMethod->method_config['order_status_on_2']);
 
                             /*
@@ -150,7 +156,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                     echo "NotificationType=payment&PaymentID=" . $responseData['PaymentID'] . "&Hash=" . $responseData['Hash'];
                 }
             } else {
-                $this->module->writeLog('Hashes do not match (received:' . $response['Hash'] . ')(recomposed:' . $this->module->computeSHA256Hash($recomposedHashString) . ')', 'warning');
+                $this->module->writeLog('Hashes do not match (received: ' . $response['Hash'] . ') vs (recomposed: ' . $this->module->computeSHA256Hash($recomposedHashString) . ')', 'warning');
             }
         } catch (Exception $e) {
             $this->module->writeLog($e->getMessage(), 'exception');

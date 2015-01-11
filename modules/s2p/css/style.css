@@ -1,0 +1,14 @@
+.smart2pay--admin-logs-container {
+    max-height: 300px;
+    overflow: scroll;
+}
+
+.smart2pay--admin-logs-item-type,
+.smart2pay--admin-logs-item-date {
+    color: #000000;
+}
+
+.smart2pay--admin-logs-item-file,
+.smart2pay--admin-logs-item-line {
+    color: #e3e3e3;
+}
