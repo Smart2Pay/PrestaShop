@@ -17,26 +17,10 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
         $moduleSettings = $this->module->getSettings();
 
         try {
-            $raw_input = file_get_contents("php://input");
-            parse_str($raw_input, $response);
+            $response = $this->parseInput();
+            $recomposedHashString = $this->recomposeHashString() . $moduleSettings['signature'];
 
-            $vars = array();
-            $recomposedHashString = '';
-            if (!empty($raw_input)) {
-                $pairs = explode("&", $raw_input);
-                foreach ($pairs as $pair) {
-                    $nv = explode("=", $pair);
-                    $name = $nv[0];
-                    $vars[$name] = $nv[1];
-                    if (strtolower($name) != 'hash') {
-                        $recomposedHashString .= $name . $vars[$name];
-                    }
-                }
-            }
-
-            $recomposedHashString .= $moduleSettings['signature'];
-
-            $this->module->writeLog('NotificationRecevied: "' . $raw_input . '"', 'info');
+            $this->module->writeLog('NotificationRecevied: "' . $this->getRawInput() . '"', 'info');
 
             /*
              * Message is intact
@@ -49,7 +33,10 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                 $order = new Order($response['MerchantTransactionID']);
                 $cart = new Cart($order->id_cart);
                 $currency = new Currency($cart->id_currency);
-                //!>> $order->addStatusHistoryComment('Smart2Pay :: notification received:<br>' . $raw_input);
+
+                if (!Validate::isLoadedObject($order)) {
+                    throw new Exception('Invalid order');
+                }
 
                 /*
                  * Check status ID
@@ -66,8 +53,9 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                         if (strcmp($orderAmount, $response['Amount']) == 0 && $orderCurrency == $response['Currency']) {
                             $this->module->writeLog('Order has been paid', 'info');
-
+                            $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-success']);
                             /*
+                             * Todo - add order payment entry
                              * $order = new Order(10);
                              * $order->addOrderPayment(23.48, 's2pmybank');
                              */
@@ -116,27 +104,25 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                         break;
                     // Status = canceled
                     case 3:
-                        /*$order->addStatusHistoryComment('Smart2Pay :: payment has been canceled.', $payMethod->method_config['order_status_on_3']);
-                        if ($order->canCancel()) {
-                            $order->cancel();
-                        } else {
-                            $this->module->writeLog('Can not cancel the order', 'warning');
-                        }*/
+                        $this->module->writeLog('Payment canceled', 'info');
+                        $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-cancel']);
+                        /*
+                         * Todo - find a way to actually cancel the order too
+                         */
                         break;
                     // Status = failed
                     case 4:
                         $this->module->writeLog('Payment failed', 'info');
-//                        $order->addStatusHistoryComment('Smart2Pay :: payment has failed.', $payMethod->method_config['order_status_on_4']);
+                        $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-fail']);
                         break;
                     // Status = expired
                     case 5:
                         $this->module->writeLog('Payment expired', 'info');
-//                        $order->addStatusHistoryComment('Smart2Pay :: payment has expired.', $payMethod->method_config['order_status_on_5']);
+                        $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-expire']);
                         break;
 
                     default:
                         $this->module->writeLog('Payment status unknown', 'info');
-//                        $order->addStatusHistoryComment('Smart2Pay status "' . $response['StatusID'] . '" occurred.', $payMethod->method_config['order_status']);
                         break;
                 }
 
@@ -144,7 +130,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                 // NotificationType IS payment
                 if (strtolower($response['NotificationType']) == 'payment') {
-                    // prepare string for 'da hash
+                    // prepare string for hash
                     $responseHashString = "notificationTypePaymentPaymentId" . $response['PaymentID'] . $moduleSettings['signature'];
                     // prepare response data
                     $responseData = array(
@@ -165,5 +151,54 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
         $this->module->writeLog('::: END HANDLE RESPONSE <<<', 'info');
 
         die();
+    }
+
+    /**
+     * Get raw php input
+     *
+     * @return string
+     */
+    private function getRawInput()
+    {
+        static $input;
+
+        if ($input === null) {
+            $input = file_get_contents("php://input");
+        }
+
+        return $input;
+    }
+
+    /**
+     * Parse php input
+     *
+     * @return mixed
+     */
+    private function parseInput()
+    {
+        parse_str($this->getRawInput(), $response);
+
+        return $response;
+    }
+
+    private function recomposeHashString()
+    {
+        $raw_input = $this->getRawInput();
+        $vars = array();
+        $recomposedHashString = '';
+
+        if (!empty($raw_input)) {
+            $pairs = explode("&", $raw_input);
+            foreach ($pairs as $pair) {
+                $nv = explode("=", $pair);
+                $name = $nv[0];
+                $vars[$name] = $nv[1];
+                if (strtolower($name) != 'hash') {
+                    $recomposedHashString .= $name . $vars[$name];
+                }
+            }
+        }
+
+        return $recomposedHashString;
     }
 }

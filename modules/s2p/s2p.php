@@ -178,31 +178,19 @@ class S2p extends PaymentModule
         if (Shop::isFeatureActive())
             Shop::setContext(Shop::CONTEXT_ALL);
 
-        { /*
-           *
-           * Insert s2p custom order statuses
-           *
-           */
-            Db::getInstance()->Execute(
-                'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`)' .
-                'VALUES(1, \'#660099\', \'s2p\')'
-            );
-            $stateID = Db::getInstance()->Insert_ID();
-            Db::getInstance()->Execute(
-                'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`)
-                VALUES(' . intval($stateID) . ', 1, \'Awaiting Smart2Pay payment\')'
-            );
-        }
-
         /*
-         *
          * Set default module config
          *
          */
+
+        $this->createCustomOrderStatuses();
+
         foreach ($this->getConfigFormInputs() as $setting) {
             switch ($setting['name']) {
                 case 's2p-new-order-status':
-                    Configuration::updateValue($setting['name'], $stateID);
+                case 's2p-order-status-on-cancel':
+                case 's2p-order-status-on-fail':
+                case 's2p-order-status-on-expire':
                     break;
                 default:
                     if (isset($setting['_default'])) {
@@ -238,27 +226,10 @@ class S2p extends PaymentModule
             return false;
         }
 
-        {/*
-          *
-          * Remove s2p order statuses
-          *
-          */
-            $ids = Db::getInstance()->executeS(
-                'SELECT GROUP_CONCAT(`id_order_state`) as `id_order_state` FROM `'._DB_PREFIX_.'order_state`
-                WHERE `module_name` = \''.pSQL('s2p').'\''
-            );
-
-            $ids = explode(",", $ids[0]['id_order_state']);
-
-            Db::getInstance()->execute(
-                'DELETE FROM `'._DB_PREFIX_.'order_state`
-                WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
-            );
-            Db::getInstance()->execute(
-                'DELETE FROM `'._DB_PREFIX_.'order_state_lang`
-                WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
-            );
-        }
+        // ! S2p custom order statuses are not removed in order to assure data consistency
+        //   This way issues are avoided when there are orders having this type of status attached, and module is uninstalled
+        //
+        // $this->deleteCustomOrderStatuses();
 
         /*
          * Uninstall Database
@@ -1623,7 +1594,7 @@ class S2p extends PaymentModule
             array(
                 'type' => 'select',
                 'label' => $this->l('Order status on EXPIRED'),
-                'name' => 's2p-order-status-on-expired',
+                'name' => 's2p-order-status-on-expire',
                 'required' => true,
                 'options' => array(
                     'query' => OrderState::getOrderStates((int)$this->context->language->id),
@@ -1735,5 +1706,77 @@ class S2p extends PaymentModule
         );
 
         return $name ? $options[$name] : $options;
+    }
+
+    /**
+     * Get an array containing order statuses parameters based on s2p payment state
+     *
+     * @return array
+     */
+    private function getPaymentStatesOrderStatuses()
+    {
+        return array(
+            'success' => array(
+                'configName' => 's2p-order-status-on-success',
+                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+            ),
+            'canceled' => array(
+                'configName' => 's2p-order-status-on-cancel',
+                'orderStatusName' => 'Smart2Pay - Canceled payment'
+            ),
+            'failed' => array(
+                'configName' => 's2p-order-status-on-fail',
+                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+            ),
+            'expired' => array(
+                'configName' => 's2p-order-status-on-expire',
+                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+            )
+        );
+    }
+
+    /**
+     * Create custom s2p order statuses
+     */
+    private function createCustomOrderStatuses()
+    {
+        foreach ($this->getPaymentStatesOrderStatuses() as $status) {
+            Db::getInstance()->Execute(
+                'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`)' .
+                'VALUES(1, \'#660099\', \'s2p\')'
+            );
+
+            $stateID = Db::getInstance()->Insert_ID();
+
+            Db::getInstance()->Execute(
+                'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`)
+                VALUES(' . intval($stateID) . ', 1, \'' . $status['orderStatusName'] . '\')'
+            );
+
+            Configuration::updateValue($status['configName'], $stateID);
+        }
+    }
+
+    /**
+     * Delete custom s2p order statuses
+     */
+    private function deleteCustomOrderStatuses()
+    {
+        $ids = Db::getInstance()->executeS(
+            'SELECT GROUP_CONCAT(`id_order_state`) as `id_order_state` FROM `'._DB_PREFIX_.'order_state`
+                WHERE `module_name` = \''.pSQL('s2p').'\''
+        );
+
+        $ids = explode(",", $ids[0]['id_order_state']);
+
+        Db::getInstance()->execute(
+            'DELETE FROM `'._DB_PREFIX_.'order_state`
+                WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
+        );
+
+        Db::getInstance()->execute(
+            'DELETE FROM `'._DB_PREFIX_.'order_state_lang`
+                WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
+        );
     }
 }
