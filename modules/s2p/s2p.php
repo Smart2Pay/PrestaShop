@@ -196,6 +196,7 @@ class S2p extends PaymentModule
                     if (isset($setting['_default'])) {
                         Configuration::updateValue($setting['name'], $setting['_default']);
                     }
+                    break;
             }
         }
 
@@ -1747,22 +1748,22 @@ class S2p extends PaymentModule
             );
 
             if (!empty($existingStatus)) {
-                continue;
+                $statusID = $existingStatus[0]['id_order_state'];
+            } else {
+                Db::getInstance()->Execute(
+                    'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`)' .
+                    'VALUES(1, \'#660099\', \'s2p\')'
+                );
+
+                $statusID = Db::getInstance()->Insert_ID();
+
+                Db::getInstance()->Execute(
+                    'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`)
+                VALUES(' . intval($statusID) . ', 1, \'' . $status['orderStatusName'] . '\')'
+                );
             }
 
-            Db::getInstance()->Execute(
-                'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`)' .
-                'VALUES(1, \'#660099\', \'s2p\')'
-            );
-
-            $stateID = Db::getInstance()->Insert_ID();
-
-            Db::getInstance()->Execute(
-                'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`)
-                VALUES(' . intval($stateID) . ', 1, \'' . $status['orderStatusName'] . '\')'
-            );
-
-            Configuration::updateValue($status['configName'], $stateID);
+            Configuration::updateValue($status['configName'], $statusID);
         }
     }
 
