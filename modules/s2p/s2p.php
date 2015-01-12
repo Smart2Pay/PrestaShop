@@ -188,6 +188,7 @@ class S2p extends PaymentModule
         foreach ($this->getConfigFormInputs() as $setting) {
             switch ($setting['name']) {
                 case 's2p-new-order-status':
+                case 's2p-order-status-on-success':
                 case 's2p-order-status-on-cancel':
                 case 's2p-order-status-on-fail':
                 case 's2p-order-status-on-expire':
@@ -1717,9 +1718,13 @@ class S2p extends PaymentModule
     private function getPaymentStatesOrderStatuses()
     {
         return array(
+            'new' => array(
+                'configName' => 's2p-new-order-status',
+                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+            ),
             'success' => array(
                 'configName' => 's2p-order-status-on-success',
-                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+                'orderStatusName' => 'Smart2Pay - Successfully paid'
             ),
             'canceled' => array(
                 'configName' => 's2p-order-status-on-cancel',
@@ -1727,11 +1732,11 @@ class S2p extends PaymentModule
             ),
             'failed' => array(
                 'configName' => 's2p-order-status-on-fail',
-                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+                'orderStatusName' => 'Smart2Pay - Failed payment'
             ),
             'expired' => array(
                 'configName' => 's2p-order-status-on-expire',
-                'orderStatusName' => 'Smart2Pay - Awaiting payment'
+                'orderStatusName' => 'Smart2Pay - Expired payment'
             )
         );
     }
