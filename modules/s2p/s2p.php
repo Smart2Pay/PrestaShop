@@ -1742,11 +1742,11 @@ class S2p extends PaymentModule
     {
         foreach ($this->getPaymentStatesOrderStatuses() as $status) {
 
-            $status = Db::getInstance()->ExecuteS(
+            $existingStatus = Db::getInstance()->ExecuteS(
                 "SELECT * FROM `"._DB_PREFIX_."order_state_lang` WHERE `name` = '" . $status['orderStatusName'] . "'"
             );
 
-            if (!empty($status)) {
+            if (!empty($existingStatus)) {
                 continue;
             }
 
