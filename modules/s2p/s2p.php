@@ -1741,6 +1741,15 @@ class S2p extends PaymentModule
     private function createCustomOrderStatuses()
     {
         foreach ($this->getPaymentStatesOrderStatuses() as $status) {
+
+            $status = Db::getInstance()->ExecuteS(
+                "SELECT * FROM `"._DB_PREFIX_."order_state_lang` WHERE `name` = '" . $status['orderStatusName'] . "'"
+            );
+
+            if (!empty($status)) {
+                continue;
+            }
+
             Db::getInstance()->Execute(
                 'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`)' .
                 'VALUES(1, \'#660099\', \'s2p\')'
