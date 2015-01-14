@@ -28,6 +28,10 @@ class S2p extends PaymentModule
         $this->description = $this->l('Payment module.');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
+
+        // !! Trick for sharing s2p base module translation to methods modules
+        //
+        $this->l('In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
     }
 
     /**
@@ -76,13 +80,13 @@ class S2p extends PaymentModule
                         switch ($validate) {
                             case 'url':
                                 if (!Validate::isUrl($formValues[$input['name']])) {
-                                    $output .= $this->displayError($this->l('Invalid ' . $input['label'] . ' value. Must be a valid URL'));
+                                    $output .= $this->displayError($this->l('Invalid') . ' ' . Translate::getModuleTranslation($this->name, $input['label']) . ' ' . $this->l('value') . '. ' . $this->l('Must be a valid URL'));
                                     $isValid = false;
                                 }
                                 break;
                             case 'notEmpty':
                                 if (empty($formValues[$input['name']])) {
-                                    $output .= $this->displayError($this->l('Invalid ' . $input['label'] . ' value. Must NOT be empty'));
+                                    $output .= $this->displayError($this->l('Invalid') . ' ' . Translate::getModuleTranslation($this->name, $input['label']) . ' ' . $this->l('value') . '. ' . $this->l('Must NOT be empty'));
                                     $isValid = false;
                                 }
                         }
@@ -371,12 +375,13 @@ class S2p extends PaymentModule
     /**
      * Change order status
      *
-     * @param int $orderId
-     * @param int $statusId
+     * @param int  $orderId
+     * @param int  $statusId
+     * @param bool $sendCustomerEmail
      *
      * @return bool
      */
-    public function changeOrderStatus($orderId, $statusId)
+    public function changeOrderStatus($orderId, $statusId, $sendCustomerEmail = false)
     {
         $order = new Order((int) $orderId);
         $orderState = new OrderState((int) $statusId);
@@ -393,8 +398,14 @@ class S2p extends PaymentModule
 
         $history = new OrderHistory();
         $history->id_order = (int)$order->id;
-        $history->changeIdOrderState(23, (int)($order->id));
-        $history->add();
+        $history->changeIdOrderState($statusId, (int)($order->id));
+
+        if ($sendCustomerEmail) {
+            $history->addWithemail();
+        } else {
+            $history->add();
+        }
+
 
         return true;
     }
@@ -424,6 +435,26 @@ class S2p extends PaymentModule
         }
 
         return $this->display(__FILE__, $name);
+    }
+
+    /**
+     * Get s2p method details by ID
+     *
+     * @param $methodId
+     *
+     * @return array|null
+     */
+    public function getMethodDetails($methodId)
+    {
+        $method = Db::getInstance()->ExecuteS(
+            "SELECT * FROM `"._DB_PREFIX_."smart2pay_method` WHERE `method_id` = '" . $methodId . "'"
+        );
+
+        if (!empty($method)) {
+            return $method[0];
+        }
+
+        return null;
     }
 
     /**
@@ -1497,7 +1528,7 @@ class S2p extends PaymentModule
                 '_default' => 'Custom product description',
                 '_validate' => ['notEmpty']
             ),
-            /*array(
+            array(
                 'type' => 'select',
                 'label' => $this->l('Notify customer by email'),
                 'name' => 's2p-notify-customer-by-email',
@@ -1509,6 +1540,7 @@ class S2p extends PaymentModule
                 ),
                 '_default' => 0
             ),
+            /*
             array(
                 'type' => 'select',
                 'label' => $this->l('Send payment instructions on order creation'),

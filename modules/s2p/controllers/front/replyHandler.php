@@ -52,34 +52,27 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                         $orderCurrency = $currency->iso_code;
 
                         if (strcmp($orderAmount, $response['Amount']) == 0 && $orderCurrency == $response['Currency']) {
+                            $methodDetails = $this->module->getMethodDetails($response['MethodID']);
+
                             $this->module->writeLog('Order has been paid', 'info');
-                            $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-success']);
+
+                            $this->module->changeOrderStatus(
+                                $order->id_cart,
+                                $moduleSettings['s2p-order-status-on-success'],
+                                $moduleSettings['s2p-notify-customer-by-email']
+                            );
+
+                            $order->addOrderPayment(
+                                $response['Amount'] / 100,
+                                Translate::getModuleTranslation(
+                                    str_replace(" ", "", $methodDetails['display_name']),
+                                    $methodDetails['display_name']
+                                )
+                            );
+
                             /*
-                             * Todo - add order payment entry
-                             * $order = new Order(10);
-                             * $order->addOrderPayment(23.48, 's2pmybank');
-                             */
-
-                            //!>> $order->addStatusHistoryComment('Smart2Pay :: order has been paid. [MethodID:' . $response['MethodID'] . ']', $payMethod->method_config['order_status_on_2']);
-
-                            /*
-
-                            if ($payMethod->method_config['auto_invoice']) {
-                                // Create and pay Order Invoice
-                                if ($order->canInvoice()) {
-                                    $invoice = Mage::getModel('sales/service_order', $order)->prepareInvoice();
-                                    $invoice->setRequestedCaptureCase(Mage_Sales_Model_Order_Invoice::CAPTURE_OFFLINE);
-                                    $invoice->register();
-                                    $transactionSave = Mage::getModel('core/resource_transaction')
-                                        ->addObject($invoice)
-                                        ->addObject($invoice->getOrder());
-                                    $transactionSave->save();
-                                    $order->addStatusHistoryComment('Smart2Pay :: order has been automatically invoiced.', $payMethod->method_config['order_status_on_2']);
-                                } else {
-                                    $this->module->writeLog('Order can not be invoiced', 'warning');
-                                }
-                            }
-
+                             * Todo - check framework's order shipment
+                             *
                             if ($payMethod->method_config['auto_ship']) {
                                 if ($order->canShip()) {
                                     $itemQty = $order->getItemsCollection()->count();
@@ -91,15 +84,10 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                                     $this->module->writeLog('Order can not be shipped', 'warning');
                                 }
                             }
-
-                            if ($payMethod->method_config['notify_customer']) {
-                                // Inform customer
-                                $this->informCustomer($order, $response['Amount'], $response['Currency']);
-                            }
-
                             */
+
                         } else {
-                            //!>> $order->addStatusHistoryComment('Smart2Pay :: notification has different amount[' . $orderAmount . '/' . $response['Amount'] . '] and/or currency[' . $orderCurrency . '/' . $response['Currency'] . ']!. Please contact support@smart2pay.com', $payMethod->method_config['order_status_on_4']);
+                            $this->module->writeLog('Smart2Pay :: notification has different amount[' . $orderAmount . '/' . $response['Amount'] . '] and/or currency[' . $orderCurrency . '/' . $response['Currency'] . ']!. Please contact support@smart2pay.com', 'info');
                         }
                         break;
                     // Status = canceled

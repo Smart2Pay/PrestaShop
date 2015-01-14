@@ -27,13 +27,18 @@ class S2pmybank extends PaymentModule
 
         parent::__construct();
 
-        $this->displayName = $this->l('Smart2Pay MyBank');
-        $this->description = $this->l('Payment module.');
+        // !! IMPORTANT NOTE: If module's display name is translated,
+        // The bellow translation string has to be the same method name as in database
+        // This module's filename also (lowercase)
+        // (@see replyHandler :: add order payment)
+        //
+        $this->displayName = 'Smart2Pay ' . $this->l('MyBank');
+        $this->description = $this->l('Payment module');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 
         if (!Configuration::get('s2p-enabled'))
-            $this->warning = $this->l('In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
+            $this->warning = Translate::getModuleTranslation('s2p', 'In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
     }
 
     /**
