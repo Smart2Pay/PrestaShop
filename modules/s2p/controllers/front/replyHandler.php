@@ -52,7 +52,8 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                         $orderCurrency = $currency->iso_code;
 
                         if (strcmp($orderAmount, $response['Amount']) == 0 && $orderCurrency == $response['Currency']) {
-                            $methodDetails = $this->module->getMethodDetails($response['MethodID']);
+                            $methodModule = $this->module->getMethodModule($response['MethodID']);
+                            $methodDisplayName = $methodModule ? $methodModule->displayName : $this->module->displayName;
 
                             $this->module->writeLog('Order has been paid', 'info');
 
@@ -64,10 +65,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                             $order->addOrderPayment(
                                 $response['Amount'] / 100,
-                                Translate::getModuleTranslation(
-                                    str_replace(" ", "", $methodDetails['display_name']),
-                                    $methodDetails['display_name']
-                                )
+                                $methodDisplayName
                             );
 
                             /*
@@ -94,9 +92,8 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                     case 3:
                         $this->module->writeLog('Payment canceled', 'info');
                         $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-cancel']);
-                        /*
-                         * Todo - find a way to actually cancel the order too
-                         */
+                        // There is no way to cancel an order other but changing it's status to canceled
+                        // What we do is not changing order status to canceled, but to a user set one, instead
                         break;
                     // Status = failed
                     case 4:
@@ -113,8 +110,6 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                         $this->module->writeLog('Payment status unknown', 'info');
                         break;
                 }
-
-                //$order->save();
 
                 // NotificationType IS payment
                 if (strtolower($response['NotificationType']) == 'payment') {

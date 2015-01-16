@@ -3,19 +3,42 @@
 if (!defined('_PS_VERSION_'))
     exit;
 
-
+/**
+ * Class S2pmybank
+ *
+ *  // !! IMPORTANT:
+ *  //
+ *  // Resulting module name has to have the 's2pmethodname' format
+ *  //
+ *  //   Therefore, set:
+ *  //     _methodName - @__construct
+ *  //                   Lowercase version of method's 'display_name' from database table,
+ *  //                   with no spaces, or special chars
+ *  //                   (note that 's2p' is prepended bellow in constructor, so do not repeat it here)
+ *  //                   ##REGEX## [0-9a-z]+
+ *  //                   EX: display_name: 'INTER-AC® Online 9' => _methodName: 'interaconline9'
+ *  //     class       - 'S2p' + _methodName
+ *
+ */
 class S2pmybank extends PaymentModule
 {
-    protected $_methodName = 'mybank';
-    protected $_methodID = 73;
-    protected $_methodDisplayName = 'My Bank';
-    protected $_moduleName;
-
     /**
      * Constructor
      */
     public function __construct()
     {
+        /*
+         * Method settings
+         */
+        $this->_methodName = 'mybank';
+        $this->_methodID = 73;
+        $this->_methodDisplayName = $this->l('MyBank');
+        $this->_methodDescription = $this->l('MyBank description');
+        $this->_moduleDescription = $this->l('Payment module');
+
+        /*
+         * Module settings
+         */
         $this->name = 's2p' . $this->_methodName;
         $this->tab = 'payments_gateways';
         $this->version = '0.1';
@@ -24,21 +47,20 @@ class S2pmybank extends PaymentModule
         $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
         $this->bootstrap = true;
         $this->controllers = array('payment');
+        $this->displayName = $this->_methodDisplayName;
+        $this->description = $this->_moduleDescription;
 
-        parent::__construct();
-
-        // !! IMPORTANT NOTE: If module's display name is translated,
-        // The bellow translation string has to be the same method name as in database
-        // This module's filename also (lowercase)
-        // (@see replyHandler :: add order payment)
-        //
-        $this->displayName = 'Smart2Pay ' . $this->l('MyBank');
-        $this->description = $this->l('Payment module');
+        /**
+         * S2p base module instance
+         */
+        $this->s2p = $m = Module::getInstanceByName('s2p');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 
         if (!Configuration::get('s2p-enabled'))
-            $this->warning = Translate::getModuleTranslation('s2p', 'In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
+            $this->warning = $this->s2p->l('In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
+
+        parent::__construct();
     }
 
     /**
@@ -177,31 +199,6 @@ class S2pmybank extends PaymentModule
         return $this->display(__FILE__, 'payment.tpl');
     }
 
-    public function hookPaymentReturn($params)
-    {
-        die(__METHOD__);
-        /*if (!$this->active)
-            return;
-
-        $state = $params['objOrder']->getCurrentState();
-        if ($state == Configuration::get('PS_OS_BANKWIRE') || $state == Configuration::get('PS_OS_OUTOFSTOCK'))
-        {
-            $this->smarty->assign(array(
-                'total_to_pay' => Tools::displayPrice($params['total_to_pay'], $params['currencyObj'], false),
-                'bankwireDetails' => Tools::nl2br($this->details),
-                'bankwireAddress' => Tools::nl2br($this->address),
-                'bankwireOwner' => $this->owner,
-                'status' => 'ok',
-                'id_order' => $params['objOrder']->id
-            ));
-            if (isset($params['objOrder']->reference) && !empty($params['objOrder']->reference))
-                $this->smarty->assign('reference', $params['objOrder']->reference);
-        }
-        else
-            $this->smarty->assign('status', 'failed');
-        return $this->display(__FILE__, 'payment_return.tpl');*/
-    }
-
     /**
      * Get module settings
      *
@@ -248,7 +245,7 @@ class S2pmybank extends PaymentModule
                 'name' => 's2p-' . $this->_methodName . '-enabled',
                 'required' => true,
                 'options' => array(
-                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'query' => $this->s2p->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
                     'name' => 'name'
                 )
@@ -256,43 +253,24 @@ class S2pmybank extends PaymentModule
         );
     }
 
-    private function getConfigFormSelectInputOptions($name = null)
-    {
-        $options = array(
-            'envs' => array(
-                array(
-                    'id' => 'test',
-                    'name' => 'Test'
-                ),
-                array(
-                    'id' => 'live',
-                    'name' => 'Live'
-                )
-            ),
-            'yesno' => array(
-                array(
-                    'id' => 0,
-                    'name' => 'No'
-                ),
-                array(
-                    'id' => 1,
-                    'name' => 'Yes'
-                )
-            )
-        );
-
-        return $name ? $options[$name] : $options;
-    }
-
+    /**
+     * Check if method is available
+     *
+     * @return bool
+     */
     private function isMethodAvailable()
     {
-//        echo "<pre>";
-//        print_r($this->context->country);
-//        print_r($this->context);
-//        echo "</pre>";
+        /*
+         * Check for base module to be active
+         */
+        if (!Configuration::get('s2p-enabled')) {
+            return false;
+        }
 
+        /*
+         * Check for current module to be available
+         */
         $enabled = Configuration::get('s2p-' . $this->_methodName . '-enabled');
-
         if (!$enabled) {
             return false;
         }
@@ -306,6 +284,9 @@ class S2pmybank extends PaymentModule
             "
         );
 
+        /*
+         * Check for method availability within current country
+         */
         if (!$countryMethod) {
             return false;
         }

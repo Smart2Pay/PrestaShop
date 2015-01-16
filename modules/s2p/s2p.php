@@ -438,6 +438,47 @@ class S2p extends PaymentModule
     }
 
     /**
+     * Get s2p payment method module by method ID
+     *
+     * @param $methodId
+     *
+     * @return null|PaymentModule  Returns null or an extended PaymentModule instance
+     */
+    public function getMethodModule($methodId)
+    {
+        $methodDetails = $this->module->getMethodDetails($methodId);
+
+        if (!$methodDetails) {
+            return null;
+        }
+
+        $methodModuleName = $this->module->resolveMethodModuleName($methodDetails['display_name']);
+
+        if (Module::isInstalled($methodModuleName))
+        {
+            $module = Module::getInstanceByName($methodModuleName);
+
+            if ($module) {
+                return $module;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve method module name
+     *
+     * @param $displayName
+     *
+     * @return string
+     */
+    public function resolveMethodModuleName($displayName)
+    {
+        return preg_replace('/[^a-z0-9]/', '', strtolower($displayName));
+    }
+
+    /**
      * Get s2p method details by ID
      *
      * @param $methodId
@@ -455,6 +496,40 @@ class S2p extends PaymentModule
         }
 
         return null;
+    }
+
+    /**
+     * Get Config Form Select Input Options
+     *
+     * @param null $name
+     * @return array
+     */
+    public function getConfigFormSelectInputOptions($name = null)
+    {
+        $options = array(
+            'envs' => array(
+                array(
+                    'id' => 'test',
+                    'name' => 'Test'
+                ),
+                array(
+                    'id' => 'live',
+                    'name' => 'Live'
+                )
+            ),
+            'yesno' => array(
+                array(
+                    'id' => 0,
+                    'name' => 'No'
+                ),
+                array(
+                    'id' => 1,
+                    'name' => 'Yes'
+                )
+            )
+        );
+
+        return $name ? $options[$name] : $options;
     }
 
     /**
@@ -1706,40 +1781,6 @@ class S2p extends PaymentModule
                 '_default' => 0
             )
         );
-    }
-
-    /**
-     * Get Config Form Select Input Options
-     *
-     * @param null $name
-     * @return array
-     */
-    private function getConfigFormSelectInputOptions($name = null)
-    {
-        $options = array(
-            'envs' => array(
-                array(
-                    'id' => 'test',
-                    'name' => 'Test'
-                ),
-                array(
-                    'id' => 'live',
-                    'name' => 'Live'
-                )
-            ),
-            'yesno' => array(
-                array(
-                    'id' => 0,
-                    'name' => 'No'
-                ),
-                array(
-                    'id' => 1,
-                    'name' => 'Yes'
-                )
-            )
-        );
-
-        return $name ? $options[$name] : $options;
     }
 
     /**

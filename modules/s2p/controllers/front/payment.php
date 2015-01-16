@@ -31,7 +31,7 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
             null
         );
 
-        $orderID = $context->cart->id;
+        $orderID = Order::getOrderByCartId($context->cart->id);
         $paymentMethodID = (int) Tools::getValue('methodID', 0);
         $skipPaymentPage = 0;
 
