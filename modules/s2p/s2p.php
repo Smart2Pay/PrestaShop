@@ -387,10 +387,11 @@ class S2p extends PaymentModule
      * @param OrderCore  $order
      * @param int        $statusId
      * @param bool       $sendCustomerEmail
+     * @param array      $mailTemplateVars
      *
      * @return bool
      */
-    public function changeOrderStatus($order, $statusId, $sendCustomerEmail = false)
+    public function changeOrderStatus($order, $statusId, $sendCustomerEmail = false, $mailTemplateVars = array())
     {
         $orderState = new OrderState((int) $statusId);
 
@@ -409,7 +410,7 @@ class S2p extends PaymentModule
         $history->changeIdOrderState($statusId, (int)($order->id));
 
         if ($sendCustomerEmail) {
-            $history->addWithemail();
+            $history->addWithemail(true, $mailTemplateVars);
         } else {
             $history->add();
         }

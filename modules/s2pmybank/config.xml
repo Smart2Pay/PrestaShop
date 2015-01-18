@@ -3,7 +3,7 @@
 	<name>s2pmybank</name>
 	<displayName><![CDATA[Smart2Pay MyBank]]></displayName>
 	<version><![CDATA[0.1]]></version>
-	<description><![CDATA[Smart2Pay MyBank payment method.]]></description>
+	<description><![CDATA[Smart2Pay MyBank payment method]]></description>
 	<author><![CDATA[Smart2Pay]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>
 	<confirmUninstall><![CDATA[Are you sure about removing these details?]]></confirmUninstall>
