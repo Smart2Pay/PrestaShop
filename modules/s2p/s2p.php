@@ -460,7 +460,7 @@ class S2p extends PaymentModule
             return null;
         }
 
-        $methodModuleName = $this->resolveMethodModuleName($methodDetails['display_name']);
+        $methodModuleName = 's2p' . $this->resolveMethodModuleName($methodDetails['display_name']);
 
         if (Module::isInstalled($methodModuleName))
         {

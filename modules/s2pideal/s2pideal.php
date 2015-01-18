@@ -4,7 +4,7 @@ if (!defined('_PS_VERSION_'))
     exit;
 
 /**
- * Class S2pmybank
+ * Class S2pideal
  *
  *  // !! IMPORTANT:
  *  //
@@ -20,7 +20,7 @@ if (!defined('_PS_VERSION_'))
  *  //     class       - 'S2p' + _methodName
  *
  */
-class S2pmybank extends PaymentModule
+class S2pideal extends PaymentModule
 {
     /**
      * Constructor
@@ -30,10 +30,10 @@ class S2pmybank extends PaymentModule
         /*
          * Method settings
          */
-        $this->_methodName = 'mybank';
-        $this->_methodID = 73;
-        $this->_methodDisplayName = $this->l('MyBank');
-        $this->_methodDescription = $this->l('MyBank description');
+        $this->_methodName = 'ideal';
+        $this->_methodID = 2;
+        $this->_methodDisplayName = $this->l('iDEAL');
+        $this->_methodDescription = $this->l('iDEAL description');
         $this->_moduleDescription = $this->l('Payment module');
 
         /*

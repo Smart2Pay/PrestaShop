@@ -59,7 +59,7 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                             $order->addOrderPayment(
                                 $response['Amount'] / 100,
-                                $methodDisplayName . " Test",
+                                $methodDisplayName,
                                 $response['PaymentID'],
                                 $currency
                             );
