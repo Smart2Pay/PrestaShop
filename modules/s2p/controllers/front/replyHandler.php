@@ -57,15 +57,17 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 
                             $this->module->writeLog('Order has been paid', 'info');
 
-                            $this->module->changeOrderStatus(
-                                $order->id_cart,
-                                $moduleSettings['s2p-order-status-on-success'],
-                                $moduleSettings['s2p-notify-customer-by-email']
-                            );
-
                             $order->addOrderPayment(
                                 $response['Amount'] / 100,
-                                $methodDisplayName
+                                $methodDisplayName,
+                                $response['PaymentID'],
+                                $currency
+                            );
+
+                            $this->module->changeOrderStatus(
+                                $order,
+                                $moduleSettings['s2p-order-status-on-success'],
+                                $moduleSettings['s2p-notify-customer-by-email']
                             );
 
                             /*
@@ -91,19 +93,19 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                     // Status = canceled
                     case 3:
                         $this->module->writeLog('Payment canceled', 'info');
-                        $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-cancel']);
+                        $this->module->changeOrderStatus($order, $moduleSettings['s2p-order-status-on-cancel']);
                         // There is no way to cancel an order other but changing it's status to canceled
                         // What we do is not changing order status to canceled, but to a user set one, instead
                         break;
                     // Status = failed
                     case 4:
                         $this->module->writeLog('Payment failed', 'info');
-                        $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-fail']);
+                        $this->module->changeOrderStatus($order, $moduleSettings['s2p-order-status-on-fail']);
                         break;
                     // Status = expired
                     case 5:
                         $this->module->writeLog('Payment expired', 'info');
-                        $this->module->changeOrderStatus($order->id_cart, $moduleSettings['s2p-order-status-on-expire']);
+                        $this->module->changeOrderStatus($order, $moduleSettings['s2p-order-status-on-expire']);
                         break;
 
                     default:

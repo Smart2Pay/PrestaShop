@@ -384,24 +384,23 @@ class S2p extends PaymentModule
     /**
      * Change order status
      *
-     * @param int  $orderId
-     * @param int  $statusId
-     * @param bool $sendCustomerEmail
+     * @param OrderCore  $order
+     * @param int        $statusId
+     * @param bool       $sendCustomerEmail
      *
      * @return bool
      */
-    public function changeOrderStatus($orderId, $statusId, $sendCustomerEmail = false)
+    public function changeOrderStatus($order, $statusId, $sendCustomerEmail = false)
     {
-        $order = new Order((int) $orderId);
         $orderState = new OrderState((int) $statusId);
 
         if (!Validate::isLoadedObject($order)) {
-            $this->writeLog("Can not change apply order state #" . $orderState . " to order #" . $orderId . " - Order state can not be loaded");
+            $this->writeLog("Can not change apply order state #" . $statusId . " to order #" . $order->id . " - Order can not be loaded");
             return false;
         }
 
         if (!Validate::isLoadedObject($orderState)) {
-            $this->writeLog("Can not change apply order state #" . $orderState . " to order #" . $orderId . " - Order can not be loaded");
+            $this->writeLog("Can not change apply order state #" . $statusId . " to order #" . $order->id . " - Order state can not be loaded");
             return false;
         }
 
@@ -414,7 +413,6 @@ class S2p extends PaymentModule
         } else {
             $history->add();
         }
-
 
         return true;
     }
@@ -455,13 +453,13 @@ class S2p extends PaymentModule
      */
     public function getMethodModule($methodId)
     {
-        $methodDetails = $this->module->getMethodDetails($methodId);
+        $methodDetails = $this->getMethodDetails($methodId);
 
         if (!$methodDetails) {
             return null;
         }
 
-        $methodModuleName = $this->module->resolveMethodModuleName($methodDetails['display_name']);
+        $methodModuleName = $this->resolveMethodModuleName($methodDetails['display_name']);
 
         if (Module::isInstalled($methodModuleName))
         {
@@ -496,8 +494,8 @@ class S2p extends PaymentModule
      */
     public function getMethodDetails($methodId)
     {
-        if (array_key_exists($methodId, $this->cache['methodDetails'])) {
-            return $this->cache['methodDetails'][$methodId];
+        if (array_key_exists($methodId, self::$cache['methodDetails'])) {
+            return self::$cache['methodDetails'][$methodId];
         }
 
         $method = Db::getInstance()->ExecuteS(
@@ -505,11 +503,11 @@ class S2p extends PaymentModule
         );
 
         if (!empty($method)) {
-            $this->cache['methodDetails'][$methodId] = $method[0];
+            self::$cache['methodDetails'][$methodId] = $method[0];
             return $method[0];
         }
 
-        $this->cache['methodDetails'][$methodId] = null;
+        self::$cache['methodDetails'][$methodId] = null;
 
         return null;
     }
