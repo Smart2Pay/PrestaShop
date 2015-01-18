@@ -9,6 +9,15 @@ if (!defined('_PS_VERSION_'))
 class S2p extends PaymentModule
 {
     /**
+     * Static cache
+     *
+     * @var array
+     */
+    static $cache = array(
+        'methodDetails' => array()
+    );
+
+    /**
      * Constructor
      */
     public function __construct()
@@ -487,13 +496,20 @@ class S2p extends PaymentModule
      */
     public function getMethodDetails($methodId)
     {
+        if (array_key_exists($methodId, $this->cache['methodDetails'])) {
+            return $this->cache['methodDetails'][$methodId];
+        }
+
         $method = Db::getInstance()->ExecuteS(
             "SELECT * FROM `"._DB_PREFIX_."smart2pay_method` WHERE `method_id` = '" . $methodId . "'"
         );
 
         if (!empty($method)) {
+            $this->cache['methodDetails'][$methodId] = $method[0];
             return $method[0];
         }
+
+        $this->cache['methodDetails'][$methodId] = null;
 
         return null;
     }
@@ -530,6 +546,85 @@ class S2p extends PaymentModule
         );
 
         return $name ? $options[$name] : $options;
+    }
+
+    /**
+     * Get default configuration form inputs for a s2p payment method module
+     *
+     * @param $methodId
+     *
+     * @return array
+     */
+    public function getMethodDefaultConfigFormInputs($methodId)
+    {
+        $methodDetails = $this->getMethodDetails($methodId);
+
+        return array (
+            array(
+                'type' => 'select',
+                'label' => $this->l('Enabled'),
+                'name' => 's2p-' . $this->resolveMethodModuleName($methodDetails['display_name']) . '-enabled',
+                'required' => true,
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name'
+                )
+            )
+        );
+    }
+
+    /**
+     * Check if s2p method is available in some particular country
+     *
+     * @param $methodId
+     * @param $countryISOCode
+     *
+     * @return bool
+     */
+    public function isMethodAvailable($methodId, $countryISOCode)
+    {
+        /*
+         * Check for base module to be active
+         */
+        if (!Configuration::get('s2p-enabled')) {
+            return false;
+        }
+
+        $methodDetails = $this->getMethodDetails($methodId);
+
+        if (empty($methodDetails)) {
+            return false;
+        }
+
+        /*
+         * Check for current module to be available
+         */
+        $enabled = Configuration::get(
+            's2p-' . $this->resolveMethodModuleName($methodDetails['display_name']) . '-enabled'
+        );
+
+        if (!$enabled) {
+            return false;
+        }
+
+        $countryMethod = Db::getInstance()->executeS(
+            "
+                SELECT CM.method_id
+                FROM " . _DB_PREFIX_ . "smart2pay_country_method CM
+                LEFT JOIN " . _DB_PREFIX_ . "smart2pay_country C ON C.country_id = CM.country_id
+                WHERE C.code = '" . DB::getInstance()->_escape($countryISOCode) . "' AND CM.method_id = " . $methodId . "
+            "
+        );
+
+        /*
+         * Check for method availability within current country
+         */
+        if (!$countryMethod) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

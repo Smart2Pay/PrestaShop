@@ -84,6 +84,7 @@ class S2pmybank extends PaymentModule
                 Configuration::updateValue($name, $formValues[$name]);
             }
         }
+
         return $output.$this->displayForm();
     }
 
@@ -154,7 +155,7 @@ class S2pmybank extends PaymentModule
      */
     public function install()
     {
-        if (!parent::install() || !$this->registerHook('payment') || !$this->registerHook('paymentReturn'))
+        if (!parent::install() || !$this->registerHook('payment'))
             return false;
 
         if (Shop::isFeatureActive())
@@ -170,19 +171,31 @@ class S2pmybank extends PaymentModule
      */
     public function uninstall()
     {
-        if (!parent::uninstall() ||
-            !Configuration::deleteByName('s2p' . $this->_methodName)
-        )
+        $settingsCleanedSuccessfully = true;
+
+        foreach ($this->getConfigFormInputs() as $setting) {
+            if (!Configuration::deleteByName($setting['name'])) {
+                $settingsCleanedSuccessfully = false;
+            }
+        }
+
+        if (!parent::uninstall() || !$settingsCleanedSuccessfully) {
             return false;
+        }
 
         return true;
     }
 
+    /**
+     * Hook payment
+     *
+     * @param $params
+     *
+     * @return bool
+     */
     public function hookPayment($params)
     {
-        if (!$this->isMethodAvailable()
-            || !$this->active
-        ) {
+        if (!$this->isMethodAvailable() || !$this->active) {
             return false;
         }
 
@@ -238,19 +251,7 @@ class S2pmybank extends PaymentModule
      */
     private function getConfigFormInputs()
     {
-        return array(
-            array(
-                'type' => 'select',
-                'label' => $this->l('Enabled'),
-                'name' => 's2p-' . $this->_methodName . '-enabled',
-                'required' => true,
-                'options' => array(
-                    'query' => $this->s2p->getConfigFormSelectInputOptions('yesno'),
-                    'id' => 'id',
-                    'name' => 'name'
-                )
-            )
-        );
+        return $this->s2p->getMethodDefaultConfigFormInputs();
     }
 
     /**
@@ -260,37 +261,6 @@ class S2pmybank extends PaymentModule
      */
     private function isMethodAvailable()
     {
-        /*
-         * Check for base module to be active
-         */
-        if (!Configuration::get('s2p-enabled')) {
-            return false;
-        }
-
-        /*
-         * Check for current module to be available
-         */
-        $enabled = Configuration::get('s2p-' . $this->_methodName . '-enabled');
-        if (!$enabled) {
-            return false;
-        }
-
-        $countryMethod = Db::getInstance()->executeS(
-            "
-                SELECT CM.method_id
-                FROM " . _DB_PREFIX_ . "smart2pay_country_method CM
-                LEFT JOIN " . _DB_PREFIX_ . "smart2pay_country C ON C.country_id = CM.country_id
-                WHERE C.code = '" . DB::getInstance()->_escape($this->context->country->iso_code) . "' AND CM.method_id = " . $this->_methodID . "
-            "
-        );
-
-        /*
-         * Check for method availability within current country
-         */
-        if (!$countryMethod) {
-            return false;
-        }
-
-        return true;
+        return $this->s2p->isMethodAvailable($this->_methodID, $this->context->country->iso_code);
     }
 }
