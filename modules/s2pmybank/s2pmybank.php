@@ -239,6 +239,16 @@ class S2pmybank extends PaymentModule
     }
 
     /**
+     * Check if method is available
+     *
+     * @return bool
+     */
+    public function isMethodAvailable()
+    {
+        return $this->s2p->isMethodAvailable($this->_methodID, $this->context->country->iso_code);
+    }
+
+    /**
      * Get Config Form Input Names
      *
      * @return array
@@ -262,15 +272,5 @@ class S2pmybank extends PaymentModule
     private function getConfigFormInputs()
     {
         return $this->s2p->getMethodDefaultConfigFormInputs();
-    }
-
-    /**
-     * Check if method is available
-     *
-     * @return bool
-     */
-    private function isMethodAvailable()
-    {
-        return $this->s2p->isMethodAvailable($this->_methodID, $this->context->country->iso_code);
     }
 }

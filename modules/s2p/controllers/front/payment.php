@@ -23,16 +23,27 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
 
         $moduleSettings = $this->module->getSettings();
 
+        $paymentMethodID = (int) Tools::getValue('methodID', 0);
+        $paymentModule = $this->module->getMethodModule($paymentMethodID);
+
+        if (
+            !$paymentModule
+            || (!$paymentModule->isMethodAvailable() && !$moduleSettings['s2p-debug-form'])
+        ) {
+            $this->module->writeLog('Module for method #' . $paymentMethodID . ' could not be loaded, or it is not available', 'error');
+            Tools::redirect('index.php?controller=order&step=1'); // Todo - give some feedback to the user
+        }
+
         $this->module->validateOrder(
             $cart->id,
             $moduleSettings['s2p-new-order-status'],
             0,
-            $this->module->displayName,
+            $paymentModule->displayName,
             null
         );
 
         $orderID = Order::getOrderByCartId($context->cart->id);
-        $paymentMethodID = (int) Tools::getValue('methodID', 0);
+
         $skipPaymentPage = 0;
 
         if ($moduleSettings['s2p-skip-payment-page']

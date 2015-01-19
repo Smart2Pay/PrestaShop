@@ -1630,6 +1630,14 @@ class S2p extends PaymentModule
             ),
             array(
                 'type' => 'text',
+                'label' => $this->l('Post URL Live'),
+                'name' => 's2p-post-url-live',
+                'required' => true,
+                '_default' => 'https://api.smart2pay.com',
+                '_validate' => ['url', 'notEmpty']
+            ),
+            array(
+                'type' => 'text',
                 'label' => $this->l('Post URL Test'),
                 'name' => 's2p-post-url-test',
                 'required' => true,
