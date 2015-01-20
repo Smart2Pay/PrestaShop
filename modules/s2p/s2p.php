@@ -1717,11 +1717,10 @@ class S2p extends PaymentModule
                 ),
                 '_default' => 0
             ),
-            /*
             array(
                 'type' => 'select',
-                'label' => $this->l('Send payment instructions on order creation'),
-                'name' => 's2p-send-payment-instructions-on-order-creation',
+                'label' => $this->l('Create invoice on success'),
+                'name' => 's2p-create-invoice-on-success',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
@@ -1729,11 +1728,12 @@ class S2p extends PaymentModule
                     'name' => 'name'
                 ),
                 '_default' => 0
-            ),*/
-            /*array(
+            ),
+            /*
+            array(
                 'type' => 'select',
-                'label' => $this->l('Create invoice on success'),
-                'name' => 's2p-create-invoice-on-success',
+                'label' => $this->l('Send payment instructions on order creation'),
+                'name' => 's2p-send-payment-instructions-on-order-creation',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),

@@ -70,6 +70,10 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                                 $moduleSettings['s2p-notify-customer-by-email']
                             );
 
+                            if ($moduleSettings['s2p-create-invoice-on-success']) {
+                                $order->setInvoice(true);
+                            }
+
                             /*
                              * Todo - check framework's order shipment
                              *
