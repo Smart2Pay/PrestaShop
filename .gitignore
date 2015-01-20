@@ -4,5 +4,9 @@
 
 modules/*
 !modules/s2p/
+!modules/s2pbanktransfer/
+!modules/s2pgiropay/
 !modules/s2pideal/
+!modules/s2pmultibancosibs/
 !modules/s2pmybank/
+!modules/s2pprzelewy24/

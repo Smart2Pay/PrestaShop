@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>s2pmultibancosibs</name>
+	<displayName><![CDATA[Smart2Pay Multibanco SIBS]]></displayName>
+	<version><![CDATA[0.1]]></version>
+	<description><![CDATA[Smart2Pay Multibanco SIBS payment method]]></description>
+	<author><![CDATA[Smart2Pay]]></author>
+	<tab><![CDATA[payments_gateways]]></tab>
+	<confirmUninstall><![CDATA[Are you sure about removing these details?]]></confirmUninstall>
+	<is_configurable>1</is_configurable>
+	<need_instance>1</need_instance>
+	<limited_countries></limited_countries>
+</module>
