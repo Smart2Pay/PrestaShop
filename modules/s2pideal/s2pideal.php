@@ -245,7 +245,7 @@ class S2pideal extends PaymentModule
      */
     public function isMethodAvailable()
     {
-        return $this->s2p->isMethodAvailable($this->_methodID, $this->context->country->iso_code);
+        return $this->s2p->isMethodAvailable($this->_methodID);
     }
 
     /**
@@ -271,6 +271,6 @@ class S2pideal extends PaymentModule
      */
     private function getConfigFormInputs()
     {
-        return $this->s2p->getMethodDefaultConfigFormInputs();
+        return $this->s2p->getMethodDefaultConfigFormInputs($this->_methodID);
     }
 }

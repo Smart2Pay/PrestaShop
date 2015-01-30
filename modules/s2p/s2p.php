@@ -577,12 +577,22 @@ class S2p extends PaymentModule
      * Check if s2p method is available in some particular country
      *
      * @param $methodId
-     * @param $countryISOCode
+     * @param $countryISOCode  If no iso code is passed along, method attempts to retrieve it from within context->cart->id_address_invoice
      *
      * @return bool
      */
-    public function isMethodAvailable($methodId, $countryISOCode)
+    public function isMethodAvailable($methodId, $countryISOCode = null)
     {
+        if ($countryISOCode == null) {
+            if ($this->context->cart) {
+                $billing_address = new Address($this->context->cart->id_address_invoice);
+                $country = new Country($billing_address->id_country);
+                $countryISOCode = $country->iso_code;
+            } else {
+                return false;
+            }
+        }
+
         /*
          * Check for base module to be active
          */
