@@ -3,11 +3,11 @@
 	<name>s2p</name>
 	<displayName><![CDATA[Smart2Pay]]></displayName>
 	<version><![CDATA[0.1]]></version>
-	<description><![CDATA[Accept payments for your products via various payment methods.]]></description>
+	<description><![CDATA[Payment module.]]></description>
 	<author><![CDATA[Smart2Pay]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>
-	<confirmUninstall><![CDATA[Are you sure about removing these details?]]></confirmUninstall>
+	<confirmUninstall><![CDATA[Are you sure you want to uninstall?]]></confirmUninstall>
 	<is_configurable>1</is_configurable>
-	<need_instance>1</need_instance>
+	<need_instance>0</need_instance>
 	<limited_countries></limited_countries>
 </module>

@@ -22,43 +22,54 @@ if (!defined('_PS_VERSION_'))
  */
 class S2pbanktransfer extends PaymentModule
 {
+    /** @var S2p $s2p */
+    private $s2p;
+
     /**
      * Constructor
      */
     public function __construct()
     {
-        /*
-         * Method settings
-         */
-        $this->_methodName = 'banktransfer';
-        $this->_methodID = 1;
+        /** @var S2p $m */
+        $this->s2p = $m = Module::getInstanceByName( 's2p' );
+
         $this->_methodDisplayName = $this->l('Bank Transfer');
         $this->_methodDescription = $this->l('Bank Transfer description');
         $this->_moduleDescription = $this->l('Payment module');
 
-        /*
-         * Module settings
+        foreach( $this->s2p->get_default_module_vars() as $key => $val )
+            $this->$key = $val;
+
+        /**
+         * This is the main thing in the module !!!
          */
-        $this->name = 's2p' . $this->_methodName;
-        $this->tab = 'payments_gateways';
+        $this->_methodID = $m::MOD_BANKTRANSFER;
+
         $this->version = '0.1';
-        $this->author = 'Smart2Pay';
-        $this->need_instance = 0;
-        $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
-        $this->bootstrap = true;
-        $this->controllers = array('payment');
+        $this->database_version = '0.1';
         $this->displayName = $this->_methodDisplayName;
         $this->description = $this->_moduleDescription;
 
-        /**
-         * S2p base module instance
+        if( !($module_details = $m::valid_module( $this->_methodID )) )
+        {
+            $this->name = strtolower( get_class( $this ) );
+
+            parent::__construct();
+            $this->warning = $this->_methodDisplayName.' is not a valid method or it\'s ID is changed. Please contact Smart2Pay support.';
+            return;
+        }
+
+        /*
+         * Method settings
          */
-        $this->s2p = $m = Module::getInstanceByName('s2p');
+        $this->_methodName = $module_details['module_name'];
 
-        $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
+        $this->name = 's2p' . $this->_methodName;
 
-        if (!Configuration::get('s2p-enabled'))
-            $this->warning = $this->s2p->l('In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
+        $this->trusted = true;
+
+        if( !Configuration::get( 's2p_enabled' ) )
+            $this->warning = $this->s2p->l( 'In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled.' );
 
         parent::__construct();
     }
@@ -70,22 +81,7 @@ class S2pbanktransfer extends PaymentModule
      */
     public function getContent()
     {
-        $output = null;
-
-        if (Tools::isSubmit('submit'.$this->name))
-        {
-            $formValues = array();
-
-            foreach ($this->getConfigFormInputNames() as $name) {
-                $formValues[$name] = strval(Tools::getValue($name));
-            }
-
-            foreach ($this->getConfigFormInputNames() as $name) {
-                Configuration::updateValue($name, $formValues[$name]);
-            }
-        }
-
-        return $output.$this->displayForm();
+        return $this->s2p->getPluginContent( $this );
     }
 
     /**
@@ -95,57 +91,7 @@ class S2pbanktransfer extends PaymentModule
      */
     public function displayForm()
     {
-        // Get default language
-        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
-
-        // Init Fields form array
-        $fields_form[0]['form'] = array(
-            'legend' => array(
-                'title' => $this->l('Settings'),
-            ),
-            'input' => $this->getConfigFormInputs(),
-            'submit' => array(
-                'title' => $this->l('Save'),
-                'class' => 'button'
-            )
-        );
-
-        $helper = new HelperForm();
-
-        // Module, token and currentIndex
-        $helper->module = $this;
-        $helper->name_controller = $this->name;
-        $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
-
-        // Language
-        $helper->default_form_language = $default_lang;
-        $helper->allow_employee_form_lang = $default_lang;
-
-        // Title and toolbar
-        $helper->title = $this->displayName;
-        $helper->show_toolbar = true;        // false -> remove toolbar
-        $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
-        $helper->submit_action = 'submit'.$this->name;
-        $helper->toolbar_btn = array(
-            'save' =>
-                array(
-                    'desc' => $this->l('Save'),
-                    'href' => AdminController::$currentIndex.'&configure='.$this->name.'&save'.$this->name.
-                        '&token='.Tools::getAdminTokenLite('AdminModules'),
-                ),
-            'back' => array(
-                'href' => AdminController::$currentIndex.'&token='.Tools::getAdminTokenLite('AdminModules'),
-                'desc' => $this->l('Back to list')
-            )
-        );
-
-        // Load current value
-        foreach ($this->getConfigFormInputNames() as $name) {
-            $helper->fields_value[$name] = Configuration::get($name);
-        }
-
-        return $helper->generateForm($fields_form);
+        return $this->s2p->displayPluginForm( $this );
     }
 
     /**
@@ -155,11 +101,11 @@ class S2pbanktransfer extends PaymentModule
      */
     public function install()
     {
-        if (!parent::install() || !$this->registerHook('payment'))
+        if( !parent::install() or !$this->registerHook( 'payment' ) )
             return false;
 
-        if (Shop::isFeatureActive())
-            Shop::setContext(Shop::CONTEXT_ALL);
+        if( Shop::isFeatureActive() )
+            Shop::setContext( Shop::CONTEXT_ALL );
 
         return true;
     }
@@ -173,15 +119,14 @@ class S2pbanktransfer extends PaymentModule
     {
         $settingsCleanedSuccessfully = true;
 
-        foreach ($this->getConfigFormInputs() as $setting) {
-            if (!Configuration::deleteByName($setting['name'])) {
+        foreach( $this->getConfigFormInputs() as $setting )
+        {
+            if( !Configuration::deleteByName( $setting['name'] ) )
                 $settingsCleanedSuccessfully = false;
-            }
         }
 
-        if (!parent::uninstall() || !$settingsCleanedSuccessfully) {
+        if( !parent::uninstall() || !$settingsCleanedSuccessfully )
             return false;
-        }
 
         return true;
     }
@@ -193,33 +138,45 @@ class S2pbanktransfer extends PaymentModule
      *
      * @return bool
      */
-    public function hookPayment($params)
+    public function hookPayment( $params )
     {
         /*
          * Check for base module to be active
          */
-        if (!Configuration::get('s2p-enabled')) {
+        if( !Configuration::get( 's2p_enabled' )
+         or !$this->isMethodAvailable() or !$this->active
+         or !($methodDetails = $this->s2p->getMethodDetails( $this->_methodID )) )
             return false;
-        }
 
-        /*
-         * Check for current method to be available and active
-         */
-        if (!$this->isMethodAvailable() || !$this->active) {
-            return false;
-        }
+        $scope_arr = array();
+        $scope_arr['method_id'] = $this->_methodID;
+        $scope_arr['module_path'] = $this->_path;
+        $scope_arr['module_name'] = $this->name;
+        $scope_arr['method_display_name'] = $this->_methodDisplayName;
 
-        $this->smarty->assign(array(
+
+        $percent_key = 's2p_' . $this->s2p->resolveMethodModuleName( $methodDetails['display_name'] ) . '_surcharge_percent';
+        $amount_key = 's2p_' . $this->s2p->resolveMethodModuleName( $methodDetails['display_name'] ) . '_surcharge_amount';
+        if( empty( $settings_arr[$percent_key] ) )
+            $settings_arr[$percent_key] = 0;
+        if( empty( $settings_arr[$amount_key] ) )
+            $settings_arr[$amount_key] = 0;
+
+        $this->s2p->smarty->assign(array(
             'this_path' => $this->_path,
             'this_path_bw' => $this->_path,
             'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
             'method_name' => $this->_methodDisplayName,
             'module_name' => 's2p',
             'method_id' => $this->_methodID,
-            'redirect_URL' => $this->context->link->getModuleLink('s2p', 'payment', array('methodID' => $this->_methodID))
+            'settings' => $settings_arr,
+            'surcharge_amount' => Tools::displayPrice( $settings_arr[$amount_key] ),
+            'surcharge_percent' => $settings_arr[$percent_key].'%',
+            'redirect_URL' => $this->context->link->getModuleLink( 's2p', 'payment', array( 'methodID' => $this->_methodID ) )
         ));
 
-        return $this->display(__FILE__, 'payment.tpl');
+        // return $this->display( __FILE__, 'payment.tpl' );
+        return $this->s2p->fetchTemplate( 'payment.tpl' );
     }
 
     /**
@@ -229,13 +186,7 @@ class S2pbanktransfer extends PaymentModule
      */
     public function getSettings()
     {
-        $settings = array();
-
-        foreach ($this->getConfigFormInputNames() as $settingName) {
-            $settings[$settingName] = Configuration::get($settingName);
-        }
-
-        return $settings;
+        return $this->s2p->get_module_settings( $this->_methodID );
     }
 
     /**
@@ -245,7 +196,7 @@ class S2pbanktransfer extends PaymentModule
      */
     public function isMethodAvailable()
     {
-        return $this->s2p->isMethodAvailable($this->_methodID);
+        return $this->s2p->isMethodAvailable( $this->_methodID );
     }
 
     /**
@@ -253,13 +204,11 @@ class S2pbanktransfer extends PaymentModule
      *
      * @return array
      */
-    private function getConfigFormInputNames()
+    public function getConfigFormInputNames()
     {
         $names = array();
-
-        foreach ($this->getConfigFormInputs() as $input) {
+        foreach( $this->getConfigFormInputs() as $input )
             $names[] = $input['name'];
-        }
 
         return $names;
     }
@@ -269,8 +218,8 @@ class S2pbanktransfer extends PaymentModule
      *
      * @return array
      */
-    private function getConfigFormInputs()
+    public function getConfigFormInputs()
     {
-        return $this->s2p->getMethodDefaultConfigFormInputs($this->_methodID);
+        return $this->s2p->getMethodDefaultConfigFormInputs( $this->_methodID );
     }
 }

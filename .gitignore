@@ -10,3 +10,4 @@ modules/*
 !modules/s2pmultibancosibs/
 !modules/s2pmybank/
 !modules/s2pprzelewy24/
+!modules/smart2pay/

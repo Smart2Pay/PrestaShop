@@ -1,4 +1,4 @@
-<div style="{if $moduleSettings['s2p-debug-form'] == 1} display: table; {else} display: none; {/if}">
+<div style="{if $moduleSettings['s2p_debug_form'] == 1} display: table; {else} display: none; {/if}">
     <p><b>Message to hash</b>: {$messageToHash}</p>
     <p><b>Hash</b>: {$paymentData['Hash']}</p>
 
@@ -15,7 +15,7 @@
         {/foreach}
     </table>
 
-    <form action="{$moduleSettings['postURL']}" id="s2pform" method="POST" {if $moduleSettings['s2p-redirect-in-iframe']} target="merchantIframe" {/if}>
+    <form action="{$moduleSettings['postURL']}" id="s2pform" method="POST" {if $moduleSettings['s2p_redirect_in_iframe']} target="merchantIframe" {/if}>
         <table>
             {foreach from=$paymentData key=k item=v}
                 <tr>
@@ -38,8 +38,8 @@
         <div style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%;">
             <div id="iframe-wrapper" style="position: fixed; display: table; margin: 0px auto; margin-top: 50px; width: 100%">
                 <div style="margin: 0px auto; display: table;">
-                    {if $moduleSettings['s2p-redirect-in-iframe']
-                        && $moduleSettings['s2p-skip-payment-page']
+                    {if $moduleSettings['s2p_redirect_in_iframe']
+                        && $moduleSettings['s2p_skip_payment_page']
                         && ($paymentData['MethodID'] == 1001 || $paymentData['MethodID'] == 1002 || $paymentData['MethodID'] == 76)
                     }
                         <iframe style='border: none; margin: 0px auto; background-color: #ffffff;' id="merchantIframe" name="merchantIframe" src="" width="780" height="500">
@@ -74,7 +74,7 @@
          * Auto-send form if not debug form required
          *
          */
-        {if !$moduleSettings['s2p-debug-form']}
+        {if !$moduleSettings['s2p_debug_form']}
             jQuery("#s2pform").submit();
         {/if}
 

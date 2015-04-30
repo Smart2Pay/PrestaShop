@@ -1,0 +1,19 @@
+
+[{shop_url}]
+
+Hi {name},
+
+You have chosen to pay using Multibanco SIBS. Please find below your personal reference number, entity number and amount to pay.
+
+ORDER DETAILS:
+Order: {OrderReference} Placed on {OrderDate}
+Payment: {OrderPayment}
+
+PAYMENT INSTRUCTIONS:
+Reference Number: {ReferenceNumber}
+Entity Number: {EntityNumber}
+Amount To Pay: {AmountToPay}
+
+
+{shop_name} [{shop_url}] powered by
+PrestaShop(tm) [http://www.prestashop.com/]

@@ -10,6 +10,9 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
      */
     public function initContent()
     {
+        $this->display_column_left = false;
+        $this->display_column_right = false;
+
         parent::initContent();
 
         $context = $this->context;
@@ -28,7 +31,7 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
 
         if (
             !$paymentModule
-            || (!$paymentModule->isMethodAvailable() && !$moduleSettings['s2p-debug-form'])
+            || (!$paymentModule->isMethodAvailable() && !$moduleSettings['s2p_debug_form'])
         ) {
             $this->module->writeLog('Module for method #' . $paymentMethodID . ' could not be loaded, or it is not available', 'error');
             Tools::redirect('index.php?controller=order&step=1'); // Todo - give some feedback to the user
@@ -36,7 +39,7 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
 
         $this->module->validateOrder(
             $cart->id,
-            $moduleSettings['s2p-new-order-status'],
+            $moduleSettings['s2p_new_order_status'],
             0,
             $paymentModule->displayName,
             null
@@ -46,7 +49,7 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
 
         $skipPaymentPage = 0;
 
-        if ($moduleSettings['s2p-skip-payment-page']
+        if ($moduleSettings['s2p_skip_payment_page']
             && !in_array($paymentMethodID, array(1, 20))
         ) {
             $skipPaymentPage = 1;
@@ -59,7 +62,7 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
             'MerchantTransactionID' => $orderID,
             'Amount'            => round($context->cart->getOrderTotal() * 100),
             'Currency'          => $context->currency->iso_code,
-            'ReturnURL'         => $moduleSettings['s2p-return-url'],
+            'ReturnURL'         => $moduleSettings['s2p_return_url'],
             'IncludeMethodIDs'  => $paymentMethodID,
             'CustomerName'      => $context->customer->firstname . ' ' . $context->customer->lastname,
             'CustomerFirstName' => $context->customer->firstname,
@@ -67,11 +70,11 @@ class S2pPaymentModuleFrontController extends ModuleFrontController
             'CustomerEmail'     => $context->customer->email,
             'Country'           => $context->country->iso_code,
             'MethodID'          => $paymentMethodID,
-            'Description'       => $moduleSettings['s2p-send-order-number-as-product-description'] ? $orderID : $moduleSettings['s2p-custom-product-description'],
-            'SkipHPP'           => $moduleSettings['s2p-skip-payment-page'],
-            'RedirectInIframe'  => $moduleSettings['s2p-redirect-in-iframe'],
-            'SkinID'            => $moduleSettings['s2p-skin-id'],
-            'SiteID'            => $moduleSettings['s2p-site-id'] ? $moduleSettings['s2p-site-id'] : null
+            'Description'       => $moduleSettings['s2p_send_order_number_as_product_description'] ? $orderID : $moduleSettings['s2p_custom_product_description'],
+            'SkipHPP'           => $moduleSettings['s2p_skip_payment_page'],
+            'RedirectInIframe'  => $moduleSettings['s2p_redirect_in_iframe'],
+            'SkinID'            => $moduleSettings['s2p_skin_id'],
+            'SiteID'            => $moduleSettings['s2p_site_id'] ? $moduleSettings['s2p_site_id'] : null
         );
 
         $notSetPaymentData = array();

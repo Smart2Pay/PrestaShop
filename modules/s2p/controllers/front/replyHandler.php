@@ -3,7 +3,9 @@
 class S2pReplyHandlerModuleFrontController extends ModuleFrontController
 {
     public $ssl = true;
-    public $display_column_left = false;
+
+    /** @var S2P $module */
+    public $module;
 
     /**
      * @see FrontController::initContent()
@@ -12,11 +14,16 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
     {
         parent::initContent();
 
-        $this->module->writeLog('>>> START HANDLE RESPONSE :::', 'info');
+        $this->display_column_left = false;
+
+        $s2p_module = $this->module;
+
+        $this->module->writeLog( '>>> START HANDLE RESPONSE :::', 'info' );
 
         $moduleSettings = $this->module->getSettings();
 
-        try {
+        try
+        {
             $response = $this->parseInput();
             $recomposedHashString = $this->recomposeHashString() . $moduleSettings['signature'];
 
@@ -26,36 +33,46 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
              * Message is intact
              *
              */
-            if ($this->module->computeSHA256Hash($recomposedHashString) == $response['Hash']) {
+            if( $this->module->computeSHA256Hash($recomposedHashString) != $response['Hash'] )
+                $this->module->writeLog( 'Hashes do not match (received: ' . $response['Hash'] . ') vs (recomposed: ' . $this->module->computeSHA256Hash( $recomposedHashString ) . ')', 'warning' );
 
+            else
+            {
                 $this->module->writeLog('Hashes match', 'info');
 
                 $order = new Order($response['MerchantTransactionID']);
                 $cart = new Cart($order->id_cart);
                 $currency = new Currency($cart->id_currency);
 
-                if (!Validate::isLoadedObject($order)) {
-                    throw new Exception('Invalid order');
-                }
+                if( !Validate::isLoadedObject( $order ) )
+                    throw new Exception( 'Invalid order' );
 
                 /*
                  * Check status ID
                  *
                  */
-                switch ($response['StatusID']) {
+                $response['StatusID'] = intval( $response['StatusID'] );
+                switch( $response['StatusID'] )
+                {
                     // Status = success
-                    case "2":
+                    case $s2p_module::S2P_STATUS_SUCCESS:
                         /*
                          * Check amount  and currency
                          */
-                        $orderAmount = number_format($cart->getOrderTotal(), 2, '.', '') * 100;
+                        $orderAmount = number_format( $cart->getOrderTotal(), 2, '.', '' ) * 100;
                         $orderCurrency = $currency->iso_code;
 
-                        if (strcmp($orderAmount, $response['Amount']) == 0 && $orderCurrency == $response['Currency']) {
-                            $methodModule = $this->module->getMethodModule($response['MethodID']);
+                        if( strcmp( $orderAmount, $response['Amount'] ) != 0
+                         or $orderCurrency != $response['Currency'] )
+                            $this->module->writeLog( 'Smart2Pay :: notification has different amount[' . $orderAmount . '/' . $response['Amount'] . '] '.
+                                                     ' and/or currency[' . $orderCurrency . '/' . $response['Currency'] . ']. Please contact support@smart2pay.com.', 'info' );
+
+                        else
+                        {
+                            $methodModule = $this->module->getMethodModule( $response['MethodID'] );
                             $methodDisplayName = $methodModule ? $methodModule->displayName : $this->module->displayName;
 
-                            $this->module->writeLog('Order has been paid', 'info');
+                            $this->module->writeLog( 'Order ['.$order->id.'] has been paid', 'info' );
 
                             $order->addOrderPayment(
                                 $response['Amount'] / 100,
@@ -70,9 +87,8 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                                 $moduleSettings['s2p-notify-customer-by-email']
                             );
 
-                            if ($moduleSettings['s2p-create-invoice-on-success']) {
-                                $order->setInvoice(true);
-                            }
+                            if( $moduleSettings['s2p-create-invoice-on-success'] )
+                                $order->setInvoice( true );
 
                             /*
                              * Todo - check framework's order shipment
@@ -90,54 +106,56 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
                             }
                             */
 
-                        } else {
-                            $this->module->writeLog('Smart2Pay :: notification has different amount[' . $orderAmount . '/' . $response['Amount'] . '] and/or currency[' . $orderCurrency . '/' . $response['Currency'] . ']!. Please contact support@smart2pay.com', 'info');
                         }
-                        break;
+                    break;
+
                     // Status = canceled
-                    case 3:
-                        $this->module->writeLog('Payment canceled', 'info');
-                        $this->module->changeOrderStatus($order, $moduleSettings['s2p-order-status-on-cancel']);
+                    case $s2p_module::S2P_STATUS_CANCELLED:
+                        $this->module->writeLog( 'Payment canceled', 'info' );
+                        $this->module->changeOrderStatus( $order, $moduleSettings['s2p-order-status-on-cancel'] );
                         // There is no way to cancel an order other but changing it's status to canceled
                         // What we do is not changing order status to canceled, but to a user set one, instead
-                        break;
+                    break;
+
                     // Status = failed
-                    case 4:
-                        $this->module->writeLog('Payment failed', 'info');
-                        $this->module->changeOrderStatus($order, $moduleSettings['s2p-order-status-on-fail']);
-                        break;
+                    case $s2p_module::S2P_STATUS_FAILED:
+                        $this->module->writeLog( 'Payment failed', 'info' );
+                        $this->module->changeOrderStatus( $order, $moduleSettings['s2p-order-status-on-fail'] );
+                    break;
+
                     // Status = expired
-                    case 5:
-                        $this->module->writeLog('Payment expired', 'info');
+                    case $s2p_module::S2P_STATUS_EXPIRED:
+                        $this->module->writeLog( 'Payment expired', 'info' );
                         $this->module->changeOrderStatus($order, $moduleSettings['s2p-order-status-on-expire']);
-                        break;
+                    break;
 
                     default:
-                        $this->module->writeLog('Payment status unknown', 'info');
-                        break;
+                        $this->module->writeLog( 'Payment status unknown', 'info' );
+                    break;
                 }
 
                 // NotificationType IS payment
-                if (strtolower($response['NotificationType']) == 'payment') {
+                if( strtolower( $response['NotificationType'] ) == 'payment' )
+                {
                     // prepare string for hash
                     $responseHashString = "notificationTypePaymentPaymentId" . $response['PaymentID'] . $moduleSettings['signature'];
                     // prepare response data
                     $responseData = array(
                         'NotificationType' => 'Payment',
                         'PaymentID' => $response['PaymentID'],
-                        'Hash' => $this->module->computeSHA256Hash($responseHashString)
+                        'Hash' => $this->module->computeSHA256Hash( $responseHashString )
                     );
+
                     // output response
                     echo "NotificationType=payment&PaymentID=" . $responseData['PaymentID'] . "&Hash=" . $responseData['Hash'];
                 }
-            } else {
-                $this->module->writeLog('Hashes do not match (received: ' . $response['Hash'] . ') vs (recomposed: ' . $this->module->computeSHA256Hash($recomposedHashString) . ')', 'warning');
             }
-        } catch (Exception $e) {
-            $this->module->writeLog($e->getMessage(), 'exception');
+        } catch( Exception $e )
+        {
+            $this->module->writeLog( $e->getMessage(), 'exception' );
         }
 
-        $this->module->writeLog('::: END HANDLE RESPONSE <<<', 'info');
+        $this->module->writeLog( '::: END HANDLE RESPONSE <<<', 'info' );
 
         die();
     }
@@ -151,8 +169,11 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
     {
         static $input;
 
-        if ($input === null) {
-            $input = file_get_contents("php://input");
+        if( $input === null )
+        {
+            // On error, set $input as null to retry next time...
+            if( ($input = @file_get_contents( 'php://input' )) === false )
+                $input = null;
         }
 
         return $input;
@@ -165,27 +186,28 @@ class S2pReplyHandlerModuleFrontController extends ModuleFrontController
      */
     private function parseInput()
     {
-        parse_str($this->getRawInput(), $response);
+        parse_str( $this->getRawInput(), $response );
 
         return $response;
     }
 
     private function recomposeHashString()
     {
-        $raw_input = $this->getRawInput();
+        if( !($raw_input = $this->getRawInput()) )
+            return '';
+
         $vars = array();
         $recomposedHashString = '';
+        $pairs = explode( '&', $raw_input );
 
-        if (!empty($raw_input)) {
-            $pairs = explode("&", $raw_input);
-            foreach ($pairs as $pair) {
-                $nv = explode("=", $pair);
-                $name = $nv[0];
-                $vars[$name] = $nv[1];
-                if (strtolower($name) != 'hash') {
-                    $recomposedHashString .= $name . $vars[$name];
-                }
-            }
+        foreach( $pairs as $pair )
+        {
+            $nv = explode( '=', $pair );
+            $name = $nv[0];
+            $vars[$name] = (isset( $nv[1] )?$nv[1]:'');
+
+            if( strtolower( $name ) != 'hash' )
+                $recomposedHashString .= $name . $vars[$name];
         }
 
         return $recomposedHashString;

@@ -8,13 +8,41 @@ if (!defined('_PS_VERSION_'))
  */
 class S2p extends PaymentModule
 {
+    const S2P_STATUS_OPEN = 1, S2P_STATUS_SUCCESS = 2, S2P_STATUS_CANCELLED = 3, S2P_STATUS_FAILED = 4, S2P_STATUS_EXPIRED = 5, S2P_STATUS_PROCESSING = 7;
+
+    const MODULE_CONFIG_VALUE_PREFIX = 's2p_';
+
+    const MOD_BANKTRANSFER = 1, MOD_IDEAL = 2, MOD_GIROPAY = 4, MOD_MULTIBANCOSIBS = 20, MOD_MYBANK = 73, MOD_PREZELEWY24 = 12;
+    private static $MODULES_ARR = array(
+        self::MOD_BANKTRANSFER => array (
+            // module name should not be prefixed with s2p as this string is used in constructing other module dependant strings
+            'module_name' => 'banktransfer',
+        ),
+        self::MOD_IDEAL => array (
+            'module_name' => 'ideal',
+        ),
+        self::MOD_GIROPAY => array (
+            'module_name' => 'giropay',
+        ),
+        self::MOD_MULTIBANCOSIBS => array (
+            'module_name' => 'multibancosibs',
+        ),
+        self::MOD_MYBANK => array (
+            'module_name' => 'mybank',
+        ),
+        self::MOD_PREZELEWY24 => array (
+            'module_name' => 'przelewy24',
+        ),
+    );
+
     /**
      * Static cache
      *
      * @var array
      */
     static $cache = array(
-        'methodDetails' => array()
+        'methodDetails' => array(),
+        'forceCountry' => false,
     );
 
     /**
@@ -43,6 +71,101 @@ class S2p extends PaymentModule
         $this->l('In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
     }
 
+    public static function get_modules()
+    {
+        return self::$MODULES_ARR;
+    }
+
+    public static function valid_module( $module_id )
+    {
+        $module_id = intval( $module_id );
+        if( empty( $module_id )
+         or !($modules_arr = self::get_modules()) or empty( $modules_arr[$module_id] ) )
+            return false;
+
+        return $modules_arr[$module_id];
+    }
+
+    public static function get_default_payment_hook_scope()
+    {
+        return array(
+            'method_id' => 0,
+            'method_settings' => array(),
+        );
+    }
+
+    public function get_default_module_vars()
+    {
+        return array(
+            'tab' => 'payments_gateways',
+            'author' => 'Smart2Pay',
+            'need_instance' => 0,
+            'ps_versions_compliancy' => array( 'min' => '1.6', 'max' => _PS_VERSION_ ),
+            'bootstrap' => true,
+            'controllers' => array( 'payment' ),
+            'confirmUninstall' => $this->l( 'Are you sure you want to uninstall this module?' ),
+        );
+    }
+
+    public static function validate_value( $value, array $checks )
+    {
+        if( empty( $checks ) or !is_array( $checks ) )
+            return array();
+
+        $check_result = array();
+        $check_result['<all_valid>'] = true;
+        foreach( $checks as $check_function )
+        {
+            $check_function = strtolower( trim( $check_function ) );
+            $result = false;
+            switch( $check_function )
+            {
+                case 'url':
+                    $result = (Validate::isUrl( $value )?true:false);
+                break;
+
+                case 'notempty':
+                    $result = (empty( $value )?true:false);
+                break;
+            }
+
+            if( !$result )
+                $check_result['<all_valid>'] = false;
+
+            $check_result[$check_function] = $result;
+        }
+
+        return $check_result;
+    }
+
+    public static function transform_value( $value, array $transforms )
+    {
+        if( empty( $transforms ) or !is_array( $transforms ) )
+            return $value;
+
+        $result = $value;
+        foreach( $transforms as $transform_function )
+        {
+            $transform_function = strtolower( trim( $transform_function ) );
+            switch( $transform_function )
+            {
+                case 'floatval':
+                    $result = @floatval( (string)$result );
+                break;
+
+                case 'intval':
+                    $result = @intval( (string)$result );
+                break;
+
+                case 'trim':
+                    $result = @trim( (string)$result );
+                break;
+            }
+        }
+
+        return $result;
+    }
+
     /**
      * Process Module Config submitted data
      *
@@ -50,66 +173,58 @@ class S2p extends PaymentModule
      */
     public function getContent()
     {
-        $output = null;
+        $output = '';
 
-        if (Tools::isSubmit('submit'.$this->name))
+        if( Tools::isSubmit( 'submit'.$this->name ) )
         {
             $formValues = array();
 
-            foreach ($this->getConfigFormInputNames() as $name) {
-                $formValues[$name] = (string) Tools::getValue($name);
-            }
+            foreach( $this->getConfigFormInputNames() as $name )
+                $formValues[$name] = (string) Tools::getValue( $name, '' );
 
             /*
              *
              * Validate and update config values
              *
              */
-            foreach ($this->getConfigFormInputs() as $input) {
+            foreach( $this->getConfigFormInputs() as $input )
+            {
                 $isValid = true;
                 $skipValidation = false;
 
-                if ($formValues['s2p-env'] == 'test'
-                    && in_array($input['name'], array('s2p-signature-live', 's2p-post-url-live', 's2p-mid-live'))
-                ) {
+                if( $formValues['s2p_env'] == 'test'
+                and in_array( $input['name'], array( 's2p_signature_live', 's2p_post_url_live', 's2p_mid_live' ) ) )
                     $skipValidation = true;
-                }
 
-                if ($formValues['s2p-env'] == 'live'
-                    && in_array($input['name'], array('s2p-signature-test', 's2p-post-url-test', 's2p-mid-test'))
-                ) {
+                if( $formValues['s2p_env'] == 'live'
+                and in_array( $input['name'], array( 's2p_signature_test', 's2p_post_url_test', 's2p_mid_test' ) ) )
                     $skipValidation = true;
+
+                echo 'Din ['.$formValues[$input['name']].']';
+                // Make necessary transformations before validation
+                if( !empty( $input['_transform'] ) and is_array( $input['_transform'] ) )
+                    $formValues[$input['name']] = self::transform_value( $formValues[$input['name']], $input['_transform'] );
+
+                echo ' = ['.$formValues[$input['name']].']';
+
+                if( !$skipValidation
+                and !empty( $input['_validate'] ) and is_array( $input['_validate'] )
+                and ($validation_result = self::validate_value( $formValues[$input['name']], $input['_validate'] ))
+                and empty( $check_result['<all_valid>'] ) )
+                {
+                    $isValid = false;
+                    if( empty( $validation_result['url'] ) )
+                        $output .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'S2p' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must be a valid URL' ) );
+                    if( empty( $validation_result['notempty'] ) )
+                        $output .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'S2p' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must NOT be empty' ) );
                 }
 
-                if (!$skipValidation
-                    && isset($input['_validate'])
-                    && $input['_validate']
-                ) {
-                    foreach ((array) $input['_validate'] as $validate) {
-                        switch ($validate) {
-                            case 'url':
-                                if (!Validate::isUrl($formValues[$input['name']])) {
-                                    $output .= $this->displayError($this->l('Invalid') . ' ' . Translate::getModuleTranslation($this->name, $input['label']) . ' ' . $this->l('value') . '. ' . $this->l('Must be a valid URL'));
-                                    $isValid = false;
-                                }
-                                break;
-                            case 'notEmpty':
-                                if (empty($formValues[$input['name']])) {
-                                    $output .= $this->displayError($this->l('Invalid') . ' ' . Translate::getModuleTranslation($this->name, $input['label']) . ' ' . $this->l('value') . '. ' . $this->l('Must NOT be empty'));
-                                    $isValid = false;
-                                }
-                        }
-                    }
-                }
-
-                if ($isValid) {
-                    Configuration::updateValue($input['name'], $formValues[$input['name']]);
-                }
+                if( $isValid )
+                    Configuration::updateValue( $input['name'], $formValues[$input['name']] );
             }
 
-            if (!$output) {
-                $output .= $this->displayConfirmation($this->l('Settings updated successfully'));
-            }
+            if( !$output )
+                $output .= $this->displayConfirmation( $this->l( 'Settings updated successfully' ) );
         }
 
         return $output.$this->displayForm();
@@ -128,11 +243,11 @@ class S2p extends PaymentModule
         // Init Fields form array
         $fields_form[0]['form'] = array(
             'legend' => array(
-                'title' => $this->l('Settings'),
+                'title' => $this->l( 'Settings' ),
             ),
             'input' => $this->getConfigFormInputs(),
             'submit' => array(
-                'title' => $this->l('Save'),
+                'title' => $this->l( 'Save' ),
                 'class' => 'button'
             )
         );
@@ -168,14 +283,113 @@ class S2p extends PaymentModule
         );
 
         // Load current value
-        foreach ($this->getConfigFormInputNames() as $name) {
-            $helper->fields_value[$name] = Configuration::get($name);
+        foreach( $this->getConfigFormInputNames() as $name )
+            $helper->fields_value[$name] = Configuration::get( $name );
+
+        $this->context->controller->addCSS( _MODULE_DIR_ . $this->name . '/css/style.css' );
+
+        return $helper->generateForm( $fields_form )
+            . $this->getLogsHTML();
+    }
+
+    public function getPluginContent( $plugin_obj )
+    {
+        if( empty( $plugin_obj ) or !is_object( $plugin_obj )
+         or empty( $plugin_obj->name )
+         or empty( $plugin_obj->_methodID )
+         or !($module_details = self::valid_module( $plugin_obj->_methodID )) )
+            return '';
+
+        $output = '';
+
+        if( Tools::isSubmit( 'submit'.$plugin_obj->name ) )
+        {
+            $formValues = array();
+
+            foreach( $this->getMethodDefaultConfigFormInputs( $plugin_obj->_methodID ) as $input )
+            {
+                $isValid = true;
+                $formValues[$input['name']] = strval( Tools::getValue( $input['name'], '' ) );
+
+                // Make necessary transformations before validation
+                if( !empty( $input['_transform'] ) and is_array( $input['_transform'] ) )
+                    $formValues[$input['name']] = self::transform_value( $formValues[$input['name']], $input['_transform'] );
+
+                if( !empty( $input['_validate'] ) and is_array( $input['_validate'] )
+                and ($validation_result = self::validate_value( $formValues[$input['name']], $input['_validate'] )) )
+                {
+                    $isValid = false;
+                    if( empty( $validation_result['url'] ) )
+                        $output .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'S2p' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must be a valid URL' ) );
+                    if( empty( $validation_result['notempty'] ) )
+                        $output .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'S2p' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must NOT be empty' ) );
+                }
+
+                if( $isValid )
+                    Configuration::updateValue( $input['name'], $formValues[$input['name']] );
+            }
         }
 
-        $this->context->controller->addCSS(_MODULE_DIR_ . $this->name . '/css/style.css');
+        return $output.$this->displayPluginForm( $plugin_obj );
+    }
 
-        return $helper->generateForm($fields_form)
-            . $this->getLogsHTML();
+    public function displayPluginForm( $plugin_obj )
+    {
+        if( empty( $plugin_obj ) or !is_object( $plugin_obj )
+         or empty( $plugin_obj->name )
+         or empty( $plugin_obj->_methodID )
+         or !($module_details = self::valid_module( $plugin_obj->_methodID )) )
+            return '';
+
+        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+
+        // Init Fields form array
+        $fields_form[0]['form'] = array(
+            'legend' => array(
+                'title' => $this->l('Settings'),
+            ),
+            'input' => $this->getMethodDefaultConfigFormInputs( $plugin_obj->_methodID ),
+            'submit' => array(
+                'title' => $this->l('Save'),
+                'class' => 'button'
+            )
+        );
+
+        $helper = new HelperForm();
+
+        // Module, token and currentIndex
+        $helper->module = $plugin_obj;
+        $helper->name_controller = $plugin_obj->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = AdminController::$currentIndex.'&configure='.$plugin_obj->name;
+
+        // Language
+        $helper->default_form_language = $default_lang;
+        $helper->allow_employee_form_lang = $default_lang;
+
+        // Title and toolbar
+        $helper->title = $plugin_obj->displayName;
+        $helper->show_toolbar = true;        // false -> remove toolbar
+        $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
+        $helper->submit_action = 'submit'.$plugin_obj->name;
+        $helper->toolbar_btn = array(
+            'save' =>
+                array(
+                    'desc' => $this->l('Save'),
+                    'href' => AdminController::$currentIndex.'&configure='.$plugin_obj->name.'&save'.$plugin_obj->name.
+                              '&token='.Tools::getAdminTokenLite('AdminModules'),
+                ),
+            'back' => array(
+                'href' => AdminController::$currentIndex.'&token='.Tools::getAdminTokenLite('AdminModules'),
+                'desc' => $this->l('Back to list')
+            )
+        );
+
+        // Load current value
+        foreach( $plugin_obj->getConfigFormInputNames() as $name )
+            $helper->fields_value[$name] = Configuration::get( $name );
+
+        return $helper->generateForm( $fields_form );
     }
 
     /**
@@ -185,32 +399,33 @@ class S2p extends PaymentModule
      */
     public function install()
     {
-        if (!parent::install())
+        if( !parent::install() or !$this->registerHook( 'payment' ) )
             return false;
 
-        if (Shop::isFeatureActive())
-            Shop::setContext(Shop::CONTEXT_ALL);
+        if( Shop::isFeatureActive() )
+            Shop::setContext( Shop::CONTEXT_ALL );
 
         /*
          * Set default module config
          *
          */
-
         $this->createCustomOrderStatuses();
 
-        foreach ($this->getConfigFormInputs() as $setting) {
-            switch ($setting['name']) {
-                case 's2p-new-order-status':
-                case 's2p-order-status-on-success':
-                case 's2p-order-status-on-cancel':
-                case 's2p-order-status-on-fail':
-                case 's2p-order-status-on-expire':
-                    break;
+        foreach( $this->getConfigFormInputs() as $setting )
+        {
+            switch( $setting['name'] )
+            {
+                case 's2p_new_order_status':
+                case 's2p_order_status_on_success':
+                case 's2p_order_status_on_cancel':
+                case 's2p_order_status_on_fail':
+                case 's2p_order_status_on_expire':
+                break;
+
                 default:
-                    if (isset($setting['_default'])) {
+                    if( isset( $setting['_default'] ) )
                         Configuration::updateValue($setting['name'], $setting['_default']);
-                    }
-                    break;
+                break;
             }
         }
 
@@ -255,6 +470,51 @@ class S2p extends PaymentModule
     }
 
     /**
+     * Hook payment
+     *
+     * @param $params
+     *
+     * @return bool
+     */
+    public function hookPayment( $params )
+    {
+        /*
+         * Check for base module to be active
+         */
+        if( !Configuration::get( 's2p_enabled' ) )
+            return '';
+
+        $this->context->controller->addCSS( $this->_path . '/css/front-style.css' );
+
+        return '';
+    }
+
+    public function get_module_settings( $method_id )
+    {
+        static $settings_arr = null;
+
+        if( !($module_details = self::valid_module( $method_id )) )
+            return array();
+
+        if( is_null( $settings_arr ) )
+            $settings_arr = array();
+
+        if( !empty( $settings_arr[$method_id] ) )
+            return $settings_arr[$method_id];
+
+        $settings_arr[$method_id] = array();
+
+        foreach( $this->getMethodDefaultConfigFormInputs( $method_id ) as $input )
+        {
+            $settings_key = str_replace( self::MODULE_CONFIG_VALUE_PREFIX.$module_details['module_name'], '' , $input['name'] );
+
+            $settings_arr[$method_id][$settings_key] = Configuration::get( $input['name'] );
+        }
+
+        return $settings_arr[$method_id];
+    }
+
+    /**
      * Get module settings
      *
      * @return array
@@ -267,9 +527,9 @@ class S2p extends PaymentModule
             $settings[$settingName] = Configuration::get($settingName);
         }
 
-        $settings['signature'] = $settings['s2p-signature-' . $settings['s2p-env']];
-        $settings['mid'] = $settings['s2p-mid-' . $settings['s2p-env']];
-        $settings['postURL'] = $settings['s2p-post-url-' . $settings['s2p-env']];
+        $settings['signature'] = $settings['s2p_signature_' . $settings['s2p_env']];
+        $settings['mid'] = $settings['s2p_mid_' . $settings['s2p_env']];
+        $settings['postURL'] = $settings['s2p_post_url_' . $settings['s2p_env']];
 
         return $settings;
     }
@@ -281,8 +541,12 @@ class S2p extends PaymentModule
      *
      * @return string
      */
-    public function computeSHA256Hash($message){
-        return hash("sha256", strtolower($message));
+    public function computeSHA256Hash( $message )
+    {
+        if( function_exists( 'mb_strtolower' ) )
+            return hash( 'sha256', mb_strtolower( $message ) );
+
+        return hash( 'sha256', strtolower( $message ) );
     }
 
     /**
@@ -325,9 +589,9 @@ class S2p extends PaymentModule
      */
     public function getLogsHTML()
     {
-        $this->context->smarty->assign(array(
-            'logs' => $this->getLogs()
-        ));
+        $this->context->smarty->assign( array(
+            'logs' => $this->getLogs( array( 'limit' => 10 ) )
+        ) );
 
         return $this->fetchTemplate('/views/templates/admin/logs.tpl');
     }
@@ -339,22 +603,32 @@ class S2p extends PaymentModule
      *
      * @return array|string
      */
-    public function getLogs($reduceToString = false) {
-        $logs = Db::getInstance()->ExecuteS(
-            "SELECT * FROM `" . _DB_PREFIX_ . "smart2pay_logs` ORDER BY log_created DESC, log_id DESC"
-        );
+    public function getLogs( $params = false )
+    {
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
 
-        if (!$reduceToString) {
+        if( empty( $params['limit'] ) )
+            $params['limit'] = 0;
+        else
+            $params['limit'] = intval( $params['limit'] );
+        if( empty( $params['to_string'] ) )
+            $params['to_string'] = false;
+
+        $logs = Db::getInstance()->ExecuteS( 'SELECT * FROM `' . _DB_PREFIX_ . 'smart2pay_logs` ORDER BY log_created DESC, log_id DESC'.
+                                             (!empty( $params['limit'] )?' LIMIT 0, '.$params['limit']:'') );
+
+        if( empty( $params['to_string'] ) )
             return $logs;
-        }
 
-        $logsString = "";
+        $logsString = '';
 
-        foreach ($logs as $log) {
-            $logsString .= "[" . $log['log_type'] . "] "
-                . "(" . $log['log_created'] . ") "
-                . $log['log_data'] . " "
-                . $log['log_source_file'] . ":" . $log['log_source_file_line']
+        foreach( $logs as $log )
+        {
+            $logsString .= '[' . $log['log_type'] . '] '
+                . '(' . $log['log_created'] . ') '
+                . $log['log_data'] . ' '
+                . $log['log_source_file'] . ':' . $log['log_source_file_line']
                 . "\r\n";
         }
 
@@ -391,29 +665,30 @@ class S2p extends PaymentModule
      *
      * @return bool
      */
-    public function changeOrderStatus($order, $statusId, $sendCustomerEmail = false, $mailTemplateVars = array())
+    public function changeOrderStatus( $order, $statusId, $sendCustomerEmail = false, $mailTemplateVars = array() )
     {
         $orderState = new OrderState((int) $statusId);
 
-        if (!Validate::isLoadedObject($order)) {
-            $this->writeLog("Can not change apply order state #" . $statusId . " to order #" . $order->id . " - Order can not be loaded");
+        if( !Validate::isLoadedObject( $order ) )
+        {
+            $this->writeLog( 'Can not change apply order state #' . $statusId . ' to order - Order can not be loaded' );
             return false;
         }
 
-        if (!Validate::isLoadedObject($orderState)) {
-            $this->writeLog("Can not change apply order state #" . $statusId . " to order #" . $order->id . " - Order state can not be loaded");
+        if( !Validate::isLoadedObject( $orderState ) )
+        {
+            $this->writeLog( 'Can not change apply order state #' . $statusId . ' to order #' . $order->id . ' - Order state can not be loaded' );
             return false;
         }
 
         $history = new OrderHistory();
         $history->id_order = (int)$order->id;
-        $history->changeIdOrderState($statusId, (int)($order->id));
+        $history->changeIdOrderState( $statusId, (int)($order->id) );
 
-        if ($sendCustomerEmail) {
-            $history->addWithemail(true, $mailTemplateVars);
-        } else {
+        if( $sendCustomerEmail )
+            $history->addWithemail( true, $mailTemplateVars );
+        else
             $history->add();
-        }
 
         return true;
     }
@@ -425,11 +700,12 @@ class S2p extends PaymentModule
      *
      * @return mixed
      */
-    public function fetchTemplate($name)
+    public function fetchTemplate( $name )
     {
-        if (version_compare(_PS_VERSION_, '1.4', '<'))
+        if( version_compare( _PS_VERSION_, '1.4', '<' ) )
             $this->context->smarty->currentTemplate = $name;
-        elseif (version_compare(_PS_VERSION_, '1.5', '<'))
+
+        elseif( version_compare( _PS_VERSION_, '1.5', '<' ) )
         {
             $views = 'views/templates/';
             if (@filemtime(dirname(__FILE__).'/'.$name))
@@ -442,7 +718,7 @@ class S2p extends PaymentModule
                 return $this->display(__FILE__, $views.'admin/'.$name);
         }
 
-        return $this->display(__FILE__, $name);
+        return $this->display( __FILE__, $name );
     }
 
     /**
@@ -452,26 +728,18 @@ class S2p extends PaymentModule
      *
      * @return null|PaymentModule  Returns null or an extended PaymentModule instance
      */
-    public function getMethodModule($methodId)
+    public function getMethodModule( $method_id )
     {
-        $methodDetails = $this->getMethodDetails($methodId);
-
-        if (!$methodDetails) {
+        if( !($module_details = self::valid_module( $method_id )) )
             return null;
-        }
 
-        $methodModuleName = 's2p' . $this->resolveMethodModuleName($methodDetails['display_name']);
+        $module_name = 's2p'.$module_details['module_name'];
 
-        if (Module::isInstalled($methodModuleName))
-        {
-            $module = Module::getInstanceByName($methodModuleName);
+        if( !Module::isInstalled( $module_name )
+         or !($module = Module::getInstanceByName( $module_name )) )
+            return null;
 
-            if ($module) {
-                return $module;
-            }
-        }
-
-        return null;
+        return $module;
     }
 
     /**
@@ -481,9 +749,29 @@ class S2p extends PaymentModule
      *
      * @return string
      */
-    public function resolveMethodModuleName($displayName)
+    public function resolveMethodModuleName( $displayName )
     {
         return preg_replace('/[^a-z0-9]/', '', strtolower($displayName));
+    }
+
+    /**
+     * Set or retrieve current country ISO 2 chars code for payment method country
+     *
+     * @param null|string $country_iso If parameter is null will return current value for force country (false by default)
+     *
+     * @return bool|string Returns current settings for force country as ISO 2 chars or false if error or nothing set yet
+     */
+    public function forceCountry( $country_iso = null )
+    {
+        if( is_null( $country_iso ) )
+            return self::$cache['forceCountry'];
+
+        $country_iso = strtoupper( trim( $country_iso ) );
+        if( !Country::getByIso( $country_iso ) )
+            return false;
+
+        self::$cache['forceCountry'] = $country_iso;
+        return self::$cache['forceCountry'];
     }
 
     /**
@@ -493,24 +781,20 @@ class S2p extends PaymentModule
      *
      * @return array|null
      */
-    public function getMethodDetails($methodId)
+    public function getMethodDetails( $methodId )
     {
-        if (array_key_exists($methodId, self::$cache['methodDetails'])) {
+        $methodId = intval( $methodId );
+        if( array_key_exists( $methodId, self::$cache['methodDetails'] ) )
             return self::$cache['methodDetails'][$methodId];
-        }
 
-        $method = Db::getInstance()->ExecuteS(
-            "SELECT * FROM `"._DB_PREFIX_."smart2pay_method` WHERE `method_id` = '" . $methodId . "'"
-        );
+        $method = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `method_id` = \'' . $methodId . '\'' );
 
-        if (!empty($method)) {
+        if( !empty( $method ) )
             self::$cache['methodDetails'][$methodId] = $method[0];
-            return $method[0];
-        }
+        else
+            self::$cache['methodDetails'][$methodId] = null;
 
-        self::$cache['methodDetails'][$methodId] = null;
-
-        return null;
+        return self::$cache['methodDetails'][$methodId];
     }
 
     /**
@@ -519,7 +803,7 @@ class S2p extends PaymentModule
      * @param null $name
      * @return array
      */
-    public function getConfigFormSelectInputOptions($name = null)
+    public function getConfigFormSelectInputOptions( $name = null )
     {
         $options = array(
             'envs' => array(
@@ -544,7 +828,7 @@ class S2p extends PaymentModule
             )
         );
 
-        return $name ? $options[$name] : $options;
+        return ($name ? (isset( $options[$name] )?$options[$name]:array()) : $options);
     }
 
     /**
@@ -554,84 +838,107 @@ class S2p extends PaymentModule
      *
      * @return array
      */
-    public function getMethodDefaultConfigFormInputs($methodId)
+    public function getMethodDefaultConfigFormInputs( $method_id )
     {
-        $methodDetails = $this->getMethodDetails($methodId);
+        if( !($module_details = self::valid_module( $method_id )) )
+            return array();
 
         return array (
             array(
                 'type' => 'select',
                 'label' => $this->l('Enabled'),
-                'name' => 's2p-' . $this->resolveMethodModuleName($methodDetails['display_name']) . '-enabled',
+                'name' => self::MODULE_CONFIG_VALUE_PREFIX.$module_details['module_name'].'_enabled',
                 'required' => true,
                 'options' => array(
-                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'query' => $this->getConfigFormSelectInputOptions( 'yesno' ),
                     'id' => 'id',
                     'name' => 'name'
                 )
-            )
+            ),
+            array(
+                'type' => 'text',
+                'label' => $this->l('Surcharge percent'),
+                'hint' => $this->l('Percent will be calculated from total order amount'),
+                'name' => self::MODULE_CONFIG_VALUE_PREFIX.$module_details['module_name'].'_surcharge_percent',
+                'required' => false,
+                'suffix' => '%',
+                'size' => '8',
+                'col' => 2,
+                '_default' => 0,
+                '_transform' => array( 'floatval' ),
+            ),
+            array(
+                'type' => 'text',
+                'label' => $this->l('Surcharge fixed amount'),
+                'hint' => $this->l('Amount currency is shop default currency'),
+                'name' => self::MODULE_CONFIG_VALUE_PREFIX.$module_details['module_name'].'_surcharge_amount',
+                'required' => false,
+                'suffix' => $this->context->currency->iso_code,
+                'size' => '8',
+                'col' => 2,
+                '_default' => 0,
+                '_transform' => array( 'floatval' ),
+            ),
         );
+    }
+
+    public function displayModuleForm()
+    {
+
     }
 
     /**
      * Check if s2p method is available in some particular country
      *
-     * @param $methodId
-     * @param $countryISOCode  If no iso code is passed along, method attempts to retrieve it from within context->cart->id_address_invoice
+     * @param int $methodId                 Method ID
+     * @param null|string $countryISOCode   If no iso code is passed along, method checks if there is a country set to as forced country, else
+     *                                      attempts to retrieve it from context->cart->id_address_invoice
      *
      * @return bool
      */
-    public function isMethodAvailable($methodId, $countryISOCode = null)
+    public function isMethodAvailable( $method_id, $countryISOCode = null )
     {
-        if ($countryISOCode == null) {
-            if ($this->context->cart) {
-                $billing_address = new Address($this->context->cart->id_address_invoice);
-                $country = new Country($billing_address->id_country);
+        $method_id = intval( $method_id );
+        if( empty( $method_id ) )
+            return false;
+
+        if( is_null( $countryISOCode ) )
+        {
+            if( ($force_country = $this->forceCountry()) )
+                $countryISOCode = $force_country;
+
+            elseif( $this->context->cart )
+            {
+                $billing_address = new Address( $this->context->cart->id_address_invoice );
+                $country = new Country( $billing_address->id_country );
                 $countryISOCode = $country->iso_code;
-            } else {
+            } else
                 return false;
-            }
         }
 
         /*
          * Check for base module to be active
-         */
-        if (!Configuration::get('s2p-enabled')) {
-            return false;
-        }
-
-        $methodDetails = $this->getMethodDetails($methodId);
-
-        if (empty($methodDetails)) {
-            return false;
-        }
-
-        /*
          * Check for current module to be available
          */
-        $enabled = Configuration::get(
-            's2p-' . $this->resolveMethodModuleName($methodDetails['display_name']) . '-enabled'
-        );
-
-        if (!$enabled) {
+        if( !Configuration::get( 's2p_enabled' )
+         or !($method_details = self::valid_module( $method_id ))
+         or !($enabled = Configuration::get( 's2p_'.$method_details['module_name'].'_enabled' )) )
             return false;
-        }
 
-        $countryMethod = Db::getInstance()->executeS(
-            "
-                SELECT CM.method_id
-                FROM " . _DB_PREFIX_ . "smart2pay_country_method CM
-                LEFT JOIN " . _DB_PREFIX_ . "smart2pay_country C ON C.country_id = CM.country_id
-                WHERE C.code = '" . DB::getInstance()->_escape($countryISOCode) . "' AND CM.method_id = " . $methodId . "
-            "
+        //return true;
+
+        $country_method = Db::getInstance()->executeS(
+            'SELECT CM.method_id '.
+            ' FROM '._DB_PREFIX_.'smart2pay_country_method CM '.
+            ' LEFT JOIN '._DB_PREFIX_.'smart2pay_country C ON C.country_id = CM.country_id '.
+            ' WHERE C.code = \''.DB::getInstance()->_escape( $countryISOCode ).'\' AND CM.method_id = ' . $method_id
         );
 
         /*
          * Check for method availability within current country
          */
-        if (!$countryMethod) {
+        if( empty( $country_method ) )
             return false;
-        }
 
         return true;
     }
@@ -641,10 +948,10 @@ class S2p extends PaymentModule
      */
     private function uninstallDatabase()
     {
-        Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_logs`");
-        Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_method`");
-        Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country`");
-        Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country_method`");
+        Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_logs`' );
+        Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_method`' );
+        Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_country`' );
+        Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_country_method`' );
     }
 
     /**
@@ -655,9 +962,8 @@ class S2p extends PaymentModule
         /*
          * Install module's database
          */
-        Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_logs`");
-        Db::getInstance()->Execute("
-            CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_logs` (
+        Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_logs`' );
+        Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_logs` (
                 `log_id` int(11) NOT NULL auto_increment,
                 `log_type` varchar(255) default NULL,
                 `log_data` text default NULL,
@@ -669,8 +975,7 @@ class S2p extends PaymentModule
         ");
 
         Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_method`");
-        Db::getInstance()->Execute("
-            CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method` (
+        Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method` (
                 `method_id` int(11) NOT NULL auto_increment,
                 `display_name` varchar(255) default NULL,
                 `provider_value` varchar(255) default NULL,
@@ -1599,9 +1904,8 @@ class S2p extends PaymentModule
     {
         $names = array();
 
-        foreach ($this->getConfigFormInputs() as $input) {
+        foreach( $this->getConfigFormInputs() as $input )
             $names[] = $input['name'];
-        }
 
         return $names;
     }
@@ -1617,281 +1921,287 @@ class S2p extends PaymentModule
             array(
                 'type' => 'select',
                 'label' => $this->l('Enabled'),
-                'name' => 's2p-enabled',
+                'name' => 's2p_enabled',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 1
+                '_default' => 1,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Environment'),
-                'name' => 's2p-env',
+                'name' => 's2p_env',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('envs'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 'test'
+                '_default' => 'test',
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Post URL Live'),
-                'name' => 's2p-post-url-live',
+                'name' => 's2p_post_url_live',
                 'required' => true,
                 '_default' => 'https://api.smart2pay.com',
-                '_validate' => ['url', 'notEmpty']
+                '_validate' => array( 'url', 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Post URL Test'),
-                'name' => 's2p-post-url-test',
+                'name' => 's2p_post_url_test',
                 'required' => true,
                 '_default' => 'https://apitest.smart2pay.com',
-                '_validate' => ['url', 'notEmpty']
+                '_validate' => array( 'url', 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('MID Live'),
-                'name' => 's2p-mid-live',
+                'name' => 's2p_mid_live',
                 'required' => true,
-                '_validate' => ['notEmpty']
+                '_transform' => array( 'intval' ),
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('MID Test'),
-                'name' => 's2p-mid-test',
+                'name' => 's2p_mid_test',
                 'required' => true,
-                '_validate' => ['notEmpty']
+                '_transform' => array( 'intval' ),
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Site ID'),
-                'name' => 's2p-site-id',
-                'required' => true
+                'name' => 's2p_site_id',
+                '_transform' => array( 'intval' ),
+                'required' => true,
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Signature Live'),
-                'name' => 's2p-signature-live',
+                'name' => 's2p_signature_live',
                 'required' => true,
-                '_validate' => ['notEmpty']
+                '_transform' => array( 'trim' ),
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Signature Test'),
-                'name' => 's2p-signature-test',
+                'name' => 's2p_signature_test',
                 'required' => true,
-                '_validate' => ['notEmpty']
+                '_transform' => array( 'trim' ),
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Return URL'),
-                'name' => 's2p-return-url',
+                'name' => 's2p_return_url',
                 'required' => true,
                 '_default' => Tools::getShopDomainSsl(true, true) . __PS_BASE_URI__ . 'index.php?fc=module&module=s2p&controller=returnHandler&id_lang=1',
-                '_validate' => ['url', 'notEmpty']
+                '_validate' => array( 'url', 'notempty' ),
+                '_transform' => array( 'trim' ),
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Send order number as product description'),
-                'name' => 's2p-send-order-number-as-product-description',
+                'name' => 's2p_send_order_number_as_product_description',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 )
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Custom product description'),
-                'name' => 's2p-custom-product-description',
+                'name' => 's2p_custom_product_description',
                 'required' => true,
                 '_default' => 'Custom product description',
-                '_validate' => ['notEmpty']
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Notify customer by email'),
-                'name' => 's2p-notify-customer-by-email',
+                'name' => 's2p_notify_customer_by_email',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
+                '_default' => 0,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Create invoice on success'),
-                'name' => 's2p-create-invoice-on-success',
+                'name' => 's2p_create_invoice_on_success',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
+                '_default' => 0,
             ),
             /*
             array(
                 'type' => 'select',
                 'label' => $this->l('Send payment instructions on order creation'),
-                'name' => 's2p-send-payment-instructions-on-order-creation',
+                'name' => 's2p_send_payment_instructions_on_order_creation',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
+                '_default' => 0,
             ),*/
             /*array(
                 'type' => 'select',
                 'label' => $this->l('Automate shipping'),
-                'name' => 's2p-automate-shipping',
+                'name' => 's2p_automate_shipping',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
+                '_default' => 0,
             ),*/
             array(
                 'type' => 'select',
                 'label' => $this->l('New Order Status'),
-                'name' => 's2p-new-order-status',
+                'name' => 's2p_new_order_status',
                 'required' => true,
                 'options' => array(
                     'query' => OrderState::getOrderStates((int)$this->context->language->id),
                     'id' => 'id_order_state',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 3
+                '_default' => 3,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Order status on SUCCESS'),
-                'name' => 's2p-order-status-on-success',
+                'name' => 's2p_order_status_on_success',
                 'required' => true,
                 'options' => array(
                     'query' => OrderState::getOrderStates((int)$this->context->language->id),
                     'id' => 'id_order_state',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 2
+                '_default' => 2,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Order status on CANCEL'),
-                'name' => 's2p-order-status-on-cancel',
+                'name' => 's2p_order_status_on_cancel',
                 'required' => true,
                 'options' => array(
                     'query' => OrderState::getOrderStates((int)$this->context->language->id),
                     'id' => 'id_order_state',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 6
+                '_default' => 6,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Order status on FAIL'),
-                'name' => 's2p-order-status-on-fail',
+                'name' => 's2p_order_status_on_fail',
                 'required' => true,
                 'options' => array(
                     'query' => OrderState::getOrderStates((int)$this->context->language->id),
                     'id' => 'id_order_state',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 8
+                '_default' => 8,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Order status on EXPIRED'),
-                'name' => 's2p-order-status-on-expire',
+                'name' => 's2p_order_status_on_expire',
                 'required' => true,
                 'options' => array(
                     'query' => OrderState::getOrderStates((int)$this->context->language->id),
                     'id' => 'id_order_state',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 8
+                '_default' => 8,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Skip payment page'),
-                'name' => 's2p-skip-payment-page',
+                'name' => 's2p_skip_payment_page',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
+                '_default' => 0,
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Redirect in iFrame'),
-                'name' => 's2p-redirect-in-iframe',
+                'name' => 's2p_redirect_in_iframe',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
+                '_default' => 0,
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Message SUCCESS'),
-                'name' => 's2p-message-success',
+                'name' => 's2p_message_success',
                 'required' => true,
                 '_default' => 'The payment succeeded',
-                '_validate' => ['notEmpty']
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Message FAILED'),
-                'name' => 's2p-message-failed',
+                'name' => 's2p_message_failed',
                 'required' => true,
                 '_default' => 'The payment process has failed',
-                '_validate' => ['notEmpty']
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Message CANCELED'),
-                'name' => 's2p-message-canceled',
+                'name' => 's2p_message_canceled',
                 'required' => true,
                 '_default' => 'The payment was canceled',
-                '_validate' => ['notEmpty']
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
                 'label' => $this->l('Message PENDING'),
-                'name' => 's2p-message-pending',
+                'name' => 's2p_message_pending',
                 'required' => true,
                 '_default' => 'The payment is pending',
-                '_validate' => ['notEmpty']
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'select',
                 'label' => $this->l('Debug Form'),
-                'name' => 's2p-debug-form',
+                'name' => 's2p_debug_form',
                 'required' => true,
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
-                    'name' => 'name'
+                    'name' => 'name',
                 ),
-                '_default' => 0
-            )
+                '_default' => 0,
+            ),
         );
     }
 
@@ -1904,23 +2214,23 @@ class S2p extends PaymentModule
     {
         return array(
             'new' => array(
-                'configName' => 's2p-new-order-status',
+                'configName' => 's2p_new_order_status',
                 'orderStatusName' => 'Smart2Pay - Awaiting payment'
             ),
             'success' => array(
-                'configName' => 's2p-order-status-on-success',
+                'configName' => 's2p_order_status_on_success',
                 'orderStatusName' => 'Smart2Pay - Successfully paid'
             ),
             'canceled' => array(
-                'configName' => 's2p-order-status-on-cancel',
+                'configName' => 's2p_order_status_on_cancel',
                 'orderStatusName' => 'Smart2Pay - Canceled payment'
             ),
             'failed' => array(
-                'configName' => 's2p-order-status-on-fail',
+                'configName' => 's2p_order_status_on_fail',
                 'orderStatusName' => 'Smart2Pay - Failed payment'
             ),
             'expired' => array(
-                'configName' => 's2p-order-status-on-expire',
+                'configName' => 's2p_order_status_on_expire',
                 'orderStatusName' => 'Smart2Pay - Expired payment'
             )
         );
@@ -1931,29 +2241,27 @@ class S2p extends PaymentModule
      */
     private function createCustomOrderStatuses()
     {
-        foreach ($this->getPaymentStatesOrderStatuses() as $status) {
-
-            $existingStatus = Db::getInstance()->ExecuteS(
-                "SELECT * FROM `"._DB_PREFIX_."order_state_lang` WHERE `name` = '" . $status['orderStatusName'] . "'"
-            );
-
-            if (!empty($existingStatus)) {
+        foreach( $this->getPaymentStatesOrderStatuses() as $status )
+        {
+            if( ($existingStatus = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'order_state_lang` WHERE `name` = \'' . $status['orderStatusName'] . '\'' )) )
                 $statusID = $existingStatus[0]['id_order_state'];
-            } else {
+
+            else
+            {
                 Db::getInstance()->Execute(
-                    'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`)' .
+                    'INSERT INTO `'._DB_PREFIX_.'order_state` (`unremovable`, `color`, `module_name`) '.
                     'VALUES(1, \'#660099\', \'s2p\')'
                 );
 
                 $statusID = Db::getInstance()->Insert_ID();
 
                 Db::getInstance()->Execute(
-                    'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`)
-                VALUES(' . intval($statusID) . ', 1, \'' . $status['orderStatusName'] . '\')'
+                    'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`) '.
+                    'VALUES(' . intval( $statusID ) . ', 1, \'' . $status['orderStatusName'] . '\')'
                 );
             }
 
-            Configuration::updateValue($status['configName'], $statusID);
+            Configuration::updateValue( $status['configName'], $statusID );
         }
     }
 
@@ -1963,20 +2271,20 @@ class S2p extends PaymentModule
     private function deleteCustomOrderStatuses()
     {
         $ids = Db::getInstance()->executeS(
-            'SELECT GROUP_CONCAT(`id_order_state`) as `id_order_state` FROM `'._DB_PREFIX_.'order_state`
-                WHERE `module_name` = \''.pSQL('s2p').'\''
+            'SELECT GROUP_CONCAT(`id_order_state`) as `id_order_state` FROM `'._DB_PREFIX_.'order_state` '.
+            ' WHERE `module_name` = \''.pSQL('s2p').'\''
         );
 
-        $ids = explode(",", $ids[0]['id_order_state']);
+        $ids = explode( ',', $ids[0]['id_order_state'] );
 
         Db::getInstance()->execute(
-            'DELETE FROM `'._DB_PREFIX_.'order_state`
-                WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
+            'DELETE FROM `'._DB_PREFIX_.'order_state` '.
+            ' WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
         );
 
         Db::getInstance()->execute(
-            'DELETE FROM `'._DB_PREFIX_.'order_state_lang`
-                WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
+            'DELETE FROM `'._DB_PREFIX_.'order_state_lang` '.
+            ' WHERE `id_order_state` IN (\'' . join('\',\'', (array)$ids) . '\')'
         );
     }
 }

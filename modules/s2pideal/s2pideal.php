@@ -22,6 +22,9 @@ if (!defined('_PS_VERSION_'))
  */
 class S2pideal extends PaymentModule
 {
+    /** @var S2p $s2p */
+    private $s2p;
+
     /**
      * Constructor
      */
@@ -57,7 +60,7 @@ class S2pideal extends PaymentModule
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 
-        if (!Configuration::get('s2p-enabled'))
+        if (!Configuration::get('s2p_enabled'))
             $this->warning = $this->s2p->l('In order for Smart2Pay methods to work, Smart2Pay Base Module has to be installed and enabled');
 
         parent::__construct();
@@ -198,7 +201,7 @@ class S2pideal extends PaymentModule
         /*
          * Check for base module to be active
          */
-        if (!Configuration::get('s2p-enabled')) {
+        if (!Configuration::get('s2p_enabled')) {
             return false;
         }
 
