@@ -55,9 +55,8 @@ class Smart2payreplyHandlerModuleFrontController extends ModuleFrontController
                 $s2p_module->writeLog( 'Hashes match', 'info' );
 
                 $order = new Order( $request_arr['MerchantTransactionID'] );
-                $cart = new Cart( $order->id_cart );
-                $customer = new Customer( $cart->id_customer );
-                $currency = new Currency( $cart->id_currency );
+                $customer = new Customer( $order->id_customer );
+                $currency = new Currency( $order->id_currency );
 
                 if( !Validate::isLoadedObject( $order ) )
                     throw new Exception( 'Invalid order ['.$request_arr['MerchantTransactionID'].']' );
@@ -129,7 +128,7 @@ class Smart2payreplyHandlerModuleFrontController extends ModuleFrontController
                         /*
                          * Check amount  and currency
                          */
-                        $orderAmount = number_format( $cart->getOrderTotal(), 2, '.', '' );
+                        $orderAmount = number_format( $order->getOrdersTotalPaid(), 2, '.', '' );
                         $orderCurrency = $currency->iso_code;
 
                         // Add surcharge if we have something...
@@ -138,10 +137,12 @@ class Smart2payreplyHandlerModuleFrontController extends ModuleFrontController
                         if( (float)$smart2pay_transaction_arr['surcharge_order_amount'] != 0 )
                             $orderAmount += (float)$smart2pay_transaction_arr['surcharge_order_amount'];
 
-                        if( strcmp( $orderAmount * 100, $request_arr['Amount'] ) != 0
+                        $orderAmount_check = number_format( $orderAmount * 100, 0, '.', '' );
+
+                        if( strcmp( $orderAmount_check, $request_arr['Amount'] ) != 0
                          or $orderCurrency != $request_arr['Currency'] )
-                            $s2p_module->writeLog( 'Smart2Pay :: notification has different amount[' . $orderAmount . '/' . $request_arr['Amount'] . '] '.
-                                                     ' and/or currency[' . $orderCurrency . '/' . $request_arr['Currency'] . ']. Please contact support@smart2pay.com.', 'info' );
+                            $s2p_module->writeLog( 'Smart2Pay :: notification has different amount[' . $orderAmount_check . '/' . $request_arr['Amount'] . '] '.
+                                                     ' and/or currency [' . $orderCurrency . '/' . $request_arr['Currency'] . ']. Please contact support@smart2pay.com.', 'info' );
 
                         elseif( empty( $request_arr['MethodID'] )
                              or !($method_details = $s2p_module->get_method_details( $request_arr['MethodID'] )) )

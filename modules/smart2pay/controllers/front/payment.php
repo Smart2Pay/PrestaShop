@@ -41,7 +41,7 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
             $cart->id,
             $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'NEW_ORDER_STATUS'],
             0,
-            'Smart2Pay: '.$payment_method['method_details']['display_name'],
+            $smart2pay_module->displayName.': '.$payment_method['method_details']['display_name'],
             null
         );
 
@@ -101,6 +101,11 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
 
         $moduleSettings['skipPaymentPage'] = $skipPaymentPage;
 
+        if( !empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SEND_ORDER_NUMBER_AS_PRODUCT_DESCRIPTION'] ) )
+            $payment_description = 'Ref. No. '.$orderID;
+        else
+            $payment_description = $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'CUSTOM_PRODUCT_DESCRIPTION'];
+
         $paymentData = array(
             'MerchantID'        => $moduleSettings['mid'],
             'MerchantTransactionID' => $orderID,
@@ -114,7 +119,7 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
             'CustomerEmail'     => $context->customer->email,
             'Country'           => $context->country->iso_code,
             'MethodID'          => $method_id,
-            'Description'       => $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SEND_ORDER_NUMBER_AS_PRODUCT_DESCRIPTION'] ? $orderID : $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'CUSTOM_PRODUCT_DESCRIPTION'],
+            'Description'       => $payment_description,
             'SkipHPP'           => (!empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SKIP_PAYMENT_PAGE'] )?1:0),
             'RedirectInIframe'  => (!empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'REDIRECT_IN_IFRAME'] )?1:0),
             'SkinID'            => $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SKIN_ID'],

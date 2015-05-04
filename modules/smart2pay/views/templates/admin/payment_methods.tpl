@@ -48,29 +48,29 @@ function s2p_config_js_invert()
 </script>
 
 <div class="panel">
-    <div class="panel-heading">Payment Methods</div>
+    <div class="panel-heading">{l s='Payment Methods' mod='smart2pay'}</div>
     <div class="smart2pay-admin-payment-method-container">
         {if empty( $payment_methods )}
-        <div style="text-align: center">No payment methods defined in database.</div>
+        <div style="text-align: center">{l s='No payment methods defined in database.' mod='smart2pay'}</div>
         {else}
-        <small>Surcharge amount is provided in shop's default currency.<br/>
-            If you want to prioritize payment methods when displaying them at checkout, use <em>Order</em> column. Lower values will display payment method higher on the page.</small>
+        <small>{l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
+            {l s='If you want to prioritize payment methods when displaying them at checkout, use Order column. Lower values will display payment method higher on the page.' mod='smart2pay'}</small>
         <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
         <table class="table">
             <thead>
             <tr>
-                <th>Enabled?</th>
-                <th colspan="2">Name</th>
-                <th>Surcharge</th>
-                <th>Priority</th>
+                <th>{l s='Enabled?' mod='smart2pay'}</th>
+                <th colspan="2">{l s='Name' mod='smart2pay'}</th>
+                <th>{l s='Surcharge' mod='smart2pay'}</th>
+                <th>{l s='Priority' mod='smart2pay'}</th>
             </tr>
             <tr>
                 <td colspan="5">
-                    <a href="javascript:void(0);" onclick="s2p_config_js_select_all()">Select all</a>
+                    <a href="javascript:void(0);" onclick="s2p_config_js_select_all()">{l s='Select all' mod='smart2pay'}</a>
                     |
-                    <a href="javascript:void(0);" onclick="s2p_config_js_invert()">Invert</a>
+                    <a href="javascript:void(0);" onclick="s2p_config_js_invert()">{l s='Invert' mod='smart2pay'}</a>
                     |
-                    <a href="javascript:void(0);" onclick="s2p_config_js_deselect_all()">Select none</a>
+                    <a href="javascript:void(0);" onclick="s2p_config_js_deselect_all()">{l s='Select none' mod='smart2pay'}</a>
                 </td>
             </tr>
             </thead>

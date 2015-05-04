@@ -67,7 +67,6 @@ class Smart2pay extends PaymentModule
             switch( $check_function )
             {
                 case 'url':
-                    $do_dump = true;
                     $result = (Validate::isUrl( $value )?true:false);
                 break;
 
@@ -352,7 +351,18 @@ class Smart2pay extends PaymentModule
      */
     public function install()
     {
-        if( !parent::install() or !$this->registerHook( 'payment' ) )
+        if( !parent::install()
+
+         // Displaying payment options
+         or !$this->registerHook( 'payment' )
+
+         // Displaying order details (public)
+         or !$this->registerHook( 'displayOrderDetail' ) // box right above product listing
+
+         // Displaying payment options (admin)
+         or !$this->registerHook( 'displayAdminOrderTabOrder' ) // Order tabs
+         or !$this->registerHook( 'displayAdminOrderContentOrder' ) // Order tab content
+        )
             return false;
 
         if( Shop::isFeatureActive() )
@@ -419,6 +429,116 @@ class Smart2pay extends PaymentModule
         $this->uninstallDatabase();
 
         return true;
+    }
+
+    /**
+     * Public order details
+     *
+     * @param OrderCore $order
+     *
+     * @return string
+     */
+    public function hookDisplayOrderDetail( $params )
+    {
+        /** @var OrderCore $order */
+        if( empty( $params ) or !is_array( $params )
+         or empty( $params['order'] ) or !($order = $params['order'])
+         or !Validate::isLoadedObject( $order )
+         or empty( $order->id )
+         or !($transaction_arr = $this->get_transaction_by_order_id( $order->id ))
+         or empty( $transaction_arr['method_id'] )
+         or !($method_details_arr = $this->get_method_details( $transaction_arr['method_id'] )) )
+            return '';
+
+        if( !empty( $transaction_arr['extra_data'] ) )
+            $transaction_extra_data = Smart2Pay_Helper::parse_string( $transaction_arr['extra_data'] );
+        else
+            $transaction_extra_data = array();
+
+        $surcharge_currency_id = Currency::getIdByIsoCode( $transaction_arr['surcharge_currency'] );
+        $order_currency_id = Currency::getIdByIsoCode( $transaction_arr['surcharge_order_currency'] );
+
+        $this->smarty->assign(array(
+            'this_path' => $this->_path,
+            'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
+            'surcharge_currency_iso' => $transaction_arr['surcharge_currency'],
+            'surcharge_currency_id' => $surcharge_currency_id,
+            'order_currency_iso' => $transaction_arr['surcharge_order_currency'],
+            'order_currency_id' => $order_currency_id,
+            'method_details' => $method_details_arr,
+            'transaction_arr' => $transaction_arr,
+            'transaction_extra_titles' => self::transaction_logger_params_to_title(),
+            'transaction_extra_data' => $transaction_extra_data,
+        ));
+
+        return $this->fetchTemplate( '/views/templates/front/order_payment_details.tpl' );
+    }
+
+    /**
+     * Admin order details tab and tab content
+     *
+     * @param OrderCore $order
+     * @param array $products
+     * @param CustomerCore $customer
+     *
+     * @return string
+     */
+    public function hookDisplayAdminOrderTabOrder( $params )
+    {
+        if( empty( $params ) or !is_array( $params )
+         or empty( $params['order'] ) or !($order = $params['order'])
+         or !Validate::isLoadedObject( $order )
+         or empty( $order->id )
+         or !($transaction_arr = $this->get_transaction_by_order_id( $order->id ))
+         or empty( $transaction_arr['method_id'] )
+         or !($method_details_arr = $this->get_method_details( $transaction_arr['method_id'] )) )
+            return '';
+
+        return '<li><a href="#s2p-payment-details"><i class="icon-money"></i> '.$this->l( 'Payment Method' ).' <span class="badge">1</span></a></li>';
+    }
+
+    /**
+     * Admin order details tab and tab content
+     *
+     * @param OrderCore $order
+     * @param array $products
+     * @param CustomerCore $customer
+     *
+     * @return string
+     */
+    public function hookDisplayAdminOrderContentOrder( $params )
+    {
+        if( empty( $params ) or !is_array( $params )
+         or empty( $params['order'] ) or !($order = $params['order'])
+         or !Validate::isLoadedObject( $order )
+         or empty( $order->id )
+         or !($transaction_arr = $this->get_transaction_by_order_id( $order->id ))
+         or empty( $transaction_arr['method_id'] )
+         or !($method_details_arr = $this->get_method_details( $transaction_arr['method_id'] )) )
+            return '';
+
+        if( !empty( $transaction_arr['extra_data'] ) )
+            $transaction_extra_data = Smart2Pay_Helper::parse_string( $transaction_arr['extra_data'] );
+        else
+            $transaction_extra_data = array();
+
+        $surcharge_currency_id = Currency::getIdByIsoCode( $transaction_arr['surcharge_currency'] );
+        $order_currency_id = Currency::getIdByIsoCode( $transaction_arr['surcharge_order_currency'] );
+
+        $this->smarty->assign(array(
+            'this_path' => $this->_path,
+            'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
+            'surcharge_currency_iso' => $transaction_arr['surcharge_currency'],
+            'surcharge_currency_id' => $surcharge_currency_id,
+            'order_currency_iso' => $transaction_arr['surcharge_order_currency'],
+            'order_currency_id' => $order_currency_id,
+            'method_details' => $method_details_arr,
+            'transaction_arr' => $transaction_arr,
+            'transaction_extra_titles' => self::transaction_logger_params_to_title(),
+            'transaction_extra_data' => $transaction_extra_data,
+        ));
+
+        return $this->fetchTemplate( '/views/templates/admin/order_payment_details.tpl' );
     }
 
     /**
@@ -945,6 +1065,28 @@ class Smart2pay extends PaymentModule
         return $transaction_arr;
     }
 
+    public static function transaction_logger_params_to_title()
+    {
+        return array(
+            'AccountHolder' => 'Account Holder',
+            'BankName' => 'Bank Name',
+            'AccountNumber' => 'Account Number',
+            'IBAN' => 'IBAN',
+            'SWIFT_BIC' => 'SWIFT / BIC',
+            'AccountCurrency' => 'Account Currency',
+
+            'EntityNumber' => 'Entity Number',
+
+            'ReferenceNumber' => 'Reference Number',
+            'AmountToPay' => 'Amount To Pay',
+        );
+    }
+
+    /**
+     * Keys in returning array should be variable names sent back by Smart2Pay and values should be default values if variables are not found in request
+     *
+     * @return array
+     */
     public static function defaultTransactionLoggerExtraParams()
     {
         return array(
@@ -1264,11 +1406,11 @@ class Smart2pay extends PaymentModule
             'yesno' => array(
                 array(
                     'id' => 0,
-                    'name' => 'No'
+                    'name' => $this->l( 'No' ),
                 ),
                 array(
                     'id' => 1,
-                    'name' => 'Yes'
+                    'name' => $this->l( 'Yes' ),
                 )
             )
         );
@@ -1661,7 +1803,7 @@ class Smart2pay extends PaymentModule
          * Install module's database
          */
         Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_transactions` (
-                `id` int(11) NOT NULL,
+                `id` int(11) NOT NULL AUTO_INCREMENT,
                 `method_id` int(11) NOT NULL DEFAULT '0',
                 `payment_id` int(11) NOT NULL DEFAULT '0',
                 `order_id` int(11) NOT NULL DEFAULT '0',
@@ -1675,19 +1817,11 @@ class Smart2pay extends PaymentModule
                 `surcharge_order_percent` decimal(6,2) NOT NULL,
                 `surcharge_order_currency` varchar(3) DEFAULT NULL COMMENT 'Currency ISO 3',
                 `last_update` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-                `created` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00'
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Transaction run trough Smart2Pay';
+                `created` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+                 PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `payment_id` (`payment_id`), KEY `order_id` (`order_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
 
         ");
-
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_transactions`
-              ADD PRIMARY KEY (`id`), ADD KEY `method_id` (`method_id`), ADD KEY `payment_id` (`payment_id`), ADD KEY `order_id` (`order_id`);
-        ");
-
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_transactions`
-              MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-        ");
-
 
         Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method_settings` (
                 `id` int(11) NOT NULL,
@@ -1751,97 +1885,95 @@ class Smart2pay extends PaymentModule
         Db::getInstance()->Execute("
             INSERT INTO `" . _DB_PREFIX_ . "smart2pay_method` (`method_id`, `display_name`, `provider_value`, `description`, `logo_url`, `guaranteed`, `active`) VALUES
             (1, 'Bank Transfer', 'banktransfer', 'Bank Transfer description', 'bank_transfer_logo_v6.png', 1, 1),
-            (2, 'iDEAL', 'ideal', 'iDEAL description', 'ideal.jpg', 1, 1),
-            (3, 'MrCash', 'mrcash', 'MrCash description', 'mrcash.gif', 1, 1),
-            (4, 'Giropay', 'giropay', 'Giropay description', 'giropay.gif', 1, 1),
-            (5, 'EPS', 'eps', 'EPS description', 'eps-e-payment-standard.gif', 1, 1),
-            (8, 'UseMyFunds', 'umb', 'UseMyFunds description', 'umb.gif', 1, 1),
-            (9, 'Sofort Banking', 'dp24', 'Sofort Banking description', 'dp24_sofort.gif', 0, 1),
-            (12, 'Przelewy24', 'p24', 'Przelewy24 description', 'p24.gif', 1, 1),
-            (13, 'OneCard', 'onecard', 'OneCard description', 'onecard.gif', 1, 1),
+            (2, 'iDEAL', 'ideal', 'iDEAL description', 'ideal.png', 1, 1),
+            (3, 'MrCash', 'mrcash', 'MrCash description', 'mrcash.png', 1, 1),
+            (4, 'Giropay', 'giropay', 'Giropay description', 'giropay.png', 1, 1),
+            (5, 'EPS', 'eps', 'EPS description', 'eps-e-payment-standard.png', 1, 1),
+            (8, 'UseMyFunds', 'umb', 'UseMyFunds description', 'umb.png', 1, 1),
+            (9, 'Sofort Banking', 'dp24', 'Sofort Banking description', 'dp24_sofort.png', 0, 1),
+            (12, 'Przelewy24', 'p24', 'Przelewy24 description', 'p24.png', 1, 1),
+            (13, 'OneCard', 'onecard', 'OneCard description', 'onecard.png', 1, 1),
             (14, 'CashU', 'cashu', 'CashU description', 'cashu.png', 1, 1),
-            (18, 'POLi', 'poli', 'POLi description', 'poli.gif', 0, 1),
-            (19, 'DineroMail', 'dineromail', 'DineroMail description', 'dineromail_v2.gif', 0, 1),
-            (20, 'Multibanco SIBS', 'sibs', 'Multibanco SIBS description', 'sibs_mb.gif', 1, 1),
-            (22, 'Moneta Wallet', 'moneta', 'Moneta Wallet description', 'moneta_v2.gif', 1, 1),
+            (18, 'POLi', 'poli', 'POLi description', 'poli.png', 0, 1),
+            (19, 'DineroMail', 'dineromail', 'DineroMail description', 'dineromail.png', 0, 1),
+            (20, 'Multibanco SIBS', 'sibs', 'Multibanco SIBS description', 'sibs_mb.png', 1, 1),
+            (22, 'Moneta Wallet', 'moneta', 'Moneta Wallet description', 'moneta.png', 1, 1),
             (23, 'Paysera', 'paysera', 'Paysera description', 'paysera.gif', 1, 1),
             (24, 'Alipay', 'alipay', 'Alipay description', 'alipay.png', 1, 1),
             (25, 'Abaqoos', 'abaqoos', 'Abaqoos description', 'abaqoos.png', 1, 1),
-            (27, 'ePlatby for eKonto', 'ebanka', 'ePlatby for eKonto description', 'eKonto.gif', 1, 1),
-            (28, 'Ukash', 'ukash', 'Ukash description', 'ukash.gif', 1, 1),
+            (27, 'ePlatby for eKonto', 'ebanka', 'eBanka description', 'eKonto.png', 1, 1),
+            (28, 'Ukash', 'ukash', 'Ukash description', 'ukash.png', 1, 1),
             (29, 'Trustly', 'trustly', 'Trustly description', 'trustly.png', 1, 1),
-            (32, 'Debito Banco do Brasil', 'debitobdb', 'Debito Banco do Brasil description', 'banco_do_brasil.jpg', 1, 1),
-            (33, 'CuentaDigital', 'cuentadigital', 'CuentaDigital description', 'cuentadigital.gif', 1, 1),
+            (32, 'Debito Banco do Brasil', 'debitobdb', 'Debito Banco do Brasil description', 'banco_do_brasil.gif', 1, 1),
+            (33, 'CuentaDigital', 'cuentadigital', 'CuentaDigital description', 'cuentadigital.png', 1, 1),
             (34, 'CardsBrazil', 'cardsbrl', 'CardsBrazil description', 'cards_brl.gif', 0, 1),
-            (35, 'PaysBuy', 'paysbuy', 'PaysBuy description', 'paysbuy.gif', 0, 1),
-            (36, 'Mazooma', 'mazooma', 'Mazooma description', 'mazooma.gif', 0, 1),
-            (37, 'eNETS Debit', 'enets', 'eNETS Debit description', 'enets.gif', 1, 1),
-            (40, 'Paysafecard', 'paysafecard', 'Paysafecard description', 'paysafecard.gif', 1, 1),
-            (42, 'PayPal', 'paypal', 'PayPal description', 'paypal.jpg', 1, 0),
-            (43, 'PagTotal', 'pagtotal', 'PagTotal description', 'pagtotal.jpg', 0, 1),
-            (44, 'Payeasy', 'payeasy', 'Payeasy description', 'payeasy.gif', 1, 1),
-            (46, 'MercadoPago', 'mercadopago', 'MercadoPago description', 'mercadopago.jpg', 0, 1),
-            (47, 'Mozca', 'mozca', 'Mozca description', 'mozca.jpg', 0, 1),
-            (49, 'ToditoCash', 'toditocash', 'ToditoCash description', 'todito_cash.gif', 1, 1),
-            (58, 'PayWithMyBank', 'pwmb', 'PayWithMyBank description', 'pwmb.png', 1 , 1),
-            (62, 'Tenpay','tenpay','Tenpay description','tenpay.gif',1,1),
-            (63, 'TrustPay', 'trustpay','TrustPay description', 'trustpay.png', 1 , 1),
-            (64, 'MangirKart', 'mangirkart', 'MangirKart description', 'mangirkart.jpg', 1, 1),
-            (65, 'Finnish Banks', 'paytrail', 'Paytrail description', 'paytrail.gif', 1,1),
+            (35, 'PaysBuy', 'paysbuy', 'PaysBuy description', 'paysbuy.png', 0, 1),
+            (36, 'Mazooma', 'mazooma', 'Mazooma description', 'mazooma.png', 0, 1),
+            (37, 'eNETS Debit', 'enets', 'eNETS Debit description', 'enets.png', 1, 1),
+            (40, 'Paysafecard', 'paysafecard', 'Paysafecard description', 'paysafecard.png', 1, 1),
+            (42, 'PayPal', 'paypal', 'PayPal description', 'paypal.png', 1, 0),
+            (43, 'PagTotal', 'pagtotal', 'PagTotal description', 'pagtotal.png', 0, 1),
+            (44, 'Payeasy', 'payeasy', 'Payeasy description', 'payeasy.png', 1, 1),
+            (46, 'MercadoPago', 'mercadopago', 'MercadoPago description', 'mercadopago.png', 0, 1),
+            (47, 'Mozca', 'mozca', 'Mozca description', 'mozca.png', 0, 1),
+            (49, 'ToditoCash', 'toditocash', 'ToditoCash description', 'todito_cash.png', 1, 1),
+            (58, 'PayWithMyBank', 'pwmb', 'PayWithMyBank description', 'pwmb.png', 1, 1),
+            (62, 'Tenpay', 'tenpay', 'Tenpay description', 'tenpay.png', 1, 1),
+            (63, 'TrustPay', 'trustpay', 'TrustPay description', 'trustpay.png', 1, 1),
+            (64, 'MangirKart', 'mangirkart', 'MangirKart description', 'mangir_cart.gif', 1, 1),
+            (65, 'Paytrail', 'paytrail', 'Paytrail description', 'paytrail.gif', 1, 1),
             (66, 'MTCPay', 'mtcpay', 'MTCPay description', 'mtcpay.png', 1, 1),
-            (67, 'DragonPay', 'dragonpay', 'DragonPay description', 'dragonpay.jpg', 1 , 1),
-            (69, 'Credit Card', 's2pcards', 'S2PCards Description', 's2p_cards.gif', 0,1),
-            (71, 'INTERAC® Online', 'interaconline', 'INTERAC® Online Description', 'interac-online.gif', 1, 1),
-            (72, 'PagoEfectivo', 'pagoefectivo', 'PagoEfectivo Description', 'pago_efectivo.gif', 1,1),
-			(73, 'MyBank', 'mybank', 'MyBank Description', 'mybank.png',1,1),
-			(74, 'Yandex.Money', 'yandexmoney', 'YandexMoney description', 'yandex_money.png', 1,1),
-			(76, 'Bitcoin', 'bitcoin', 'Bitcoin description', 'bitcoin.png', 1,1),
+            (67, 'DragonPay', 'dragonpay', 'DragonPay description', 'dragon_pay.png', 1, 1),
+            (69, 'Credit Card', 's2pcards', 'S2PCards Description', 's2p_cards.gif', 0, 1),
+            (72, 'PagoEfectivo', 'pagoefectivo', 'PagoEfectivo Description', 'pago_efectivo.gif', 1, 1),
+            (73, 'MyBank', 'mybank', 'MyBank Description', 'mybank.png', 1, 1),
+            (74, 'Yandex.Money', 'yandexmoney', 'YandexMoney description', 'yandex_money.png', 1, 1),
+            (76, 'Bitcoin', 'bitcoin', 'Bitcoin description', 'bitcoin.png', 1, 1),
             (1000, 'Boleto', 'paganet', 'Boleto description', 'boleto_bancario.png', 1, 1),
-            (1001, 'Debito', 'paganet', 'Debito description', 'debito_bradesco.jpg', 1, 1),
-            (1002, 'Transferencia', 'paganet', 'Transferencia description', 'bradesco_transferencia.jpg', 1, 1),
-            (1003, 'QIWI Wallet', 'qiwi', 'QIWI Wallet description', 'qiwi_wallet_v2.gif', 1, 1),
+            (1001, 'Debito', 'paganet', 'Debito description', 'debito_bradesco.png', 1, 1),
+            (1002, 'Transferencia', 'paganet', 'Transferencia description', 'bradesco_transferencia.png', 1, 1),
+            (1003, 'QIWI Wallet', 'qiwi', 'QIWI Wallet description', 'qiwi_wallet.png', 1, 1),
             (1004, 'Beeline', 'qiwi', 'Beeline description', 'beeline.png', 1, 1),
-            (1005, 'Megafon', 'qiwi', 'Megafon description', 'megafon_v1.gif', 1, 1),
+            (1005, 'Megafon', 'qiwi', 'Megafon description', 'megafon.png', 1, 1),
             (1006, 'MTS', 'qiwi', 'MTS description', 'mts.gif', 1, 1),
-            (1007, 'WebMoney', 'moneta', 'WebMoney description', 'webmoney_v1.gif', 1, 1),
-            (1008, 'Yandex', 'moneta', 'Yandex description', 'yandex_money.gif', 1, 1),
+            (1007, 'WebMoney', 'moneta', 'WebMoney description', 'webmoney.png', 1, 1),
+            (1008, 'Yandex', 'moneta', 'Yandex description', 'yandex.png', 1, 1),
             (1009, 'Alliance Online', 'asiapay', 'Alliance Online description', 'alliance_online.gif', 1, 1),
             (1010, 'AmBank', 'asiapay', 'AmBank description', 'ambank_group.png', 1, 1),
             (1011, 'CIMB Clicks', 'asiapay', 'CIMB Clicks description', 'cimb_clicks.png', 1, 1),
-            (1012, 'FPX', 'asiapay', 'FPX description', 'FPX.gif', 1, 1),
-            (1013, 'Hong Leong Bank Transfer', 'asiapay', 'Hong Leong Bank Transfer description', 'hong_leong.gif', 1, 1),
-            (1014, 'Maybank2U', 'asiapay', 'Maybank2U description', 'maybank2u.gif', 1, 1),
-            (1015, 'Meps Cash', 'asiapay', 'Meps Cash description', 'meps_cash.gif', 1, 1),
-            (1016, 'Mobile Money', 'asiapay', 'Mobile Money description', 'mobile_money.gif', 1, 1),
-            (1017, 'RHB', 'asiapay', 'RHB description', 'rhb.gif', 1, 1),
+            (1012, 'FPX', 'asiapay', 'FPX description', 'fpx.png', 1, 1),
+            (1013, 'Hong Leong Bank Transfer', 'asiapay', 'Hong Leong Bank Transfer description', 'hong_leong.png', 1, 1),
+            (1014, 'Maybank2U', 'asiapay', 'Maybank2U description', 'maybank2u.png', 1, 1),
+            (1015, 'Meps Cash', 'asiapay', 'Meps Cash description', 'meps_cash.png', 1, 1),
+            (1016, 'Mobile Money', 'asiapay', 'Mobile Money description', 'mobile_money.png', 1, 1),
+            (1017, 'RHB', 'asiapay', 'RHB description', 'rhb.png', 1, 1),
             (1018, 'Webcash', 'asiapay', 'Webcash description', 'web_cash.gif', 1, 1),
-            (1019, 'Credit Cards Colombia', 'pagosonline', 'Credit Cards Colombia description', 'cards_colombia.jpg', 1, 1),
-            (1020, 'PSE', 'pagosonline', 'PSE description', 'pse.gif', 1, 1),
+            (1019, 'Credit Cards Colombia', 'pagosonline', 'Credit Cards Colombia description', 'cards_colombia.gif', 1, 1),
+            (1020, 'PSE', 'pagosonline', 'PSE description', 'pse.png', 1, 1),
             (1021, 'ACH Debit', 'pagosonline', 'ACH Debit description', 'ach.png', 1, 1),
-            (1022, 'Via Baloto', 'pagosonline', 'Via Baloto description', 'payment_in_cash.gif', 1, 1),
-            (1023, 'Referenced Payment', 'pagosonline', 'Referenced Payment description', 'payment_references.gif', 1, 1),
+            (1022, 'Via Baloto', 'pagosonline', 'Via Baloto description', 'payment_via_baloto.png', 1, 1),
+            (1023, 'Referenced Payment', 'pagosonline', 'Referenced Payment description', 'payment_references.png', 1, 1),
             (1024, 'Mandiri', 'asiapay', 'Mandiri description', 'mandiri.png', 1, 1),
-            (1025, 'XL Tunai', 'asiapay', 'XL Tunai description', 'XLTunai.gif', 1, 1),
+            (1025, 'XL Tunai', 'asiapay', 'XL Tunai description', 'xltunai.png', 1, 1),
             (1026, 'Bancomer Pago referenciado', 'dineromaildirect', 'Bancomer Pago referenciado description', 'bancomer.png', 1, 1),
             (1027, 'Santander Pago referenciado', 'dineromaildirect', 'Santander Pago referenciado description', 'santander.gif', 1, 1),
             (1028, 'ScotiaBank Pago referenciado', 'dineromaildirect', 'ScotiaBank Pago referenciado description', 'scotiabank.gif', 1, 1),
-            (1029, '7-Eleven Pago en efectivo', 'dineromaildirect', '7-Eleven Pago en efectivo description', '7eleven.gif', 1, 1),
+            (1029, '7-Eleven Pago en efectivo', 'dineromaildirect', '7-Eleven Pago en efectivo description', '7-Eleven.gif', 1, 1),
             (1030, 'Oxxo Pago en efectivo', 'dineromaildirect', 'Oxxo Pago en efectivo description', 'oxxo.gif', 1, 1),
             (1031, 'IXE Pago referenciado', 'dineromaildirect', 'IXE Pago referenciado description', 'IXe.gif', 1, 1),
             (1033, 'Cards Thailand', 'paysbuy', 'Cards Thailand description', 'cards_brl.gif', 1, 1),
-            (1034, 'PayPalThailand', 'paysbuy', 'PayPalThailand description', 'paypal.jpg', 1, 1),
+            (1034, 'PayPal Thailand', 'paysbuy', 'PayPalThailand description', 'paypal.png', 1, 1),
             (1035, 'AMEXThailand', 'paysbuy', 'AMEXThailand description', 'american_express.png', 1, 1),
-            (1036, 'Cash Options Thailand', 'paysbuy', 'Cash Options Thailand description', 'cash_paysbuy.jpg', 1, 1),
-            (1037, 'OnlineBankingThailand', 'paysbuy', 'OnlineBankingThailand description', 'onlinebankingthailand.gif', 1, 1),
-            (1038, 'PaysBuy Wallet', 'paysbuy', 'PaysBuy Wallet description', 'paysbuy.gif', 1, 1),
+            (1036, 'Cash Options Thailand', 'paysbuy', 'Cash Options Thailand description', 'counter-service-thailand_paysbuy-cash.png', 1, 1),
+            (1037, 'Online Banking Thailand', 'paysbuy', 'OnlineBankingThailand description', 'online_banking_thailanda.png', 1, 1),
+            (1038, 'PaysBuy Wallet', 'paysbuy', 'PaysBuy Wallet description', 'paysbuy.png', 1, 1),
             (1039, 'Pagos en efectivo', 'dineromaildirect', 'Pagos en efectivo Chile description', 'pagos_en_efectivo_servipag_bci_chile.png', 1, 1),
-			(1040, 'Pagos en efectivo', 'dineromaildirect', 'Pagos en efectivo Argentina description', 'argentina_banks.png', 1,1),
-			(1041, 'OP-Pohjola', 'paytrail', 'OP-Pohjola description', 'op-pohjola.png', 1, 1),
-			(1042, 'Nordea', 'paytrail','Nordea description', 'nordea.png', 1,1),
-			(1043, 'Danske bank', 'paytrail','Danske description', 'danske_bank.png', 1,1),
-			(1044, 'Cash-in' , 'yandexmoney', 'Cash-in description', 'cashinyandex.gif',1,1),
-			(1045, 'Cards Russia', 'yandexmoney', 'Cards Russia description', 's2p_cards.gif',0,1)
-
+            (1040, 'Pagos en efectivo', 'dineromaildirect', 'Pagos en efectivo Argentina description', 'argentina_banks.png', 1, 1),
+            (1041, 'OP-Pohjola', 'paytrail', 'OP-Pohjola description', 'op-pohjola.png', 1, 1),
+            (1042, 'Nordea', 'paytrail', 'Nordea description', 'nordea.png', 1, 1),
+            (1043, 'Danske bank', 'paytrail', 'Danske description', 'danske_bank.png', 1, 1),
+            (1044, 'Cash-in', 'yandexmoney', 'Cash-in description', 'cashinyandex.gif', 1, 1),
+            (1045, 'Cards Russia', 'yandexmoney', 'Cards Russia description', 's2p_cards.gif', 1, 1);
         ");
 
         Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country`");

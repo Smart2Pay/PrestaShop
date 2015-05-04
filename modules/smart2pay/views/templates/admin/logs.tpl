@@ -1,15 +1,15 @@
 <div class="panel">
-    <div class="panel-heading">Logs</div>
+    <div class="panel-heading">{l s='Logs' mod='smart2pay'}</div>
     <div class="smart2pay-admin-logs-container">
         {if empty( $logs )}
-        <div style="text-align: center">No logs available at the moment</div>
+        <div style="text-align: center">{l s='No logs available at the moment' mod='smart2pay'}</div>
         {else}
         <table class="table">
             <thead>
             <tr>
-                <th>Type</th>
-                <th>Date</th>
-                <th>Message</th>
+                <th>{l s='Type' mod='smart2pay'}</th>
+                <th>{l s='Date' mod='smart2pay'}</th>
+                <th>{l s='Message' mod='smart2pay'}</th>
             </tr>
             </thead>
             <tbody>
