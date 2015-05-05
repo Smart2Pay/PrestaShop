@@ -6,13 +6,14 @@ if (!defined('_PS_VERSION_'))
 include_once( _PS_MODULE_DIR_.'smart2pay/includes/helper.inc.php' );
 
 /**
- * Class S2p
+ * Class Smart2pay
  */
 class Smart2pay extends PaymentModule
 {
     const S2P_STATUS_OPEN = 1, S2P_STATUS_SUCCESS = 2, S2P_STATUS_CANCELLED = 3, S2P_STATUS_FAILED = 4, S2P_STATUS_EXPIRED = 5, S2P_STATUS_PROCESSING = 7;
 
     const CONFIG_PREFIX = 'S2P_';
+    const S2PD_CONFIG_PREFIX = 'S2PD_';
 
     const PAYM_BANK_TRANSFER = 1, PAYM_MULTIBANCO_SIBS = 20;
 
