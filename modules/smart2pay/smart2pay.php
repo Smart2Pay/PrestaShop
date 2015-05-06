@@ -17,6 +17,8 @@ class Smart2pay extends PaymentModule
 
     const PAYM_BANK_TRANSFER = 1, PAYM_MULTIBANCO_SIBS = 20;
 
+    const DEMO_SIGNATURE = 'fc5fa3b8-746a', DEMO_MID = '1045', DEMO_SID = '30144', DEMO_POSTURL = 'https://apitest.smart2pay.com';
+
     /**
      * Static cache
      *
@@ -25,8 +27,10 @@ class Smart2pay extends PaymentModule
     static $cache = array(
         'all_method_details_in_cache' => false,
         'all_method_settings_in_cache' => false,
+        'all_countries' => array(),
         'method_details' => array(),
         'method_settings' => array(),
+        'methods_country' => '',
         'detected_country' => false,
         'detected_country_ip' => '',
         'force_country' => false,
@@ -74,6 +78,10 @@ class Smart2pay extends PaymentModule
                 case 'notempty':
                     $result = (!empty( $value )?true:false);
                 break;
+
+                case 'country_iso':
+                    $result = ((empty( $value ) or Country::getByIso( $value ))?true:false);
+                break;
             }
 
             if( !$result )
@@ -106,6 +114,10 @@ class Smart2pay extends PaymentModule
 
                 case 'trim':
                     $result = @trim( (string)$result );
+                break;
+
+                case 'toupper':
+                    $result = @strtoupper( (string)$result );
                 break;
             }
         }
@@ -184,11 +196,11 @@ class Smart2pay extends PaymentModule
                 $skipValidation = false;
                 $field_error = '';
 
-                if( $formValues[self::CONFIG_PREFIX.'ENV'] == 'test'
+                if( in_array( $formValues[self::CONFIG_PREFIX.'ENV'], array( 'demo', 'test' ) )
                 and in_array( $input['name'], array( self::CONFIG_PREFIX.'SIGNATURE_LIVE', self::CONFIG_PREFIX.'POST_URL_LIVE', self::CONFIG_PREFIX.'MID_LIVE' ) ) )
                     $skipValidation = true;
 
-                if( $formValues[self::CONFIG_PREFIX.'ENV'] == 'live'
+                if( in_array( $formValues[self::CONFIG_PREFIX.'ENV'], array( 'demo', 'live' ) )
                 and in_array( $input['name'], array( self::CONFIG_PREFIX.'SIGNATURE_TEST', self::CONFIG_PREFIX.'POST_URL_TEST', self::CONFIG_PREFIX.'MID_TEST' ) ) )
                     $skipValidation = true;
 
@@ -206,6 +218,8 @@ class Smart2pay extends PaymentModule
                         $field_error .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'smart2pay' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must be a valid URL' ) );
                     if( empty( $validation_result['notempty'] ) )
                         $field_error .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'smart2pay' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must NOT be empty' ) );
+                    if( empty( $validation_result['country_iso'] ) )
+                        $field_error .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'smart2pay' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Should be a valid country.' ) );
 
                     if( empty( $field_error ) )
                         $field_error .= $this->displayError( $this->l( 'Value provided for' ). Translate::getModuleTranslation( $this->name, $input['label'], 'smart2pay' ) .' ' . $this->l( 'is invalid' ) );
@@ -566,6 +580,7 @@ class Smart2pay extends PaymentModule
             'default_currency' => Currency::getDefaultCurrency()->iso_code,
             'default_currency_id' => Currency::getDefaultCurrency()->id,
             'payment_methods' => $payment_methods_arr,
+            'methods_country' => self::$cache['methods_country'],
             //'redirect_URL' => $this->context->link->getModuleLink('smart2pay', 'payment', array('methodID' => $this->_methodID)),
         ));
 
@@ -575,7 +590,8 @@ class Smart2pay extends PaymentModule
     public function detect_country( $ip = false )
     {
         if( !($settings_arr = $this->getSettings())
-         or empty( $settings_arr[self::CONFIG_PREFIX.'COUNTRY_DETECTION'] ) )
+         or empty( $settings_arr[self::CONFIG_PREFIX.'COUNTRY_DETECTION'] )
+         or !Configuration::get( self::S2PD_CONFIG_PREFIX.'ENABLED' ) )
             return false;
 
         if( empty( $ip ) )
@@ -587,10 +603,15 @@ class Smart2pay extends PaymentModule
         if( !empty( self::$cache['detected_country_ip'] ) and self::$cache['detected_country_ip'] == $ip )
             return self::$cache['detected_country'];
 
-        self::$cache['detected_country_ip'] = $ip;
-        self::$cache['detected_country'] = false;
+        /** @var Smart2paydetection $smart2pay_detection */
+        if( !($smart2pay_detection = Module::getInstanceByName( 'smart2paydetection' )) )
+            return false;
 
-        // TODO: Detect country using other plugin
+        if( !($country_iso = $smart2pay_detection->get_country_iso( $ip )) )
+            return false;
+
+        self::$cache['detected_country_ip'] = $ip;
+        self::$cache['detected_country'] = $country_iso;
 
         return self::$cache['detected_country'];
     }
@@ -616,9 +637,18 @@ class Smart2pay extends PaymentModule
 
         $env = strtoupper( $settings[self::CONFIG_PREFIX.'ENV'] );
 
-        $settings['signature'] = $settings[self::CONFIG_PREFIX.'SIGNATURE_'.$env];
-        $settings['mid'] = $settings[self::CONFIG_PREFIX.'MID_'.$env];
-        $settings['posturl'] = $settings[self::CONFIG_PREFIX.'POST_URL_'.$env];
+        if( $env == 'DEMO' )
+        {
+            $settings[self::CONFIG_PREFIX.'SITE_ID'] = self::DEMO_SID;
+            $settings['signature'] = self::DEMO_SIGNATURE;
+            $settings['mid']       = self::DEMO_MID;
+            $settings['posturl']   = self::DEMO_POSTURL;
+        } else
+        {
+            $settings['signature'] = $settings[ self::CONFIG_PREFIX . 'SIGNATURE_' . $env ];
+            $settings['mid']       = $settings[ self::CONFIG_PREFIX . 'MID_' . $env ];
+            $settings['posturl']   = $settings[ self::CONFIG_PREFIX . 'POST_URL_' . $env ];
+        }
 
         return $settings;
     }
@@ -833,6 +863,35 @@ class Smart2pay extends PaymentModule
 
         self::$cache['force_country'] = $country_iso;
         return self::$cache['force_country'];
+    }
+
+    /**
+     * Get Smart2Pay countries list
+     *
+     * @return array
+     */
+    public function get_smart2pay_countries()
+    {
+        if( !empty( self::$cache['all_countries'] ) )
+            return self::$cache['all_countries'];
+
+        $country_rows = Db::getInstance()->executeS(
+            'SELECT * '.
+            ' FROM '._DB_PREFIX_.'smart2pay_country '.
+            ' ORDER BY name'
+        );
+
+        self::$cache['all_countries'] = array();
+
+        if( empty( $country_rows ) )
+            return array();
+
+        foreach( $country_rows as $country_arr )
+        {
+            self::$cache['all_countries'][$country_arr['code']] = $country_arr['name'];
+        }
+
+        return self::$cache['all_countries'];
     }
 
     /**
@@ -1251,11 +1310,17 @@ class Smart2pay extends PaymentModule
 
         if( is_null( $country_iso ) )
         {
-            if( ($detected_country = $this->detect_country()) )
+            if( ($forced_country = $this->force_country()) )
+                $country_iso = $forced_country;
+
+            elseif( ($forced_config_country = Configuration::get( self::CONFIG_PREFIX.'FORCED_COUNTRY' )) )
+                $country_iso = $forced_config_country;
+
+            elseif( ($detected_country = $this->detect_country()) )
                 $country_iso = $detected_country;
 
-            elseif( ($forced_country = $this->force_country()) )
-                $country_iso = $forced_country;
+            elseif( ($fallback_country = Configuration::get( self::CONFIG_PREFIX.'FALLBACK_COUNTRY' )) )
+                $country_iso = $fallback_country;
 
             elseif( $this->context->cart )
             {
@@ -1265,6 +1330,8 @@ class Smart2pay extends PaymentModule
             } else
                 return false;
         }
+
+        self::$cache['methods_country'] = $country_iso;
 
         if( !($country_method_ids = Db::getInstance()->executeS(
                     'SELECT CM.method_id '.
@@ -1391,32 +1458,68 @@ class Smart2pay extends PaymentModule
      * @param null $name
      * @return array
      */
-    public function getConfigFormSelectInputOptions( $name = null )
+    public function getConfigFormSelectInputOptions( $name, $params = false )
     {
-        $options = array(
-            'envs' => array(
-                array(
-                    'id' => 'test',
-                    'name' => 'Test'
-                ),
-                array(
-                    'id' => 'live',
-                    'name' => 'Live'
-                )
-            ),
-            'yesno' => array(
-                array(
-                    'id' => 0,
-                    'name' => $this->l( 'No' ),
-                ),
-                array(
-                    'id' => 1,
-                    'name' => $this->l( 'Yes' ),
-                )
-            )
-        );
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
 
-        return ($name ? (isset( $options[$name] )?$options[$name]:array()) : $options);
+        switch( $name )
+        {
+            default:
+                return array();
+
+            case 'envs':
+                return array(
+                    array(
+                        'id' => 'demo',
+                        'name' => $this->l( 'Demo' ),
+                    ),
+                    array(
+                        'id' => 'test',
+                        'name' => $this->l( 'Test' ),
+                    ),
+                    array(
+                        'id' => 'live',
+                        'name' => $this->l( 'Live' ),
+                    ),
+                );
+            break;
+
+            case 'yesno':
+                return array(
+                    array(
+                        'id' => 0,
+                        'name' => $this->l( 'No' ),
+                    ),
+                    array(
+                        'id' => 1,
+                        'name' => $this->l( 'Yes' ),
+                    ),
+                );
+            break;
+
+            case 'country_list':
+                if( !($countries_list = $this->get_smart2pay_countries())
+                    or !is_array( $countries_list ) )
+                    return array();
+
+                if( empty( $params['no_option_title'] ) )
+                    $params['no_option_title'] = $this->l( '- No Option -' );
+
+                $return_arr = array();
+                $return_arr[] = array( 'id' => '', 'name' => $params['no_option_title'] );
+
+                foreach( $countries_list as $code => $name )
+                {
+                    $return_arr[] = array(
+                        'id' => $code,
+                        'name' => $name.' ['.$code.']',
+                    );
+                }
+
+                return $return_arr;
+                break;
+        }
     }
 
     /**
@@ -1570,11 +1673,30 @@ class Smart2pay extends PaymentModule
             ),
             array(
                 'type' => 'select',
+                'label' => $this->l('Force country'),
+                'name' => self::CONFIG_PREFIX.'FORCED_COUNTRY',
+                'desc' => array(
+                    $this->l( 'If this option is selected Country detection will be disregarded.' ),
+                    $this->l( 'NOTE: Please be sure all your clients can make payments in selected country.' ),
+                ),
+                'hint' => $this->l( 'Always use this country for payment module.' ),
+                'required' => true,
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions( 'country_list', array( 'no_option_title' => $this->l( '- Don\'t force country -' ) ) ),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_transform' => array( 'trim', 'toupper' ),
+                '_validate' => array( 'country_iso' ),
+                '_default' => '',
+            ),
+            array(
+                'type' => 'select',
                 'label' => $this->l( 'Country detection' ),
                 'name' => self::CONFIG_PREFIX.'COUNTRY_DETECTION',
                 'desc' => array(
                     $this->l( 'Plugin will try detecting visitor\'s country by IP. Country is important for plugin as payment methods are displayed depending on country.' ),
-                    $this->l( 'Country detection is available when you install Smart2Pay Country Detection plugin.' ),
+                    $this->l( 'Country detection is available when you install Smart2Pay Detection plugin.' ),
                     $this->l( 'If you select Yes and country detection plugin is not installed, plugin will use as fallback country set in customer\'s billing address.' ),
                 ),
                 'required' => false,
@@ -1587,6 +1709,21 @@ class Smart2pay extends PaymentModule
             ),
             array(
                 'type' => 'select',
+                'label' => $this->l('Fallback country'),
+                'name' => self::CONFIG_PREFIX.'FALLBACK_COUNTRY',
+                'hint' => $this->l( 'If country detection fails, use this country as fallback.' ),
+                'required' => true,
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions( 'country_list', array( 'no_option_title' => $this->l( '- Country From Billing Address -' ) ) ),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_transform' => array( 'trim', 'toupper' ),
+                '_validate' => array( 'country_iso' ),
+                '_default' => '',
+            ),
+            array(
+                'type' => 'select',
                 'label' => $this->l('Send order number as product description'),
                 'name' => self::CONFIG_PREFIX.'SEND_ORDER_NUMBER_AS_PRODUCT_DESCRIPTION',
                 'required' => false,
@@ -1594,7 +1731,8 @@ class Smart2pay extends PaymentModule
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
                     'name' => 'name',
-                )
+                ),
+                '_default' => 1,
             ),
             array(
                 'type' => 'text',
@@ -1621,6 +1759,9 @@ class Smart2pay extends PaymentModule
                 'label' => $this->l('Notify customer by email'),
                 'name' => self::CONFIG_PREFIX.'NOTIFY_CUSTOMER_BY_EMAIL',
                 'required' => false,
+                'desc' => array(
+                    $this->l( 'When payment is completed with success should system send an email to the customer?' ),
+                ),
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',
@@ -1633,6 +1774,10 @@ class Smart2pay extends PaymentModule
                 'label' => $this->l('Send payment instructions on order creation'),
                 'name' => self::CONFIG_PREFIX.'SEND_PAYMENT_INSTRUCTIONS_ON_ORDER_CREATION',
                 'required' => false,
+                'desc' => array(
+                    $this->l( 'Some payment methods (like Bank Transfer and Multibanco SIBS) generate information required by costomer to complete the payment.' ),
+                    $this->l( 'These informations are displayed to customer on return page, but plugin can also send an email to customer with these details.' ),
+                ),
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',

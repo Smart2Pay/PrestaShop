@@ -27,12 +27,20 @@
             <td>{$db_file_location}</td>
         </tr>
         <tr>
-            <td><strong>{l s='DB File Size' mod='smart2paydetection'}</strong></td>
-            <td>{$db_file_size} {l s='bytes' mod='smart2paydetection'}</td>
-        </tr>
-        <tr>
             <td><strong>{l s='DB File Date' mod='smart2paydetection'}</strong></td>
             <td>{$db_file_time}</td>
+        </tr>
+        <tr>
+            <td><strong>{l s='DB Size' mod='smart2paydetection'}</strong></td>
+            <td>{$db_file_size_human} ({$db_file_size} {l s='bytes' mod='smart2paydetection'}), {$db_file_records} {l s='records' mod='smart2paydetection'}</td>
+        </tr>
+        <tr>
+            <td><strong>{l s='DB Version' mod='smart2paydetection'}</strong></td>
+            <td>{$db_file_version}</td>
+        </tr>
+        <tr>
+            <td><strong>{l s='Description' mod='smart2paydetection'}</strong></td>
+            <td>{$db_file_description}</td>
         </tr>
         </tbody>
         </table>

@@ -117,26 +117,12 @@ class Smart2paydetection extends Module
         if( !Configuration::get( self::CONFIG_PREFIX.'ENABLED' ) )
             return false;
 
-        if( !($detection_result = $this->detect_details_from_ip( $ip )) )
-        {
-            $fallback_country = Configuration::get( self::CONFIG_PREFIX.'FALLBACK_COUNTRY' );
-
-            if( !empty( $fallback_country ) )
-                return $fallback_country;
-
+        if( !($detection_result = $this->detect_details_from_ip( $ip ))
+         or empty( $detection_result['country'] ) or !is_array( $detection_result['country'] )
+         or empty( $detection_result['country']['iso_code'] ) )
             return false;
-        }
 
-        if( !empty( $detection_result['country'] ) and is_array( $detection_result['country'] )
-        and !empty( $detection_result['country']['iso_code'] ) )
-            return strtoupper( $detection_result['country']['iso_code'] );
-
-        $fallback_country = Configuration::get( self::CONFIG_PREFIX.'FALLBACK_COUNTRY' );
-
-        if( !empty( $fallback_country ) )
-            return $fallback_country;
-
-        return false;
+        return strtoupper( $detection_result['country']['iso_code'] );
     }
 
     public function detect_details_from_ip( $ip = false )
@@ -214,7 +200,11 @@ class Smart2paydetection extends Module
 
         $db_file_exists = true;
         $db_file_size = 0;
+        $db_file_records = 0;
         $db_file_time = 0;
+        $db_file_version = 'N/A';
+        $db_file_description = 'N/A';
+
         if( !($db_file = self::get_db_file_location())
          or !@file_exists( $db_file ) )
             $db_file_exists = false;
@@ -223,6 +213,21 @@ class Smart2paydetection extends Module
         {
             $db_file_size = @filesize( $db_file );
             $db_file_time = @filemtime( $db_file );
+
+            try
+            {
+                $reader = new MaxMind\Db\Reader( $db_file );
+                if( $reader->metadata() )
+                {
+                    $db_file_version = $reader->metadata()->binaryFormatMajorVersion . '.' . $reader->metadata()->binaryFormatMinorVersion .
+                                       ' (' . date( $this->context->language->date_format_full, $reader->metadata()->buildEpoch ) . ')'.
+                                       ' - IPv'.$reader->metadata()->ipVersion ;
+                    $db_file_description = $reader->metadata()->description['en'];
+                    $db_file_records = $reader->metadata()->nodeCount;
+                }
+            } catch( Exception $e )
+            {
+            }
         }
 
         $s2p_test_ip = Tools::getValue( 's2p_test_ip', '' );
@@ -231,7 +236,11 @@ class Smart2paydetection extends Module
             's2p_test_ip' => $s2p_test_ip,
             'db_file_location' => $db_file,
             'db_file_installed' => $db_file_exists,
-            'db_file_size' => $db_file_size,
+            'db_file_size' => number_format( $db_file_size, 0 ),
+            'db_file_size_human' => Tools::formatBytes( $db_file_size ),
+            'db_file_records' => number_format( $db_file_records, 0 ),
+            'db_file_version' => $db_file_version,
+            'db_file_description' => $db_file_description,
             'db_file_time' => (!empty( $db_file_time )?date( $this->context->language->date_format_full, $db_file_time ):'N/A'),
             'detection_result' => (!empty( $post_result['<detection_result>'] )?$post_result['<detection_result>']:false),
         ) );
@@ -517,13 +526,9 @@ class Smart2paydetection extends Module
     }
 
     /**
-     * Check if s2p method is available in some particular country
+     * Get Smart2Pay countries list
      *
-     * @param int $method_id                 Method ID
-     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a country, else
-     *                                      attempts to retrieve it from context->cart->id_address_invoice
-     *
-     * @return bool
+     * @return array
      */
     public function get_smart2pay_countries()
     {
@@ -543,6 +548,8 @@ class Smart2paydetection extends Module
             ' ORDER BY name'
         );
 
+        self::$cache['all_countries'] = array();
+
         if( empty( $country_rows ) )
             return array();
 
@@ -560,8 +567,11 @@ class Smart2paydetection extends Module
      * @param null $name
      * @return array
      */
-    public function getConfigFormSelectInputOptions( $name = null )
+    public function getConfigFormSelectInputOptions( $name, $params = false )
     {
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
+
         switch( $name )
         {
             default:
@@ -585,8 +595,11 @@ class Smart2paydetection extends Module
                  or !is_array( $countries_list ) )
                     return array();
 
+                if( empty( $params['no_option_title'] ) )
+                    $params['no_option_title'] = $this->l( '- No Option -' );
+
                 $return_arr = array();
-                $return_arr[] = array( 'id' => '', 'name' => $this->l( '- No Fallback -' ) );
+                $return_arr[] = array( 'id' => '', 'name' => $params['no_option_title'] );
 
                 foreach( $countries_list as $code => $name )
                 {
@@ -635,20 +648,6 @@ class Smart2paydetection extends Module
                     'name' => 'name',
                 ),
                 '_default' => 1,
-            ),
-            array(
-                'type' => 'select',
-                'label' => $this->l('Fallback country'),
-                'name' => self::CONFIG_PREFIX.'FALLBACK_COUNTRY',
-                'hint' => $this->l( 'If country detection fails, use this country as fallback.' ),
-                'required' => true,
-                'options' => array(
-                    'query' => $this->getConfigFormSelectInputOptions('country_list'),
-                    'id' => 'id',
-                    'name' => 'name',
-                ),
-                '_transform' => array( 'trim', 'toupper' ),
-                '_default' => 0,
             ),
         );
     }
