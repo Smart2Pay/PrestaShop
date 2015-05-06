@@ -1,3 +1,14 @@
+{*
+* 2015 Smart2Pay
+*
+* DISCLAIMER
+*
+* Do not edit or add to this file if you wish to upgrade this plugin
+* in the future.
+*
+*  @author Smart2Pay
+*  @copyright  2015 Smart2Pay
+*}
 <script type="text/javascript">
 {literal}
 function s2p_config_js_select_all()
@@ -55,7 +66,7 @@ function s2p_config_js_invert()
         {else}
         <small>{l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
             {l s='If you want to prioritize payment methods when displaying them at checkout, use Order column. Lower values will display payment method higher on the page.' mod='smart2pay'}</small>
-        <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
+        <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
         <table class="table">
             <thead>
             <tr>

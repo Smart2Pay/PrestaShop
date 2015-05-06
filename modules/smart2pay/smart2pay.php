@@ -1,13 +1,24 @@
 <?php
-
+/**
+ * 2015 Smart2Pay
+ *
+ * DISCLAIMER
+ *
+ * Do not edit or add to this file if you wish to upgrade this plugin
+ * in the future.
+ *
+ * @author    Smart2Pay
+ * @copyright 2015 Smart2Pay
+ * @license   http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
+**/
+/**
+ * Smart2Pay module file
+**/
 if (!defined('_PS_VERSION_'))
     exit;
 
 include_once( _PS_MODULE_DIR_.'smart2pay/includes/helper.inc.php' );
 
-/**
- * Class Smart2pay
- */
 class Smart2pay extends PaymentModule
 {
     const S2P_STATUS_OPEN = 1, S2P_STATUS_SUCCESS = 2, S2P_STATUS_CANCELLED = 3, S2P_STATUS_FAILED = 4, S2P_STATUS_EXPIRED = 5, S2P_STATUS_PROCESSING = 7;
@@ -43,7 +54,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0';
+        $this->version = '1.0.1';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -67,7 +78,7 @@ class Smart2pay extends PaymentModule
         $check_result['<all_valid>'] = true;
         foreach( $checks as $check_function )
         {
-            $check_function = strtolower( trim( $check_function ) );
+            $check_function = Tools::strtolower( trim( $check_function ) );
             $result = false;
             switch( $check_function )
             {
@@ -101,15 +112,15 @@ class Smart2pay extends PaymentModule
         $result = $value;
         foreach( $transforms as $transform_function )
         {
-            $transform_function = strtolower( trim( $transform_function ) );
+            $transform_function = Tools::strtolower( trim( $transform_function ) );
             switch( $transform_function )
             {
                 case 'floatval':
-                    $result = @floatval( (string)$result );
+                    $result = (float)$result;
                 break;
 
                 case 'intval':
-                    $result = @intval( (string)$result );
+                    $result = (int)$result;
                 break;
 
                 case 'trim':
@@ -117,7 +128,7 @@ class Smart2pay extends PaymentModule
                 break;
 
                 case 'toupper':
-                    $result = @strtoupper( (string)$result );
+                    $result = @Tools::strtoupper( (string)$result );
                 break;
             }
         }
@@ -255,7 +266,7 @@ class Smart2pay extends PaymentModule
             $valid_ids = array();
             foreach( $enabled_methods_arr as $method_id )
             {
-                $method_id = intval( $method_id );
+                $method_id = (int)$method_id;
                 if( empty( $all_methods_arr[$method_id] ) )
                     continue;
 
@@ -263,9 +274,9 @@ class Smart2pay extends PaymentModule
 
                 $method_settings = array();
                 $method_settings['enabled'] = 1;
-                $method_settings['surcharge_amount'] = (!empty( $surcharge_amounts_arr[$method_id] )?floatval( trim( $surcharge_amounts_arr[$method_id] ) ):0);
-                $method_settings['surcharge_percent'] = (!empty( $surcharge_percents_arr[$method_id] )?floatval( trim( $surcharge_percents_arr[$method_id] ) ):0);
-                $method_settings['priority'] = (!empty( $methods_priority_arr[$method_id] )?intval( trim( $methods_priority_arr[$method_id] ) ):0);
+                $method_settings['surcharge_amount'] = (!empty( $surcharge_amounts_arr[$method_id] )?(float)trim( $surcharge_amounts_arr[$method_id] ):0);
+                $method_settings['surcharge_percent'] = (!empty( $surcharge_percents_arr[$method_id] )?(float)trim( $surcharge_percents_arr[$method_id] ):0);
+                $method_settings['priority'] = (!empty( $methods_priority_arr[$method_id] )?(int)trim( $methods_priority_arr[$method_id] ):0);
 
                 if( !$this->save_method_settings( $method_id, $method_settings ) )
                     $post_data['errors_buffer'] .= $this->displayError( 'Error saving details for payment method '.$all_methods_arr[$method_id]['display_name'].'.' );
@@ -285,11 +296,11 @@ class Smart2pay extends PaymentModule
      */
     public function displayPaymentMethodsForm()
     {
-        $this->context->controller->addCSS( _MODULE_DIR_ . $this->name . '/css/back-style.css' );
+        $this->context->controller->addCSS( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
 
         $this->context->smarty->assign( array(
             'module_path' => $this->_path,
-            'logos_path' => $this->_path.'logos/',
+            'logos_path' => $this->_path.'views/img/logos/',
             'default_currency' => Currency::getDefaultCurrency()->iso_code,
             'payment_methods' => $this->get_all_methods(),
             'payment_method_settings' => $this->get_all_method_settings(),
@@ -307,6 +318,8 @@ class Smart2pay extends PaymentModule
     {
         // Get default language
         $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+
+        $fields_form = array();
 
         // Init Fields form array
         $fields_form[0]['form'] = array(
@@ -354,7 +367,7 @@ class Smart2pay extends PaymentModule
         foreach( $this->getConfigFormInputNames() as $name )
             $helper->fields_value[$name] = Configuration::get( $name );
 
-        $this->context->controller->addCSS( _MODULE_DIR_ . $this->name . '/css/back-style.css' );
+        $this->context->controller->addCSS( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
 
         return $helper->generateForm( $fields_form );
     }
@@ -506,7 +519,7 @@ class Smart2pay extends PaymentModule
          or empty( $order->id )
          or !($transaction_arr = $this->get_transaction_by_order_id( $order->id ))
          or empty( $transaction_arr['method_id'] )
-         or !($method_details_arr = $this->get_method_details( $transaction_arr['method_id'] )) )
+         or !$this->get_method_details( $transaction_arr['method_id'] ) )
             return '';
 
         return '<li><a href="#s2p-payment-details"><i class="icon-money"></i> '.$this->l( 'Payment Method' ).' <span class="badge">1</span></a></li>';
@@ -572,7 +585,7 @@ class Smart2pay extends PaymentModule
          or !($payment_methods_arr = $this->get_methods_for_country()) )
             return '';
 
-        $this->context->controller->addCSS( $this->_path . '/css/style.css' );
+        $this->context->controller->addCSS( $this->_path . '/views/css/style.css' );
 
         $this->smarty->assign(array(
             'this_path' => $this->_path,
@@ -635,7 +648,7 @@ class Smart2pay extends PaymentModule
             $settings[$settingName] = Configuration::get( $settingName );
         }
 
-        $env = strtoupper( $settings[self::CONFIG_PREFIX.'ENV'] );
+        $env = Tools::strtoupper( $settings[self::CONFIG_PREFIX.'ENV'] );
 
         if( $env == 'DEMO' )
         {
@@ -662,10 +675,10 @@ class Smart2pay extends PaymentModule
      */
     public function computeSHA256Hash( $message )
     {
-        if( function_exists( 'mb_strtolower' ) )
-            return hash( 'sha256', mb_strtolower( $message ) );
+        //if( function_exists( 'mb_strtolower' ) )
+        //    return hash( 'sha256', mb_strtolower( $message ) );
 
-        return hash( 'sha256', strtolower( $message ) );
+        return hash( 'sha256', Tools::strtolower( $message ) );
     }
 
     /**
@@ -731,7 +744,7 @@ class Smart2pay extends PaymentModule
         if( empty( $params['limit'] ) )
             $params['limit'] = 0;
         else
-            $params['limit'] = intval( $params['limit'] );
+            $params['limit'] = (int)$params['limit'];
         if( empty( $params['to_string'] ) )
             $params['to_string'] = false;
 
@@ -857,7 +870,7 @@ class Smart2pay extends PaymentModule
         if( is_null( $country_iso ) )
             return self::$cache['force_country'];
 
-        $country_iso = strtoupper( trim( $country_iso ) );
+        $country_iso = Tools::strtoupper( trim( $country_iso ) );
         if( !Country::getByIso( $country_iso ) )
             return false;
 
@@ -953,7 +966,7 @@ class Smart2pay extends PaymentModule
      */
     public function get_method_details( $method_id )
     {
-        $method_id = intval( $method_id );
+        $method_id = (int)$method_id;
         if( array_key_exists( $method_id, self::$cache['method_details'] ) )
             return self::$cache['method_details'][$method_id];
 
@@ -976,7 +989,7 @@ class Smart2pay extends PaymentModule
      */
     public function get_method_settings( $method_id )
     {
-        $method_id = intval( $method_id );
+        $method_id = (int)$method_id;
         if( array_key_exists( $method_id, self::$cache['method_settings'] ) )
             return self::$cache['method_settings'][$method_id];
 
@@ -1022,9 +1035,9 @@ class Smart2pay extends PaymentModule
             else
             {
                 if( is_int( $default ) )
-                    $transaction_arr[$key] = intval( $transaction_arr[$key] );
+                    $transaction_arr[$key] = (int)$transaction_arr[$key];
                 elseif( is_float( $default ) )
-                    $transaction_arr[$key] = floatval( $transaction_arr[$key] );
+                    $transaction_arr[$key] = (float)$transaction_arr[$key];
                 elseif( is_string( $default ) )
                     $transaction_arr[$key] = trim( $transaction_arr[$key] );
             }
@@ -1035,7 +1048,7 @@ class Smart2pay extends PaymentModule
 
     public function get_transaction_by_order_id( $order_id )
     {
-        $order_id = intval( $order_id );
+        $order_id = (int)$order_id;
         if( empty( $order_id )
          or !($transaction_arr = Db::getInstance()->ExecuteS(
                 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_transactions` WHERE order_id = \'' . $order_id . '\' LIMIT 0, 1'
@@ -1049,7 +1062,7 @@ class Smart2pay extends PaymentModule
     public function save_transaction( $params )
     {
         if( empty( $params['order_id'] )
-         or !intval( $params['order_id'] ) )
+         or !(int)$params['order_id'] )
             return false;
 
         if( !empty( $params['extra_data'] ) )
@@ -1075,9 +1088,9 @@ class Smart2pay extends PaymentModule
                     continue;
 
                 if( is_int( $default ) )
-                    $params[$key] = intval( $params[$key] );
+                    $params[$key] = (int)$params[$key];
                 elseif( is_float( $default ) )
-                    $params[$key] = floatval( $params[$key] );
+                    $params[$key] = (float)$params[$key];
                 elseif( is_string( $default ) )
                     $params[$key] = trim( $params[$key] );
 
@@ -1180,7 +1193,7 @@ class Smart2pay extends PaymentModule
                 continue;
 
             if( is_int( $val ) )
-                $new_val = intval( $params_arr[$key] );
+                $new_val = (int)$params_arr[$key];
             elseif( is_string( $val ) )
                 $new_val = trim( $params_arr[$key] );
             else
@@ -1204,7 +1217,7 @@ class Smart2pay extends PaymentModule
      */
     public function save_method_settings( $method_id, $params )
     {
-        $method_id = intval( $method_id );
+        $method_id = (int)$method_id;
         if( empty( $method_id )
          or empty( $params ) or !is_array( $params ) )
             return false;
@@ -1212,11 +1225,11 @@ class Smart2pay extends PaymentModule
         if( isset( $params['enabled'] ) )
             $params['enabled'] = (!empty( $params['enabled'] )?1:0);
         if( isset( $params['surcharge_amount'] ) )
-            $params['surcharge_amount'] = floatval( $params['surcharge_amount'] );
+            $params['surcharge_amount'] = (float)$params['surcharge_amount'];
         if( isset( $params['surcharge_percent'] ) )
-            $params['surcharge_percent'] = floatval( $params['surcharge_percent'] );
+            $params['surcharge_percent'] = (float)$params['surcharge_percent'];
         if( isset( $params['priority'] ) )
-            $params['priority'] = intval( $params['priority'] );
+            $params['priority'] = (int)$params['priority'];
 
         $new_settings_arr = array();
         if( !($current_settings = $this->get_method_settings( $method_id )) )
@@ -1261,11 +1274,11 @@ class Smart2pay extends PaymentModule
             if( isset( $params['enabled'] ) )
                 $current_settings['enabled'] = $edit_arr['enabled'] = (!empty( $params['enabled'] )?1:0);
             if( isset( $params['surcharge_percent'] ) )
-                $current_settings['surcharge_percent'] = $edit_arr['surcharge_percent'] = floatval( $params['surcharge_percent'] );
+                $current_settings['surcharge_percent'] = $edit_arr['surcharge_percent'] = (float)$params['surcharge_percent'];
             if( isset( $params['surcharge_amount'] ) )
-                $current_settings['surcharge_amount'] = $edit_arr['surcharge_amount'] = floatval( $params['surcharge_amount'] );
+                $current_settings['surcharge_amount'] = $edit_arr['surcharge_amount'] = (float)$params['surcharge_amount'];
             if( isset( $params['priority'] ) )
-                $current_settings['priority'] = $edit_arr['priority'] = intval( $params['priority'] );
+                $current_settings['priority'] = $edit_arr['priority'] = (int)$params['priority'];
 
             if( !empty( $edit_arr ) )
                 $edit_arr['last_update'] = array( 'type' => 'sql', 'value' => 'NOW()' );
@@ -1347,7 +1360,7 @@ class Smart2pay extends PaymentModule
         $priority_methods_arr = array();
         foreach( $country_method_ids as $db_row )
         {
-            $method_id = intval( $db_row['method_id'] );
+            $method_id = (int)$db_row['method_id'];
             if( empty( $method_id )
              or empty( $all_methods_arr[$method_id] )
              or empty( $all_methods_settings_arr[$method_id] )
@@ -1367,7 +1380,7 @@ class Smart2pay extends PaymentModule
         ksort( $priority_methods_arr );
 
         $country_methods_arr = array();
-        foreach( $priority_methods_arr as $priority => $priority_method_ids )
+        foreach( $priority_methods_arr as $priority_method_ids )
         {
             if( empty( $priority_method_ids ) or !is_array( $priority_method_ids ) )
                 continue;
@@ -1401,7 +1414,7 @@ class Smart2pay extends PaymentModule
      */
     public function method_details_if_available( $method_id, $country_iso = null )
     {
-        $method_id = intval( $method_id );
+        $method_id = (int)$method_id;
         if( empty( $method_id ) )
             return false;
 
@@ -1483,7 +1496,6 @@ class Smart2pay extends PaymentModule
                         'name' => $this->l( 'Live' ),
                     ),
                 );
-            break;
 
             case 'yesno':
                 return array(
@@ -1496,7 +1508,6 @@ class Smart2pay extends PaymentModule
                         'name' => $this->l( 'Yes' ),
                     ),
                 );
-            break;
 
             case 'country_list':
                 if( !($countries_list = $this->get_smart2pay_countries())
@@ -1518,7 +1529,6 @@ class Smart2pay extends PaymentModule
                 }
 
                 return $return_arr;
-                break;
         }
     }
 
@@ -2973,7 +2983,7 @@ class Smart2pay extends PaymentModule
 
                 Db::getInstance()->Execute(
                     'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`) '.
-                    'VALUES(' . intval( $statusID ) . ', 1, \'' . pSQL( $status['orderStatusName'] ). '\')'
+                    'VALUES(' . (int)$statusID . ', 1, \'' . pSQL( $status['orderStatusName'] ). '\')'
                 );
             }
 
