@@ -62,12 +62,12 @@
         </div>
 
 
-        <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall'}" id="s2pd_ip_detection_test" name="s2pd_ip_detection_test" class="defaultForm form-horizontal smart2paydetection">
+        <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2pd_ip_detection_test" name="s2pd_ip_detection_test" class="defaultForm form-horizontal smart2paydetection">
         <div class="form-wrapper">
 
             <div class="form-group">
                 <label class="control-label col-lg-3 required" for="s2p_test_ip">{l s='Try Detection on IP' mod='smart2paydetection'}</label>
-                <div class="col-lg-9"><input id="s2p_test_ip" name="s2p_test_ip" class="" type="text" required="required" value="{$s2p_test_ip|escape:'htmlall'}" /></div>
+                <div class="col-lg-9"><input id="s2p_test_ip" name="s2p_test_ip" class="" type="text" required="required" value="{$s2p_test_ip|escape:'htmlall':'UTF-8'}" /></div>
             </div>
 
             <div class="form-group">

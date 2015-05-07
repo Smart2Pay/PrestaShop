@@ -43,7 +43,7 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0';
+        $this->version = '1.0.0';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -67,7 +67,7 @@ class Smart2paydetection extends Module
         $check_result['<all_valid>'] = true;
         foreach( $checks as $check_function )
         {
-            $check_function = strtolower( trim( $check_function ) );
+            $check_function = Tools::strtolower( trim( $check_function ) );
             $result = false;
             switch( $check_function )
             {
@@ -101,11 +101,11 @@ class Smart2paydetection extends Module
             switch( $transform_function )
             {
                 case 'floatval':
-                    $result = @floatval( (string)$result );
+                    $result = (float)$result;
                 break;
 
                 case 'intval':
-                    $result = @intval( (string)$result );
+                    $result = (int)$result;
                 break;
 
                 case 'trim':
@@ -113,7 +113,7 @@ class Smart2paydetection extends Module
                 break;
 
                 case 'toupper':
-                    $result = @strtoupper( (string)$result );
+                    $result = @Tools::strtoupper( (string)$result );
                 break;
             }
         }
@@ -136,7 +136,7 @@ class Smart2paydetection extends Module
          or empty( $detection_result['country']['iso_code'] ) )
             return false;
 
-        return strtoupper( $detection_result['country']['iso_code'] );
+        return Tools::strtoupper( $detection_result['country']['iso_code'] );
     }
 
     public function detect_details_from_ip( $ip = false )
@@ -397,6 +397,8 @@ class Smart2paydetection extends Module
         // Get default language
         $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
 
+        $fields_form = array();
+
         // Init Fields form array
         $fields_form[0]['form'] = array(
             'legend' => array(
@@ -602,7 +604,6 @@ class Smart2paydetection extends Module
                         'name' => $this->l( 'Yes' ),
                     )
                 );
-            break;
 
             case 'country_list':
                 if( !($countries_list = $this->get_smart2pay_countries())
@@ -624,7 +625,6 @@ class Smart2paydetection extends Module
                 }
 
                 return $return_arr;
-            break;
         }
     }
 
