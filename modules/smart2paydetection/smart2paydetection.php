@@ -193,6 +193,12 @@ class Smart2paydetection extends Module
      */
     public function getContent()
     {
+        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader.php';
+        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Decoder.php';
+        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/InvalidDatabaseException.php';
+        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Metadata.php';
+        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Util.php';
+
         $post_result = $this->process_post_data();
 
         $output = '';

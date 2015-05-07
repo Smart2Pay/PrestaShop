@@ -30,6 +30,9 @@ class Smart2pay extends PaymentModule
 
     const DEMO_SIGNATURE = 'fc5fa3b8-746a', DEMO_MID = '1045', DEMO_SID = '30144', DEMO_POSTURL = 'https://apitest.smart2pay.com';
 
+    // Tells module if install() or uninstall() methods are currenctly called
+    private static $maintenance_functionality = false;
+
     /**
      * Static cache
      *
@@ -379,6 +382,8 @@ class Smart2pay extends PaymentModule
      */
     public function install()
     {
+        self::$maintenance_functionality = true;
+
         if( !parent::install()
 
          // Displaying payment options
@@ -391,10 +396,22 @@ class Smart2pay extends PaymentModule
          or !$this->registerHook( 'displayAdminOrderTabOrder' ) // Order tabs
          or !$this->registerHook( 'displayAdminOrderContentOrder' ) // Order tab content
         )
+        {
+            self::$maintenance_functionality = false;
             return false;
+        }
 
         if( Shop::isFeatureActive() )
             Shop::setContext( Shop::CONTEXT_ALL );
+
+        /*
+         * Install database
+         */
+        if( !$this->installDatabase() )
+        {
+            self::$maintenance_functionality = false;
+            return false;
+        }
 
         /*
          * Set default module config
@@ -420,10 +437,7 @@ class Smart2pay extends PaymentModule
             }
         }
 
-        /*
-         * Install database
-         */
-        $this->installDatabase();
+        self::$maintenance_functionality = false;
 
         return true;
     }
@@ -435,6 +449,8 @@ class Smart2pay extends PaymentModule
      */
     public function uninstall()
     {
+        self::$maintenance_functionality = true;
+
         $settingsCleanedSuccessfully = true;
 
         foreach( $this->getConfigFormInputs() as $setting )
@@ -444,7 +460,10 @@ class Smart2pay extends PaymentModule
         }
 
         if( !parent::uninstall() || !$settingsCleanedSuccessfully )
+        {
+            self::$maintenance_functionality = false;
             return false;
+        }
 
         // ! S2p custom order statuses are not removed in order to assure data consistency
         //   This way issues are avoided when there are orders having this type of status attached, and module is uninstalled
@@ -455,6 +474,8 @@ class Smart2pay extends PaymentModule
          * Uninstall Database
          */
         $this->uninstallDatabase();
+
+        self::$maintenance_functionality = false;
 
         return true;
     }
@@ -885,6 +906,9 @@ class Smart2pay extends PaymentModule
      */
     public function get_smart2pay_countries()
     {
+        if( !empty( self::$maintenance_functionality ) )
+            return array();
+        
         if( !empty( self::$cache['all_countries'] ) )
             return self::$cache['all_countries'];
 
@@ -1608,7 +1632,7 @@ class Smart2pay extends PaymentModule
                     'id' => 'id',
                     'name' => 'name',
                 ),
-                '_default' => 'test',
+                '_default' => 'demo',
             ),
             array(
                 'type' => 'text',
@@ -1958,7 +1982,7 @@ class Smart2pay extends PaymentModule
         /*
          * Install module's database
          */
-        Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_transactions` (
+        if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_transactions` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `method_id` int(11) NOT NULL DEFAULT '0',
                 `payment_id` int(11) NOT NULL DEFAULT '0',
@@ -1975,11 +1999,12 @@ class Smart2pay extends PaymentModule
                 `last_update` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
                 `created` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
                  PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `payment_id` (`payment_id`), KEY `order_id` (`order_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
+                ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
 
-        ");
+        ") )
+            return false;
 
-        Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method_settings` (
+        if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method_settings` (
                 `id` int(11) NOT NULL,
                 `method_id` int(11) NOT NULL DEFAULT '0',
                 `enabled` tinyint(2) NOT NULL DEFAULT '0',
@@ -1988,38 +2013,55 @@ class Smart2pay extends PaymentModule
                 `priority` tinyint(4) NOT NULL DEFAULT '10' COMMENT '1 means first',
                 `last_update` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
                 `configured` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00'
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Smart2Pay method configurations';
-        ");
+                ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Smart2Pay method configurations';
+        ") )
+            return false;
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method_settings`
+        if( !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method_settings`
               ADD PRIMARY KEY (`id`), ADD KEY `method_id` (`method_id`), ADD KEY `enabled` (`enabled`);
-        ");
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method_settings`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method_settings`
               MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
         Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_logs`' );
-        Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_logs` (
+        if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_logs` (
                 `log_id` int(11) NOT NULL,
                 `log_type` varchar(255) default NULL,
                 `log_data` text default NULL,
                 `log_source_file` varchar(255) default NULL,
                 `log_source_file_line` varchar(255) default NULL,
                 `log_created` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
-        ");
+            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8;
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_logs`
+        if( !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_logs`
               ADD PRIMARY KEY (`log_id`);
-        ");
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_logs`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_logs`
               MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT;
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
         Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_method`");
-        Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method` (
+        if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method` (
                 `method_id` int(11) NOT NULL,
                 `display_name` varchar(255) default NULL,
                 `provider_value` varchar(255) default NULL,
@@ -2027,18 +2069,26 @@ class Smart2pay extends PaymentModule
                 `logo_url` varchar(255) default NULL,
                 `guaranteed` int(1) default NULL,
                 `active` int(1) default NULL
-            ) ENGINE=InnoDB  DEFAULT CHARSET=utf8
-        ");
+            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method`
               ADD PRIMARY KEY (`method_id`), ADD KEY `active` (`active`);
-        ");
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_method`
               MODIFY `method_id` int(11) NOT NULL AUTO_INCREMENT;
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
-        Db::getInstance()->Execute("
+        if( !Db::getInstance()->Execute("
             INSERT INTO `" . _DB_PREFIX_ . "smart2pay_method` (`method_id`, `display_name`, `provider_value`, `description`, `logo_url`, `guaranteed`, `active`) VALUES
             (1, 'Bank Transfer', 'banktransfer', 'Bank Transfer description', 'bank_transfer_logo_v6.png', 1, 1),
             (2, 'iDEAL', 'ideal', 'iDEAL description', 'ideal.png', 1, 1),
@@ -2130,26 +2180,39 @@ class Smart2pay extends PaymentModule
             (1043, 'Danske bank', 'paytrail', 'Danske description', 'danske_bank.png', 1, 1),
             (1044, 'Cash-in', 'yandexmoney', 'Cash-in description', 'cashinyandex.gif', 1, 1),
             (1045, 'Cards Russia', 'yandexmoney', 'Cards Russia description', 's2p_cards.gif', 1, 1);
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
         Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country`");
-        Db::getInstance()->Execute("
+        if( !Db::getInstance()->Execute("
             CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_country` (
                 `country_id` int(11) NOT NULL,
                 `code` varchar(3) default NULL,
                 `name` varchar(100) default NULL
-            ) ENGINE=InnoDB  DEFAULT CHARSET=utf8
-        ");
+            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country`
               ADD PRIMARY KEY (`country_id`);
-        ");
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country`
               MODIFY `country_id` int(11) NOT NULL AUTO_INCREMENT;
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
-        Db::getInstance()->Execute("
+
+        if( !Db::getInstance()->Execute("
             INSERT INTO `" . _DB_PREFIX_ . "smart2pay_country` (`country_id`, `code`, `name`) VALUES
             (1, 'AD', 'Andorra'),
             (2, 'AE', 'United Arab Emirates'),
@@ -2394,29 +2457,41 @@ class Smart2pay extends PaymentModule
             (242, 'PS', 'Palestinian Territory'),
             (243, 'ME', 'Montenegro'),
             (244, 'RS', 'Serbia')
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
 
         Db::getInstance()->Execute("DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country_method`");
-        Db::getInstance()->Execute("
+        if( !Db::getInstance()->Execute("
             CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_country_method` (
                 `id` int(11) NOT NULL,
                 `country_id` int(11) default NULL,
                 `method_id` int(11) default NULL,
                 `priority` int(2) default NULL
-            ) ENGINE=InnoDB  DEFAULT CHARSET=utf8
-        ");
+            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
+        ")
 
+            or
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country_method`
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country_method`
               ADD PRIMARY KEY (`id`), ADD KEY `country_id` (`country_id`), ADD KEY `method_id` (`method_id`);
-        ");
+        ")
 
-        Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country_method`
+            or
+
+        !Db::getInstance()->Execute( "ALTER TABLE `" . _DB_PREFIX_ . "smart2pay_country_method`
               MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
 
-        Db::getInstance()->Execute("
+
+        if( !Db::getInstance()->Execute("
             INSERT INTO `" . _DB_PREFIX_ . "smart2pay_country_method` (`id`, `country_id`, `method_id`, `priority`) VALUES
                 (1,1,76,99),
                 (2,2,13,1),
@@ -2959,7 +3034,13 @@ class Smart2pay extends PaymentModule
                 (539,244,63,1),
                 (540,244,69,2),
                 (541,244,76,99)
-        ");
+        ") )
+        {
+            $this->uninstallDatabase();
+            return false;
+        }
+
+        return true;
     }
 
     /**
