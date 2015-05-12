@@ -65,6 +65,9 @@ class Smart2paydetection extends Module
 
         $check_result = array();
         $check_result['<all_valid>'] = true;
+        $check_result['url'] = true;
+        $check_result['notempty'] = true;
+
         foreach( $checks as $check_function )
         {
             $check_function = Tools::strtolower( trim( $check_function ) );

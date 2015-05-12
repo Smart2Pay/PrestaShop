@@ -81,6 +81,10 @@ class Smart2pay extends PaymentModule
 
         $check_result = array();
         $check_result['<all_valid>'] = true;
+        $check_result['url'] = true;
+        $check_result['notempty'] = true;
+        $check_result['country_iso'] = true;
+
         foreach( $checks as $check_function )
         {
             $check_function = Tools::strtolower( trim( $check_function ) );
@@ -1856,7 +1860,7 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'COUNTRY_DETECTION',
                 'desc' => array(
                     $this->l( 'Plugin will try detecting visitor\'s country by IP. Country is important for plugin as payment methods are displayed depending on country.' ),
-                    $this->l( 'Country detection is available when you install Smart2Pay Detection plugin.' ),
+                    $this->l( 'Country detection is available when you install and activate Smart2Pay Detection plugin.' ),
                     $this->l( 'If you select Yes and country detection plugin is not installed, plugin will use as fallback country set in customer\'s billing address.' ),
                 ),
                 'required' => false,

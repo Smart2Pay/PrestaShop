@@ -64,7 +64,7 @@ $_MODULE['<{smart2pay}prestashop>order_payment_logs_5352601a9516c0ff896e60e8a5da
 $_MODULE['<{smart2pay}prestashop>payment_methods_af01f8c298aa063d9c7490f00eddd2df'] = 'Payment Methods';
 $_MODULE['<{smart2pay}prestashop>payment_methods_cb0733a5717056586ec73b995f27dabe'] = 'No payment methods defined in database.';
 $_MODULE['<{smart2pay}prestashop>payment_methods_bf8f278b7a6146ebafff7ef79ef025c6'] = 'Surcharge amount is provided in shop\'s default currency.';
-$_MODULE['<{smart2pay}prestashop>payment_methods_f22abf3a65a1572a6c8a90ab2bd9313c'] = 'If you want to prioritize payment methods when displaying them at checkout, use Order column. Lower values will display payment method higher on the page.';
+$_MODULE['<{smart2pay}prestashop>payment_methods_308c2519b06025a2ce8764a955c34006'] = 'If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.';
 $_MODULE['<{smart2pay}prestashop>payment_methods_3f3d064b6c177cc47540a4bb55d5a587'] = 'Enabled?';
 $_MODULE['<{smart2pay}prestashop>payment_methods_49ee3087348e8d44e1feda1917443987'] = 'Name';
 $_MODULE['<{smart2pay}prestashop>payment_methods_70a2468998d90207df5ed8727c31e7b2'] = 'Surcharge';
