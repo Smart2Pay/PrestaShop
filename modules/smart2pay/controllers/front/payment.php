@@ -47,7 +47,7 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
         if( empty( $method_id )
          or !($payment_method = $smart2pay_module->method_details_if_available( $method_id )) )
         {
-            $smart2pay_module->writeLog( 'Payment method #' . $method_id . ' could not be loaded, or it is not available', 'error' );
+            $smart2pay_module->writeLog( 'Payment method #' . $method_id . ' could not be loaded, or it is not available', array( 'type' => 'error' ) );
             Tools::redirect( 'index.php?controller=order&step=1' ); // Todo - give some feedback to the user
         }
 
@@ -66,7 +66,7 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
         /**
          *    Surcharge calculation
          */
-        $amount_to_pay = number_format( $context->cart->getOrderTotal(), 2, '.', '' );
+        $cart_original_amount = $amount_to_pay = number_format( $context->cart->getOrderTotal(), 2, '.', '' );
 
         $surcharge_percent_amount = 0;
         // Amount in shop currency (base currency)
@@ -86,7 +86,23 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
                 $surcharge_order_amount = $surcharge_amount;
         }
 
-        $amount_to_pay += $surcharge_percent_amount + $surcharge_order_amount;
+        $total_surcharge = $surcharge_percent_amount + $surcharge_order_amount;
+        $amount_to_pay += $total_surcharge;
+
+        if( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE']
+        and $cart_original_amount != $amount_to_pay )
+        {
+            $order = new Order( $orderID );
+
+            if( Validate::isLoadedObject( $order ) )
+            {
+                $order->total_paid = $amount_to_pay;
+                $order->total_paid_tax_incl = $amount_to_pay;
+
+                $order->update();
+
+            }
+        }
         /**
          *    END Surcharge calculation
          */
@@ -115,7 +131,7 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
 
         $moduleSettings['skipPaymentPage'] = $skipPaymentPage;
 
-        if( !empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SEND_ORDER_NUMBER_AS_PRODUCT_DESCRIPTION'] ) )
+        if( !empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SEND_ORDER_NUMBER'] ) )
             $payment_description = 'Ref. No. '.$orderID;
         else
             $payment_description = $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'CUSTOM_PRODUCT_DESCRIPTION'];
@@ -131,12 +147,12 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
             'CustomerFirstName' => $context->customer->firstname,
             'CustomerLastName'  => $context->customer->lastname,
             'CustomerEmail'     => $context->customer->email,
-            'Country'           => $context->country->iso_code,
+            'Country'           => $payment_method['country_iso'], // $context->country->iso_code,
             'MethodID'          => $method_id,
             'Description'       => $payment_description,
             'SkipHPP'           => (!empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SKIP_PAYMENT_PAGE'] )?1:0),
             'RedirectInIframe'  => (!empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'REDIRECT_IN_IFRAME'] )?1:0),
-            'SkinID'            => $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SKIN_ID'],
+            'SkinID'            => (!empty( $moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SKIN_ID'] )?$moduleSettings[$smart2pay_module::CONFIG_PREFIX.'SKIN_ID']:null),
             'SiteID'            => $site_id,
         );
 
@@ -162,6 +178,8 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
             'moduleSettings' => $moduleSettings,
             'notSetPaymentData' => $notSetPaymentData,
         ) );
+
+        $smart2pay_module->writeLog( 'Message to hash ['.$messageToHash.'], Hash ['.$paymentData['Hash'].']', array( 'order_id' => $orderID ) );
 
         $this->setTemplate('sendForm.tpl');
     }

@@ -43,10 +43,10 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.0';
+        $this->version = '1.0.3';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
-        $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
+        $this->ps_versions_compliancy = array( 'min' => '1.5', 'max' => _PS_VERSION_ );
         $this->bootstrap = true;
         $this->controllers = array( 'payment' );
 
@@ -139,7 +139,7 @@ class Smart2paydetection extends Module
         return Tools::strtoupper( $detection_result['country']['iso_code'] );
     }
 
-    public function detect_details_from_ip( $ip = false )
+    public function detect_details_from_ip( $ip = false, $log_result = true )
     {
         // Reset last error...
         self::$cache['last_detection_error_msg'] = '';
@@ -176,7 +176,19 @@ class Smart2paydetection extends Module
         {
             $reader = new MaxMind\Db\Reader( $db_file );
 
-            $result = $reader->get( $ip );
+            if( ($result = $reader->get( $ip )) )
+            {
+                /** @var Smart2Pay $s2p_module */
+                if( !empty( $log_result )
+                and !empty( $result['country'] ) and is_array( $result['country'] )
+                and !empty( $result['country']['iso_code'] )
+                and Configuration::get( self::CONFIG_PREFIX.'LOG_DETECTIONS' )
+                and Configuration::get( self::S2P_CONFIG_PREFIX.'ENABLED' )
+                and ($s2p_module = Module::getInstanceByName( 'smart2pay' )) )
+                {
+                    $s2p_module->writeLog( 'Detected country ['.$result['country']['iso_code'].'] for IP ['.$ip.']', array( 'type' => 'detection' ) );
+                }
+            }
         } catch( Exception $e )
         {
             self::$cache['last_detection_error_msg'] = $this->l( 'Couldn\'t locate IP in database.' );
@@ -184,6 +196,37 @@ class Smart2paydetection extends Module
         }
 
         return $result;
+    }
+
+    public function get_detection_logs( $params = false )
+    {
+        /** @var Smart2pay $smart2pay */
+        if( !($smart2pay = Module::getInstanceByName( 'smart2pay' )) )
+            return array();
+
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
+
+        if( empty( $params['limit'] ) )
+            $params['limit'] = 20;
+
+        $params['log_type'] = 'detection';
+
+        if( !($logs_arr = $smart2pay->getLogs( $params )) )
+            return array();
+
+        return $logs_arr;
+    }
+
+    public static function formatBytes( $size, $precision = 2 )
+    {
+        if( !$size )
+            return '0';
+
+        $base = log( $size ) / log( 1024 );
+        $suffixes = array('', 'k', 'M', 'G', 'T');
+
+        return round(pow(1024, $base - floor($base)), $precision).$suffixes[floor($base)];
     }
 
     /**
@@ -257,12 +300,13 @@ class Smart2paydetection extends Module
             'db_file_location' => $db_file,
             'db_file_installed' => $db_file_exists,
             'db_file_size' => number_format( $db_file_size, 0 ),
-            'db_file_size_human' => Tools::formatBytes( $db_file_size ),
+            'db_file_size_human' => self::formatBytes( $db_file_size ),
             'db_file_records' => number_format( $db_file_records, 0 ),
             'db_file_version' => $db_file_version,
             'db_file_description' => $db_file_description,
             'db_file_time' => (!empty( $db_file_time )?date( $this->context->language->date_format_full, $db_file_time ):'N/A'),
             'detection_result' => (!empty( $post_result['<detection_result>'] )?$post_result['<detection_result>']:false),
+            'detection_logs' => $this->get_detection_logs(),
         ) );
 
         return $output.
@@ -345,7 +389,7 @@ class Smart2paydetection extends Module
 
             $s2p_test_ip = Tools::getValue( 's2p_test_ip', '' );
 
-            if( !($detection_result = $this->detect_details_from_ip( $s2p_test_ip )) )
+            if( !($detection_result = $this->detect_details_from_ip( $s2p_test_ip, false )) )
             {
                 if( !empty( self::$cache['last_detection_error_msg'] ) )
                     $post_data['errors_buffer'] .= $this->displayError( self::$cache['last_detection_error_msg'] );
@@ -668,6 +712,24 @@ class Smart2paydetection extends Module
                     'name' => 'name',
                 ),
                 '_default' => 1,
+            ),
+            array(
+                'type' => 'select',
+                'label' => $this->l( 'Log detections in Smart2Pay' ),
+                'name' => self::CONFIG_PREFIX.'LOG_DETECTIONS',
+                'hint' => array(
+                    $this->l( 'Try logging results in Smart2Pay module' ),
+                ),
+                'desc' => array(
+                    $this->l( 'If enabled, Smart2Pay Detection module will try writing detection result in Smart2Pay logs. Smart2Pay module has to be enabled too.' ),
+                ),
+                'required' => true,
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_default' => 0,
             ),
         );
     }

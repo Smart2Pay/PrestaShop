@@ -9,17 +9,23 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
+{if $smarty.const._PS_VERSION_ >= 1.6}
 <div class="panel">
     <div class="panel-heading">{l s='IP Detection Demo' mod='smart2paydetection'}</div>
     <div class="smart2paydetection-admin-ip-detection-container">
+{else}
+<br/>
+<fieldset>
+    <legend>{l s='IP Detection Demo' mod='smart2paydetection'}</legend>
+{/if}
 
         <div style="text-align: center; padding: 5px;">
 
             This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com">http://www.maxmind.com</a>.<br/>
 
-            <strong>Please note that in order to have higher rates of detection you should update database file as often as possible.</strong><br/>
+            <strong>{l s='Please note that in order to have higher rates of detection you should update database file as often as possible.' mod='smart2paydetection'}</strong><br/>
 
-            You can download database file from <a href="http://dev.maxmind.com/geoip/geoip2/geolite2/" target="_blank">http://dev.maxmind.com/geoip/geoip2/geolite2/</a>.
+            {l s='You can download database file from following location: ' mod='smart2paydetection'} <a href="http://dev.maxmind.com/geoip/geoip2/geolite2/" target="_blank">http://dev.maxmind.com/geoip/geoip2/geolite2/</a>.
 
         </div>
 
@@ -30,7 +36,7 @@
 
         {else}
 
-        <table class="table">
+        <table class="table" style="width: 80%; margin: 0 auto;">
         <tbody>
         <tr>
             <td><strong>{l s='DB File Location' mod='smart2paydetection'}</strong></td>
@@ -57,7 +63,7 @@
 
         <div style="text-align: center; padding: 10px;">
 
-            To test plugin detection you can use the form below.<br/>
+            {l s='To test plugin detection you can use the form below.' mod='smart2paydetection'}<br/>
 
         </div>
 
@@ -78,7 +84,7 @@
         </form>
 
         {if !empty( $detection_result ) }
-        <table class="table">
+        <table class="table" style="width: 80%; margin: 0 auto;">
             <tbody>
             <tr>
                 <td><strong>{l s='Detected Country' mod='smart2paydetection'}</strong></td>
@@ -93,5 +99,56 @@
         {/if}
 
         {/if}
+
+{if $smarty.const._PS_VERSION_ < 1.6}
+</fieldset>
+{else}
     </div>
 </div>
+{/if}
+
+{if $smarty.const._PS_VERSION_ >= 1.6}
+<div class="panel">
+    <div class="panel-heading">{l s='Detection Logs' mod='smart2paydetection'}</div>
+    <div class="smart2paydetection-admin-ip-detection-container">
+{else}
+<br/>
+<fieldset>
+    <legend>{l s='Detection Logs' mod='smart2paydetection'}</legend>
+{/if}
+
+        <div style="text-align: center; padding: 5px;">
+
+            <strong>{l s='Below you have last 20 logs about IP detection.' mod='smart2paydetection'}</strong><br/>
+
+        </div>
+
+        <table class="table s2p-payment-logs row-margin-bottom" {if $smarty.const._PS_VERSION_ < 1.6}style="width: 100%"{/if}>
+            <thead>
+            <tr>
+                <td style="width:180px; text-align: center;">{l s='Date' mod='smart2paydetection'}</td>
+                <td>{l s='Log' mod='smart2paydetection'}</td>
+            </tr>
+            </thead>
+            <tbody>
+            {if empty( $detection_logs )}
+                <tr>
+                    <td colspan="2" style="text-align: center;"><p>{l s='No detection logs in database.' mod='smart2paydetection'}</p></td>
+                </tr>
+            {else}
+                {foreach from=$detection_logs key=key item=log_item name=s2p_detection_logs}
+                    <tr>
+                        <td style="white-space: nowrap;">{Tools::displayDate( $log_item.log_created, null, true )}</td>
+                        <td>{$log_item.log_data}</td>
+                    </tr>
+                {/foreach}
+            {/if}
+            </tbody>
+        </table>
+
+{if $smarty.const._PS_VERSION_ < 1.6}
+</fieldset>
+{else}
+    </div>
+</div>
+{/if}

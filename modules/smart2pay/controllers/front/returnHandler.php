@@ -72,6 +72,9 @@ class Smart2payreturnHandlerModuleFrontController extends ModuleFrontController
 
         $data = (int) Tools::getValue( 'data', 0 );
 
+        if( empty( $data ) )
+            $data = $s2p_module::S2P_STATUS_FAILED;
+
         if( !($path = $this->context->smarty->getVariable( 'path', null, true, false ))
          or ($path instanceof Undefined_Smarty_Variable) )
             $path = '';

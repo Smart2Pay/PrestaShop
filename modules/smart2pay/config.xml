@@ -2,8 +2,8 @@
 <module>
 	<name>smart2pay</name>
 	<displayName><![CDATA[Smart2Pay]]></displayName>
-	<version><![CDATA[1.0.1]]></version>
-	<description><![CDATA[Secure payments through more than 100 payment methods.]]></description>
+	<version><![CDATA[1.0.3]]></version>
+	<description><![CDATA[Secure payments through 90 alternative payment methods.]]></description>
 	<author><![CDATA[Smart2Pay]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>
 	<confirmUninstall><![CDATA[Are you sure you want to uninstall Smart2Pay plugin?]]></confirmUninstall>

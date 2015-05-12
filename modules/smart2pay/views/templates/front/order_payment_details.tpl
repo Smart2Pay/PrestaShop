@@ -9,17 +9,21 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
-<div class="adresses_bloc">
+<div class="adresses_bloc clearfix">
     <div class="row">
         <div class="col-xs-12 col-sm-12">
-            <ul class="address alternate_item box">
+            <ul class="address alternate_item box" {if $smarty.const._PS_VERSION_ < 1.6} style="width:100% !important;" {/if}>
+                {if $smarty.const._PS_VERSION_ >= 1.6}
                 <li><h3 class="page-subheading">{l s='Payment Details' mod='smart2pay'}</h3></li>
+                {else}
+                <li class="address_title">{l s='Payment Details' mod='smart2pay'}</li>
+                {/if}
 
-                <li><strong class="dark">{l s='Payment Method' mod='smart2pay'}</strong> {$method_details.display_name}</li>
+                <li><strong class="dark">{l s='Payment Method' mod='smart2pay'}</strong>: {$method_details.display_name}</li>
 
                 {if $transaction_arr.surcharge_amount != 0 || $transaction_arr.surcharge_percent != 0}
                 <li>
-                    <strong class="dark">{l s='Method Surcharge' mod='smart2pay'}</strong>
+                    <strong class="dark">{l s='Method Surcharge' mod='smart2pay'}</strong>:
                     {if $transaction_arr.surcharge_amount != 0}
                         {if !empty( $surcharge_currency_id )}
                             {displayPrice price=$transaction_arr.surcharge_amount currency=$surcharge_currency_id}
@@ -51,7 +55,7 @@
                 </li>
                 {/if}
 
-                <li><strong class="dark">{l s='Payment ID' mod='smart2pay'}</strong> {$transaction_arr.payment_id}</li>
+                <li><strong class="dark">{l s='Payment ID' mod='smart2pay'}</strong>: {$transaction_arr.payment_id}</li>
 
                 {if false}
                 <!--
@@ -72,7 +76,7 @@
                         {continue}
                     {/if}
                     <li>
-                        <strong class="dark">{l s=$val mod='smart2pay'}</strong>
+                        <strong class="dark">{l s=$val mod='smart2pay'}</strong>:
                         {$transaction_extra_data[$key]}
                     </li>
                 {/foreach}

@@ -58,16 +58,23 @@ function s2p_config_js_invert()
 {/literal}
 </script>
 
+{if $smarty.const._PS_VERSION_ >= 1.6}
 <div class="panel">
     <div class="panel-heading">{l s='Payment Methods' mod='smart2pay'}</div>
     <div class="smart2pay-admin-payment-method-container">
+{else}
+<br/>
+<fieldset>
+    <legend>{l s='Payment Methods' mod='smart2pay'}</legend>
+{/if}
+
         {if empty( $payment_methods )}
         <div style="text-align: center">{l s='No payment methods defined in database.' mod='smart2pay'}</div>
         {else}
         <small>{l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
             {l s='If you want to prioritize payment methods when displaying them at checkout, use Order column. Lower values will display payment method higher on the page.' mod='smart2pay'}</small>
         <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
-        <table class="table">
+        <table class="table" style="width: 80%; margin: 0 auto;">
             <thead>
             <tr>
                 <th>{l s='Enabled?' mod='smart2pay'}</th>
@@ -114,5 +121,10 @@ function s2p_config_js_invert()
         </table>
         </form>
         {/if}
+
+{if $smarty.const._PS_VERSION_ < 1.6}
+</fieldset>
+{else}
     </div>
 </div>
+{/if}

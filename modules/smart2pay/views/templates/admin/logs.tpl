@@ -9,9 +9,15 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
+{if $smarty.const._PS_VERSION_ >= 1.6}
 <div class="panel">
     <div class="panel-heading">{l s='Logs' mod='smart2pay'}</div>
     <div class="smart2pay-admin-logs-container">
+{else}
+<br/>
+<fieldset>
+    <legend>{l s='Logs' mod='smart2pay'}</legend>
+{/if}
         {if empty( $logs )}
         <div style="text-align: center">{l s='No logs available at the moment' mod='smart2pay'}</div>
         {else}
@@ -38,5 +44,9 @@
             </tbody>
         </table>
         {/if}
+{if $smarty.const._PS_VERSION_ < 1.6}
+</fieldset>
+{else}
     </div>
 </div>
+{/if}

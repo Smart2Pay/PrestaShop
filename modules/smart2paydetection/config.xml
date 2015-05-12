@@ -2,7 +2,7 @@
 <module>
 	<name>smart2paydetection</name>
 	<displayName><![CDATA[Smart2Pay Detection]]></displayName>
-	<version><![CDATA[1.0.0]]></version>
+	<version><![CDATA[1.0.3]]></version>
 	<description><![CDATA[Smart2Pay Detection is a helper module for Smart2Pay Payment module.]]></description>
 	<author><![CDATA[Smart2Pay]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>

@@ -9,10 +9,16 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
+{if $smarty.const._PS_VERSION_ >= 1.6}
 <div class="tab-pane" id="s2p-payment-details">
     <h4 class="visible-print">{l s='Payment Details' mod='smart2pay'}</h4>
     <div class="table-responsive">
-    <table class="table s2p-payment-details row-margin-bottom">
+{else}
+<br />
+<fieldset>
+    <legend>{l s='Payment Details' mod='smart2pay'}</legend>
+{/if}
+    <table class="table s2p-payment-details row-margin-bottom" {if $smarty.const._PS_VERSION_ < 1.6}style="width: 100%"{/if}>
     <tbody>
         <tr>
             <td><strong>{l s='Environment' mod='smart2pay'}</strong></td>
@@ -87,5 +93,9 @@
         {/foreach}
     </tbody>
     </table>
+{if $smarty.const._PS_VERSION_ < 1.6}
+    </fieldset>
+{else}
     </div>
 </div>
+{/if}
