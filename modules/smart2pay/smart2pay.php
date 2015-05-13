@@ -26,6 +26,8 @@ class Smart2pay extends PaymentModule
     const CONFIG_PREFIX = 'S2P_';
     const S2PD_CONFIG_PREFIX = 'S2PD_';
 
+    const S2P_DETECTOR_NAME = 'smart2paydetection';
+
     const COOKIE_NAME = 'S2P_COOKIE';
 
     const PAYM_BANK_TRANSFER = 1, PAYM_MULTIBANCO_SIBS = 20;
@@ -59,7 +61,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.3';
+        $this->version = '1.0.4';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.5', 'max' => _PS_VERSION_ );
@@ -72,6 +74,14 @@ class Smart2pay extends PaymentModule
         $this->description = $this->l( 'Secure payments through 90 alternative payment methods.' );
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
+    }
+
+    public function clean_methods_cache()
+    {
+        self::$cache['method_details'] = array();
+        self::$cache['method_settings'] = array();
+        self::$cache['all_method_details_in_cache'] = false;
+        self::$cache['all_method_settings_in_cache'] = false;
     }
 
     public static function validate_value( $value, array $checks )
@@ -223,6 +233,17 @@ class Smart2pay extends PaymentModule
                 if( !$this->save_method_settings( $method_id, $method_settings ) )
                     $post_data['errors_buffer'] .= $this->displayError( 'Error saving details for payment method '.$all_methods_arr[$method_id]['display_name'].'.' );
             }
+
+            if( empty( $valid_ids ) )
+                Db::getInstance()->execute( 'TRUNCATE TABLE `'._DB_PREFIX_.'smart2pay_method_settings`' );
+
+            else
+                Db::getInstance()->execute( 'DELETE FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE method_id NOT IN ('.implode( ',', $valid_ids ).')' );
+
+            $this->clean_methods_cache();
+
+            $all_methods_arr = $this->get_all_methods();
+            $this->get_all_method_settings();
 
             if( empty( $post_data['errors_buffer'] ) )
                 $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'Payment method details saved.' ) );
@@ -676,16 +697,55 @@ class Smart2pay extends PaymentModule
         return $this->fetchTemplate( 'payment.tpl' );
     }
 
+    public function detection_module_available()
+    {
+        if( !Module::isInstalled( self::S2P_DETECTOR_NAME )
+         or !Module::isEnabled( self::S2P_DETECTOR_NAME ) )
+            return false;
+
+        return true;
+    }
+
+    public function payment_module_available()
+    {
+        if( !Module::isInstalled( $this->name )
+         or !Module::isEnabled( $this->name ) )
+            return false;
+
+        return true;
+    }
+
+    public function detection_module_active()
+    {
+        if( !$this->detection_module_available()
+         or !Configuration::get( self::S2PD_CONFIG_PREFIX.'ENABLED' ) )
+            return false;
+
+        return true;
+    }
+
+    public function payment_module_active()
+    {
+        if( !$this->payment_module_available()
+         or !Configuration::get( self::CONFIG_PREFIX.'ENABLED' ) )
+            return false;
+
+        return true;
+    }
+
     public function detect_country( $ip = false )
     {
         if( !($settings_arr = $this->getSettings())
          or empty( $settings_arr[self::CONFIG_PREFIX.'COUNTRY_DETECTION'] )
-         or !Configuration::get( self::S2PD_CONFIG_PREFIX.'ENABLED' ) )
+         or !$this->detection_module_active() )
         {
             $log_msg = '';
             if( empty( $settings_arr[self::CONFIG_PREFIX.'COUNTRY_DETECTION'] ) )
-                $log_msg .= 'Coutry detection disabled in Smart2Pay module. ';
-            if( !Configuration::get( self::S2PD_CONFIG_PREFIX.'ENABLED' ) )
+                $log_msg .= 'Coutry detection option is disabled in Smart2Pay module. ';
+            if( !Module::isInstalled( self::S2P_DETECTOR_NAME ) )
+                $log_msg .= 'Module Smart2Pay Detection is not installed.';
+            elseif( !Module::isEnabled( self::S2P_DETECTOR_NAME )
+                 or !Configuration::get( self::S2PD_CONFIG_PREFIX.'ENABLED' ) )
                 $log_msg .= 'Module Smart2Pay Detection is not enabled.';
 
             $this->writeLog( $log_msg, array( 'type' => 'detection' ) );
@@ -708,9 +768,9 @@ class Smart2pay extends PaymentModule
         }
 
         /** @var Smart2paydetection $smart2pay_detection */
-        if( !($smart2pay_detection = Module::getInstanceByName( 'smart2paydetection' )) )
+        if( !($smart2pay_detection = Module::getInstanceByName( self::S2P_DETECTOR_NAME )) )
         {
-            $this->writeLog( 'Couldn\'t obtain Smart2Pay Detection instance. Make sure plugin is installed.', array( 'type' => 'detection' ) );
+            $this->writeLog( 'Couldn\'t obtain Smart2Pay Detection instance. Make sure plugin is installed correctly.', array( 'type' => 'detection' ) );
             return false;
         }
 
@@ -858,7 +918,7 @@ class Smart2pay extends PaymentModule
         if( !empty( $params['log_type'] ) )
             $where_sql .= ' AND log_type = \''.pSQL( $params['log_type'] ).'\'';
 
-        $logs = Db::getInstance()->ExecuteS( 'SELECT * FROM `' . _DB_PREFIX_ . 'smart2pay_logs` '.
+        $logs = Db::getInstance()->executeS( 'SELECT * FROM `' . _DB_PREFIX_ . 'smart2pay_logs` '.
                                              (!empty( $where_sql )?' WHERE 1 '.$where_sql:'').
                                              ' ORDER BY log_created DESC, log_id DESC'.
                                              (!empty( $params['limit'] )?' LIMIT 0, '.$params['limit']:'') );
@@ -1045,7 +1105,7 @@ class Smart2pay extends PaymentModule
 
         self::$cache['method_details'] = array();
 
-        if( ($methods = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `active` = 1 ORDER BY `display_name` ASC' )) )
+        if( ($methods = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `active` = 1 ORDER BY `display_name` ASC' )) )
         {
             foreach( $methods as $method_arr )
             {
@@ -1070,7 +1130,7 @@ class Smart2pay extends PaymentModule
 
         self::$cache['method_settings'] = array();
 
-        if( ($methods = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` ORDER BY `priority` ASC' )) )
+        if( ($methods = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` ORDER BY `priority` ASC' )) )
         {
             foreach( $methods as $method_arr )
             {
@@ -1096,7 +1156,7 @@ class Smart2pay extends PaymentModule
         if( array_key_exists( $method_id, self::$cache['method_details'] ) )
             return self::$cache['method_details'][$method_id];
 
-        $method = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `method_id` = \'' . $method_id . '\' LIMIT 0, 1' );
+        $method = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `method_id` = \'' . $method_id . '\' LIMIT 0, 1' );
 
         if( empty( $method ) )
             return null;
@@ -1119,7 +1179,7 @@ class Smart2pay extends PaymentModule
         if( array_key_exists( $method_id, self::$cache['method_settings'] ) )
             return self::$cache['method_settings'][$method_id];
 
-        $method = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE `method_id` = \'' . $method_id . '\' LIMIT 0, 1' );
+        $method = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE `method_id` = \'' . $method_id . '\' LIMIT 0, 1' );
 
         if( empty( $method ) )
             return null;
@@ -1176,7 +1236,7 @@ class Smart2pay extends PaymentModule
     {
         $order_id = (int)$order_id;
         if( empty( $order_id )
-         or !($transaction_arr = Db::getInstance()->ExecuteS(
+         or !($transaction_arr = Db::getInstance()->executeS(
                 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_transactions` WHERE order_id = \'' . $order_id . '\' LIMIT 0, 1'
             ))
          or empty( $transaction_arr[0] ) )
@@ -1200,7 +1260,7 @@ class Smart2pay extends PaymentModule
         }
 
         $transaction_arr = false;
-        if( ($existing_transaction = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_transactions` WHERE order_id = \'' . $params['order_id'] . '\' LIMIT 0, 1' ))
+        if( ($existing_transaction = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_transactions` WHERE order_id = \'' . $params['order_id'] . '\' LIMIT 0, 1' ))
         and !empty( $existing_transaction[0] ) )
         {
             $transaction_arr = $existing_transaction[0];
@@ -3196,7 +3256,7 @@ class Smart2pay extends PaymentModule
     {
         foreach( $this->getPaymentStatesOrderStatuses() as $status )
         {
-            if( ($existingStatus = Db::getInstance()->ExecuteS( 'SELECT * FROM `'._DB_PREFIX_.'order_state_lang` WHERE `name` = \'' . pSQL( $status['orderStatusName'] ) . '\'' )) )
+            if( ($existingStatus = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'order_state_lang` WHERE `name` = \'' . pSQL( $status['orderStatusName'] ) . '\'' )) )
                 $statusID = $existingStatus[0]['id_order_state'];
 
             else

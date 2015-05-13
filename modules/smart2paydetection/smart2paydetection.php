@@ -25,6 +25,8 @@ class Smart2paydetection extends Module
     const S2P_CONFIG_PREFIX = 'S2P_';
     const CONFIG_PREFIX = 'S2PD_';
 
+    const S2P_MODULE_NAME = 'smart2pay';
+
     /**
      * Static cache
      *
@@ -43,7 +45,7 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.3';
+        $this->version = '1.0.4';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.5', 'max' => _PS_VERSION_ );
@@ -131,7 +133,7 @@ class Smart2paydetection extends Module
 
     public function get_country_iso( $ip = false )
     {
-        if( !Configuration::get( self::CONFIG_PREFIX.'ENABLED' ) )
+        if( !$this->detection_module_active() )
             return false;
 
         if( !($detection_result = $this->detect_details_from_ip( $ip ))
@@ -186,8 +188,8 @@ class Smart2paydetection extends Module
                 and !empty( $result['country'] ) and is_array( $result['country'] )
                 and !empty( $result['country']['iso_code'] )
                 and Configuration::get( self::CONFIG_PREFIX.'LOG_DETECTIONS' )
-                and Configuration::get( self::S2P_CONFIG_PREFIX.'ENABLED' )
-                and ($s2p_module = Module::getInstanceByName( 'smart2pay' )) )
+                and $this->payment_module_available()
+                and ($s2p_module = Module::getInstanceByName( self::S2P_MODULE_NAME )) )
                 {
                     $s2p_module->writeLog( 'Detected country ['.$result['country']['iso_code'].'] for IP ['.$ip.']', array( 'type' => 'detection' ) );
                 }
@@ -204,7 +206,8 @@ class Smart2paydetection extends Module
     public function get_detection_logs( $params = false )
     {
         /** @var Smart2pay $smart2pay */
-        if( !($smart2pay = Module::getInstanceByName( 'smart2pay' )) )
+        if( !$this->payment_module_available()
+         or !($smart2pay = Module::getInstanceByName( self::S2P_MODULE_NAME )) )
             return array();
 
         if( empty( $params ) or !is_array( $params ) )
@@ -594,6 +597,42 @@ class Smart2paydetection extends Module
         return $this->display( __FILE__, $name );
     }
 
+    public function detection_module_available()
+    {
+        if( !Module::isInstalled( $this->name )
+         or !Module::isEnabled( $this->name ) )
+            return false;
+
+        return true;
+    }
+
+    public function payment_module_available()
+    {
+        if( !Module::isInstalled( self::S2P_MODULE_NAME )
+         or !Module::isEnabled( self::S2P_MODULE_NAME ) )
+            return false;
+
+        return true;
+    }
+
+    public function detection_module_active()
+    {
+        if( !$this->detection_module_available()
+         or !Configuration::get( self::CONFIG_PREFIX.'ENABLED' ) )
+            return false;
+
+        return true;
+    }
+
+    public function payment_module_active()
+    {
+        if( !$this->payment_module_available()
+         or !Configuration::get( self::S2P_CONFIG_PREFIX.'ENABLED' ) )
+            return false;
+
+        return true;
+    }
+
     /**
      * Get Smart2Pay countries list
      *
@@ -605,7 +644,7 @@ class Smart2paydetection extends Module
          * Check for base module to be active
          * Check for current module to be available
          */
-        if( !Configuration::get( self::S2P_CONFIG_PREFIX.'ENABLED' ) )
+        if( !$this->payment_module_available() )
             return array();
 
         if( !empty( self::$cache['all_countries'] ) )
