@@ -35,7 +35,7 @@
                         {/if}
                     {/if}
 
-                    {if $transaction_arr.surcharge_amount != 0 && $transaction_arr.surcharge_percent != 0}
+                    {if $transaction_arr.surcharge_amount != 0 && $transaction_arr.surcharge_percent > 0}
                         +
                     {/if}
 

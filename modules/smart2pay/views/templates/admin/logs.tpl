@@ -21,7 +21,7 @@
         {if empty( $logs )}
         <div style="text-align: center">{l s='No logs available at the moment' mod='smart2pay'}</div>
         {else}
-        <table class="table">
+        <table class="table" style="{if $smarty.const._PS_VERSION_ >= 1.5}width: 80%;{else}width: 100%;{/if} margin: 0 auto;">
             <thead>
             <tr>
                 <th>{l s='Type' mod='smart2pay'}</th>

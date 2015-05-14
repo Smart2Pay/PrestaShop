@@ -74,7 +74,7 @@ function s2p_config_js_invert()
         <small>{l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
             {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}</small>
         <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
-        <table class="table" style="width: 80%; margin: 0 auto;">
+        <table class="table" style="{if $smarty.const._PS_VERSION_ >= 1.5}width: 80%;{else}width: 100%;{/if} margin: 0 auto;">
             <thead>
             <tr>
                 <th>{l s='Enabled?' mod='smart2pay'}</th>

@@ -17,6 +17,9 @@
 if (!defined('_PS_VERSION_'))
     exit;
 
+
+include_once( _PS_MODULE_DIR_.'smart2paydetection/includes/helper.inc.php' );
+
 /**
  * Class S2p
  */
@@ -45,10 +48,10 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.4';
+        $this->version = '1.0.5';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
-        $this->ps_versions_compliancy = array( 'min' => '1.5', 'max' => _PS_VERSION_ );
+        $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
         $this->bootstrap = true;
         $this->controllers = array( 'payment' );
 
@@ -58,6 +61,32 @@ class Smart2paydetection extends Module
         $this->description = $this->l( 'Smart2Pay Detection is a helper module for Smart2Pay Payment module.' );
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay Detection plugin?');
+
+        $this->create_context();
+    }
+
+    public function create_context()
+    {
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+        {
+            global $smarty, $cookie, $cart;
+
+            if( $cookie )
+                $lang_id = (int) $cookie->id_lang;
+            else
+                $lang_id = 1;
+
+            $language = new Language( $lang_id );
+
+            // create context object for PrestaShop 1.4...
+            if( empty( $this->context ) )
+                $this->context = new stdClass();
+
+            $this->smarty = $smarty;
+            $this->context->smarty = $smarty;
+            $this->context->cart = $cart;
+            $this->context->language = $language;
+        }
     }
 
     public static function validate_value( $value, array $checks )
@@ -248,6 +277,8 @@ class Smart2paydetection extends Module
         require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Metadata.php';
         require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Util.php';
 
+        $this->create_context();
+
         $post_result = $this->process_post_data();
 
         $output = '';
@@ -312,6 +343,7 @@ class Smart2paydetection extends Module
             'db_file_description' => $db_file_description,
             'db_file_time' => (!empty( $db_file_time )?date( $this->context->language->date_format_full, $db_file_time ):'N/A'),
             'detection_result' => (!empty( $post_result['<detection_result>'] )?$post_result['<detection_result>']:false),
+            'language_id' => $this->context->language->id,
             'detection_logs' => $this->get_detection_logs(),
         ) );
 
@@ -331,9 +363,50 @@ class Smart2paydetection extends Module
         $post_data['submit'] = '';
 
         /**
+         * Check submit for country detection test
+         */
+        if( Tools::isSubmit( 'submit_test_detection' ) )
+        {
+            $post_data['submit'] = 'submit_test_detection';
+            $post_data['<detection_result>'] = false;
+
+            $s2p_test_ip = Tools::getValue( 's2p_test_ip', '' );
+
+            if( !($detection_result = $this->detect_details_from_ip( $s2p_test_ip, false )) )
+            {
+                if( !empty( self::$cache['last_detection_error_msg'] ) )
+                    $post_data['errors_buffer'] .= $this->displayError( self::$cache['last_detection_error_msg'] );
+                else
+                    $post_data['errors_buffer'] .= $this->displayError( $this->l( 'Error detecting country for IP ['.$s2p_test_ip.']' ) );
+            }
+
+            if( empty( $post_data['errors_buffer'] ) )
+            {
+                $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'IP detected with success.' ) );
+
+                $detection_arr = array();
+                $detection_arr['country'] = array( 'name' => 'N/A', 'code' => '' );
+                $detection_arr['continent'] = array( 'name' => 'N/A', 'code' => '' );
+
+                if( !empty( $detection_result['continent'] ) )
+                {
+                    $detection_arr['continent']['name'] = $detection_result['continent']['names']['en'];
+                    $detection_arr['continent']['code'] = $detection_result['continent']['code'];
+                }
+                if( !empty( $detection_result['country'] ) )
+                {
+                    $detection_arr['country']['name'] = $detection_result['country']['names']['en'];
+                    $detection_arr['country']['code'] = $detection_result['country']['iso_code'];
+                }
+
+                $post_data['<detection_result>'] = $detection_arr;
+            }
+        }
+
+        /**
          * Check submit of main form
          */
-        if( Tools::isSubmit( 'submit_main_data' ) )
+        elseif( Tools::isSubmit( 'submit_main_data' ) )
         {
             $post_data['submit'] = 'submit_main_data';
 
@@ -385,47 +458,6 @@ class Smart2paydetection extends Module
                 $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'Settings updated successfully' ) );
         }
 
-        /**
-         * Check submit for payment method settings
-         */
-        elseif( Tools::isSubmit( 'submit_test_detection' ) )
-        {
-            $post_data['submit'] = 'submit_test_detection';
-            $post_data['<detection_result>'] = false;
-
-            $s2p_test_ip = Tools::getValue( 's2p_test_ip', '' );
-
-            if( !($detection_result = $this->detect_details_from_ip( $s2p_test_ip, false )) )
-            {
-                if( !empty( self::$cache['last_detection_error_msg'] ) )
-                    $post_data['errors_buffer'] .= $this->displayError( self::$cache['last_detection_error_msg'] );
-                else
-                    $post_data['errors_buffer'] .= $this->displayError( $this->l( 'Error detecting country for IP ['.$s2p_test_ip.']' ) );
-            }
-
-            if( empty( $post_data['errors_buffer'] ) )
-            {
-                $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'IP detected with success.' ) );
-
-                $detection_arr = array();
-                $detection_arr['country'] = array( 'name' => 'N/A', 'code' => '' );
-                $detection_arr['continent'] = array( 'name' => 'N/A', 'code' => '' );
-
-                if( !empty( $detection_result['continent'] ) )
-                {
-                    $detection_arr['continent']['name'] = $detection_result['continent']['names']['en'];
-                    $detection_arr['continent']['code'] = $detection_result['continent']['code'];
-                }
-                if( !empty( $detection_result['country'] ) )
-                {
-                    $detection_arr['country']['name'] = $detection_result['country']['names']['en'];
-                    $detection_arr['country']['code'] = $detection_result['country']['iso_code'];
-                }
-
-                $post_data['<detection_result>'] = $detection_arr;
-            }
-        }
-
         return $post_data;
     }
 
@@ -436,6 +468,8 @@ class Smart2paydetection extends Module
      */
     public function displayTestForm()
     {
+        $this->create_context();
+
         $this->context->smarty->assign( array(
             'module_path' => $this->_path,
         ) );
@@ -467,41 +501,55 @@ class Smart2paydetection extends Module
             )
         );
 
-        $helper = new HelperForm();
+        $form_data = array();
+        $form_data['submit_action'] = 'submit_main_data';
 
-        // Module, token and currentIndex
-        $helper->module = $this;
-        $helper->name_controller = $this->name;
-        $helper->token = Tools::getAdminTokenLite('AdminModules');
-        $helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
-
-        // Language
-        $helper->default_form_language = $default_lang;
-        $helper->allow_employee_form_lang = $default_lang;
-
-        // Title and toolbar
-        $helper->title = $this->displayName;
-        $helper->show_toolbar = true;        // false -> remove toolbar
-        $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
-        $helper->submit_action = 'submit_main_data';
-        $helper->toolbar_btn = array(
-            'save' =>
-                array(
-                    'desc' => $this->l('Save'),
-                    'href' => AdminController::$currentIndex.'&configure='.$this->name.'&save'.$this->name.
-                        '&token='.Tools::getAdminTokenLite('AdminModules'),
-                ),
-            'back' => array(
-                'href' => AdminController::$currentIndex.'&token='.Tools::getAdminTokenLite('AdminModules'),
-                'desc' => $this->l('Back to list')
-            )
-        );
-
+        $form_values = array();
         // Load current value
         foreach( $this->getConfigFormInputNames() as $name )
-            $helper->fields_value[$name] = Configuration::get( $name );
+            $form_values[ $name ] = Configuration::get( $name );
 
-        return $helper->generateForm( $fields_form );
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+            $form_buffer = Smart2Pay_Helper::generate_ancient_form( $fields_form, $form_data, $form_values );
+
+        else
+        {
+            $helper = new HelperForm();
+
+            // Module, token and currentIndex
+            $helper->module          = $this;
+            $helper->name_controller = $this->name;
+            $helper->token           = Tools::getAdminTokenLite( 'AdminModules' );
+            $helper->currentIndex    = AdminController::$currentIndex . '&configure=' . $this->name;
+
+            // Language
+            $helper->default_form_language    = $default_lang;
+            $helper->allow_employee_form_lang = $default_lang;
+
+            // Title and toolbar
+            $helper->title          = $this->displayName;
+            $helper->show_toolbar   = true;        // false -> remove toolbar
+            $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
+            $helper->submit_action  = $form_data['submit_action'];
+            $helper->toolbar_btn    = array(
+                'save' =>
+                    array(
+                        'desc' => $this->l( 'Save' ),
+                        'href' => AdminController::$currentIndex . '&configure=' . $this->name . '&save' . $this->name .
+                                  '&token=' . Tools::getAdminTokenLite( 'AdminModules' ),
+                    ),
+                'back' => array(
+                    'href' => AdminController::$currentIndex . '&token=' . Tools::getAdminTokenLite( 'AdminModules' ),
+                    'desc' => $this->l( 'Back to list' )
+                )
+            );
+
+            $helper->fields_value = $form_values;
+
+            $form_buffer = $helper->generateForm( $fields_form );
+        }
+
+        return $form_buffer;
     }
 
     /**
@@ -514,8 +562,11 @@ class Smart2paydetection extends Module
         if( !parent::install() )
             return false;
 
-        if( Shop::isFeatureActive() )
-            Shop::setContext( Shop::CONTEXT_ALL );
+        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+        {
+            if( Shop::isFeatureActive() )
+                Shop::setContext( Shop::CONTEXT_ALL );
+        }
 
         foreach( $this->getConfigFormInputs() as $setting )
         {
@@ -540,6 +591,9 @@ class Smart2paydetection extends Module
             if( !Configuration::deleteByName( $setting['name'] ) )
                 $settingsCleanedSuccessfully = false;
         }
+
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+            $settingsCleanedSuccessfully = true;
 
         if( !parent::uninstall() || !$settingsCleanedSuccessfully )
             return false;
@@ -578,10 +632,10 @@ class Smart2paydetection extends Module
      */
     public function fetchTemplate( $name )
     {
-        if( version_compare( _PS_VERSION_, '1.4', '<' ) )
-            $this->context->smarty->currentTemplate = $name;
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+            $this->create_context();
 
-        elseif( version_compare( _PS_VERSION_, '1.5', '<' ) )
+        if( version_compare( _PS_VERSION_, '1.6', '<' ) )
         {
             $views = 'views/templates/';
             if (@filemtime(dirname(__FILE__).'/'.$name))
@@ -600,7 +654,7 @@ class Smart2paydetection extends Module
     public function detection_module_available()
     {
         if( !Module::isInstalled( $this->name )
-         or !Module::isEnabled( $this->name ) )
+         or (version_compare( _PS_VERSION_, '1.5', '>=' ) and !Module::isEnabled( $this->name )) )
             return false;
 
         return true;
@@ -609,7 +663,7 @@ class Smart2paydetection extends Module
     public function payment_module_available()
     {
         if( !Module::isInstalled( self::S2P_MODULE_NAME )
-         or !Module::isEnabled( self::S2P_MODULE_NAME ) )
+         or (version_compare( _PS_VERSION_, '1.5', '>=' ) and !Module::isEnabled( self::S2P_MODULE_NAME )) )
             return false;
 
         return true;
