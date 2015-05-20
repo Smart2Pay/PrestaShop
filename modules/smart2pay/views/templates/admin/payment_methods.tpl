@@ -71,8 +71,10 @@ function s2p_config_js_invert()
         {if empty( $payment_methods )}
         <div style="text-align: center">{l s='No payment methods defined in database.' mod='smart2pay'}</div>
         {else}
-        <small>{l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
-            {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}</small>
+        <small>
+            {l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
+            {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}
+        </small>
         <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
         <table class="table" style="{if $smarty.const._PS_VERSION_ >= 1.5}width: 80%;{else}width: 100%;{/if} margin: 0 auto;">
             <thead>
@@ -101,10 +103,22 @@ function s2p_config_js_invert()
                         <strong>{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong><br/>
                         {$payment_method.description|escape:'htmlall':'UTF-8'}
                     </td>
-                    <td>
+                    <td style="white-space: nowrap;">
                         <input type="number" size="8" step="0.01" style="width: 100px; text-align: right;" name="surcharge_percent[{$payment_method.method_id}]" value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_percent}{else}0{/if}" /> %
                         <br/>
-                        <input type="number" size="8" step="0.01" style="width: 100px; text-align: right;" name="surcharge_amount[{$payment_method.method_id}]" value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_amount}{else}0{/if}" /> {$default_currency}
+                        <input type="number" size="8" step="0.01" style="width: 100px; text-align: right;" name="surcharge_amount[{$payment_method.method_id}]" value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_amount}{else}0{/if}" />
+                        {if empty( $all_currencies )}
+                            Please activate currencies first!
+                        {else}
+                            <select name="surcharge_currency[{$payment_method.method_id}]" style="margin: 0 5px; max-height: 30px; padding: 2px 4px; width: 80px; display: inherit;">
+                            {foreach $all_currencies as $ccurrency}
+                            <option value="{$ccurrency['iso_code']}"
+                                    {if ((!empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['iso_code'] == $payment_method_settings[$payment_method.method_id]['surcharge_currency'])
+                                         || (empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['id_currency'] == $default_currency_id) )
+                                    } selected="selected" {/if}>{$ccurrency['iso_code']}{if $ccurrency['id_currency'] == $default_currency_id} ({l s='default' mod='smart2pay'}){/if}</option>
+                            {/foreach}
+                            </select>
+                        {/if}
                     </td>
                     <td><input type="number" size="8" style="width: 100px; text-align: right;" name="method_priority[{$payment_method.method_id}]" value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].priority}{else}0{/if}" /></td>
                 </tr>

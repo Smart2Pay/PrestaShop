@@ -17,9 +17,22 @@
 
 $useSSL = true;
 
-include( dirname( __FILE__ ) . '/../../../config/config.inc.php' );
-include( dirname( __FILE__ ) . '/../../../header.php' );
-include( dirname( __FILE__ ) . '/../smart2pay.php' );
+    if( @file_exists( dirname( __FILE__ ) . '/../../../config/config.inc.php' ) )
+        $root_path = dirname( __FILE__ ) . '/../../../';
+
+    elseif( !empty( $_SERVER['SCRIPT_FILENAME'] )
+        and @file_exists( realpath( dirname( dirname( dirname( dirname( $_SERVER['SCRIPT_FILENAME'] ) ) ) ) ). '/config/config.inc.php' ) )
+        $root_path = realpath( dirname( dirname( dirname( dirname( $_SERVER['SCRIPT_FILENAME'] ) ) ) ) ).'/';
+
+    else
+    {
+        echo 'Cannot find main configuration file...';
+        exit;
+    }
+
+include( $root_path . 'config/config.inc.php' );
+include( $root_path . 'header.php' );
+include( _PS_MODULE_DIR_ . 'smart2pay/smart2pay.php' );
 
 if( !$cookie->isLogged( true ) )
     Tools::redirect( 'authentication.php?back=order.php' );
@@ -32,5 +45,5 @@ $smart2pay->prepare_send_form();
 
 echo $smart2pay->fetchTemplate( 'sendForm.tpl' );
 
-include_once( dirname( __FILE__ ) . '/../../../footer.php' );
+include_once( $root_path . 'footer.php' );
 

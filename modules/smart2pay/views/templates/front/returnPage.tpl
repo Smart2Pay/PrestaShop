@@ -31,3 +31,19 @@
     </tbody>
     </table>
 {/if}
+
+{if !empty( $s2p_transaction )}
+{if $s2p_transaction.payment_status == $s2p_statuses.open }
+    {include file="{$front_tpl_dir}payment_open.tpl"}
+{elseif $s2p_transaction.payment_status == $s2p_statuses.success }
+    {include file="{$front_tpl_dir}payment_success.tpl"}
+{elseif $s2p_transaction.payment_status == $s2p_statuses.cancelled }
+    {include file="{$front_tpl_dir}payment_canceled.tpl"}
+{elseif $s2p_transaction.payment_status == $s2p_statuses.failed }
+    {include file="{$front_tpl_dir}payment_failed.tpl"}
+{elseif $s2p_transaction.payment_status == $s2p_statuses.expired }
+    {include file="{$front_tpl_dir}payment_expired.tpl"}
+{elseif $s2p_transaction.payment_status == $s2p_statuses.processing }
+    {include file="{$front_tpl_dir}payment_processing.tpl"}
+{/if}
+{/if}

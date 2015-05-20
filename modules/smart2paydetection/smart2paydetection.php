@@ -48,7 +48,7 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.5';
+        $this->version = '1.0.6';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -437,12 +437,12 @@ class Smart2paydetection extends Module
                 {
                     $isValid = false;
                     if( empty( $validation_result['url'] ) )
-                        $field_error .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'smart2paydetection' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must be a valid URL' ) );
+                        $field_error .= $this->displayError( $this->l( 'Invalid value for input.' ) . ' '. $this->l( $input['label'] ).': ' . $this->l( 'Must be a valid URL' ) );
                     if( empty( $validation_result['notempty'] ) )
-                        $field_error .= $this->displayError( $this->l( 'Invalid' ) . ' ' . Translate::getModuleTranslation( $this->name, $input['label'], 'smart2paydetection' ) . ' ' . $this->l('value') . '. ' . $this->l( 'Must NOT be empty' ) );
+                        $field_error .= $this->displayError( $this->l( 'Invalid value for input.' ) . ' '. $this->l( $input['label'] ).': ' . $this->l( 'Must NOT be empty' ) );
 
                     if( empty( $field_error ) )
-                        $field_error .= $this->displayError( $this->l( 'Value provided for' ). Translate::getModuleTranslation( $this->name, $input['label'], 'smart2paydetection' ) .' ' . $this->l( 'is invalid' ) );
+                        $field_error .= $this->displayError( $this->l( 'Value provided for input is invalid' ).' ('.$this->l( $input['label'] ).')' );
                 }
 
                 if( $isValid )
