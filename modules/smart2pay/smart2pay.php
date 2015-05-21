@@ -287,14 +287,14 @@ class Smart2pay extends PaymentModule
         // Amount in order currency
         $surcharge_order_amount = 0;
         if( (float)$payment_method['method_settings']['surcharge_percent'] != 0 )
-            $surcharge_percent_amount = number_format( ( $amount_to_pay * $payment_method['method_settings']['surcharge_percent'] ) / 100, 2, '.', '' );
+            $surcharge_percent_amount = Tools::ps_round( ( $amount_to_pay * $payment_method['method_settings']['surcharge_percent'] ) / 100, 2 );
         if( (float)$payment_method['method_settings']['surcharge_amount'] != 0 )
-            $surcharge_amount = number_format( $payment_method['method_settings']['surcharge_amount'], 2, '.', '' );
+            $surcharge_amount = Tools::ps_round( $payment_method['method_settings']['surcharge_amount'], 2 );
 
         if( $surcharge_amount != 0 )
         {
             if( $surcharge_currency_id != $context->cart->id_currency )
-                $surcharge_order_amount = number_format( Smart2Pay_Helper::convert_price( $surcharge_amount, $surcharge_currency_obj, $cart_currency ), 2, '.', '' );
+                $surcharge_order_amount = Tools::ps_round( Smart2Pay_Helper::convert_price( $surcharge_amount, $surcharge_currency_obj, $cart_currency ), 2 );
             else
                 $surcharge_order_amount = $surcharge_amount;
         }
@@ -306,7 +306,7 @@ class Smart2pay extends PaymentModule
             $cart->id,
             $moduleSettings[ self::CONFIG_PREFIX . 'NEW_ORDER_STATUS' ],
             $cart_original_amount,
-            $this->displayName . ': ' . $payment_method['method_details']['display_name'],
+            $payment_method['method_details']['display_name'],
 
             // $message
             null,
@@ -333,9 +333,9 @@ class Smart2pay extends PaymentModule
 
             if( Validate::isLoadedObject( $order ) )
             {
-                $order->total_paid = $amount_to_pay;
+                $order->total_paid += $total_surcharge;
                 if( property_exists( $order, 'total_paid_tax_incl' ) )
-                    $order->total_paid_tax_incl = $amount_to_pay;
+                    $order->total_paid_tax_incl += $total_surcharge;
 
                 $order->update();
 
@@ -601,7 +601,7 @@ class Smart2pay extends PaymentModule
                             {
                                 $order->addOrderPayment(
                                     $order_only_amount,
-                                    ( ! empty( $method_details['display_name'] ) ? $this->displayName . ': ' . $method_details['display_name'] : $this->displayName ),
+                                    ( ! empty( $method_details['display_name'] ) ? $method_details['display_name'] : $this->displayName ),
                                     $request_arr['PaymentID'],
                                     $currency
                                 );
@@ -1146,24 +1146,27 @@ class Smart2pay extends PaymentModule
          // Displaying payment options
          or !$this->registerHook( 'payment' )
 
+         // Displaying invoices (1.5+ doesn't offer access to pdf renderer)
+         or (version_compare( _PS_VERSION_, '1.5', '<' ) and !$this->registerHook( 'PDFInvoice' ))
+
          // Displaying order details (public)
-        or (
+         or (
 
-            version_compare( _PS_VERSION_, '1.5', '>=' )
+             version_compare( _PS_VERSION_, '1.5', '>=' )
 
-            and
+             and
 
-            !$this->registerHook( 'displayOrderDetail' ) // box right above product listing
-        )
+             !$this->registerHook( 'displayOrderDetail' ) // box right above product listing
+         )
 
-        or (
+         or (
 
-            version_compare( _PS_VERSION_, '1.5', '<' )
+             version_compare( _PS_VERSION_, '1.5', '<' )
 
-            and
+             and
 
-            !$this->registerHook( 'orderDetailDisplayed' ) // box right above product listing
-        )
+             !$this->registerHook( 'orderDetailDisplayed' ) // box right above product listing
+         )
 
          // Displaying payment options (admin)
          or (
@@ -1175,7 +1178,7 @@ class Smart2pay extends PaymentModule
                !$this->registerHook( 'displayAdminOrderTabOrder' ) // Order tabs
             or !$this->registerHook( 'displayAdminOrderContentOrder' ) // Order tab content
             )
-        )
+         )
 
          or (
                 version_compare( _PS_VERSION_, '1.5', '<' )
@@ -1191,7 +1194,7 @@ class Smart2pay extends PaymentModule
                 and
 
                 !$this->registerHook( 'displayAdminOrder' ) // Order content for 1.5
-        ) )
+         ) )
         {
             self::$maintenance_functionality = false;
             return false;
@@ -1280,6 +1283,48 @@ class Smart2pay extends PaymentModule
         self::$maintenance_functionality = false;
 
         return true;
+    }
+
+    public function hookPDFInvoice( $params )
+    {
+        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+            return;
+
+        if( empty( $params['pdf'] )
+         or !($pdf = $params['pdf']) or !is_object( $pdf )
+         or empty( $params['id_order'] )
+         or !($order = new Order( $params['id_order'] ))
+         or !Validate::isLoadedObject( $order )
+         or !($transaction_arr = $this->get_transaction_by_order_id( $order->id ))
+         or (!(float)$transaction_arr['surcharge_order_amount'] and !(float)$transaction_arr['surcharge_order_percent'])
+         or empty( $transaction_arr['surcharge_order_currency'] )
+         or !($order_currency_id = Currency::getIdByIsoCode( $transaction_arr['surcharge_order_currency'] ))
+         or !($order_currency_obj = new Currency( $order_currency_id )) )
+            return;
+
+        /** @var PDF $pdf */
+        $pdf->Ln( 4 );
+        $pdf->Ln( 4 );
+
+        $old_style = $pdf->FontStyle;
+
+        $total_surcharge = (float)$transaction_arr['surcharge_order_amount'] + (float)$transaction_arr['surcharge_order_percent'];
+
+        $pdf->SetFont( '', 'B', 8 );
+
+        $pdf->Cell( 165, 0, $this->l( 'Order Total Amount' ).' : ', 0, 0, 'R' );
+        $pdf->Cell( 0, 0, Tools::displayPrice( $order->total_paid - $total_surcharge, $order_currency_obj, true ), 0, 0, 'R' );
+        $pdf->Ln( 4 );
+
+        $pdf->Cell( 165, 0, $this->l( 'Payment Method Fees' ).' : ', 0, 0, 'R' );
+        $pdf->Cell( 0, 0, Tools::displayPrice( $total_surcharge, $order_currency_obj, true ), 0, 0, 'R' );
+        $pdf->Ln( 4 );
+
+        $pdf->Cell( 165, 0, $this->l( 'Total Paid' ).' : ', 0, 0, 'R' );
+        $pdf->Cell( 0, 0, Tools::displayPrice( $order->total_paid, $order_currency_obj, true ), 0, 0, 'R' );
+        $pdf->Ln( 4 );
+
+        $pdf->SetFont( '', $old_style );
     }
 
     /**

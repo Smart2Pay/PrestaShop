@@ -3,9 +3,6 @@
 global $_MODULE;
 $_MODULE = array();
 $_MODULE['<{smart2paydetection}prestashop>smart2paydetection_4134cb96a9c4d77a9184e53795623b97'] = 'Are you sure you want to uninstall Smart2Pay Detection plugin?';
-$_MODULE['<{smart2paydetection}prestashop>smart2paydetection_2063c1608d6e0baf80249c42e2be5804'] = 'value';
-$_MODULE['<{smart2paydetection}prestashop>smart2paydetection_c9cc8cce247e49bae79f15173ce97354'] = 'Save';
-$_MODULE['<{smart2paydetection}prestashop>smart2paydetection_630f6dc397fe74e52d5189e2c80f282b'] = 'Back to list';
 $_MODULE['<{smart2paydetection}prestashop>smart2paydetection_00d23a76e43b46dae9ec7aa9dcbebb32'] = 'Enabled';
 $_MODULE['<{smart2paydetection}prestashop>ip_detection_abe08c4d7cd79b79748539b4b4fb18c4'] = 'IP Detection Demo';
 $_MODULE['<{smart2paydetection}prestashop>ip_detection_6e8c07f6cf9ebfb1cc65acba676b197b'] = 'Please note that in order to have higher rates of detection you should update database file as often as possible.';

@@ -3,9 +3,6 @@
 global $_MODULE;
 $_MODULE = array();
 $_MODULE['<{smart2pay}prestashop>smart2pay_97d1bf08fa62db4062cc0387de68ffe2'] = 'Are you sure you want to uninstall Smart2Pay plugin?';
-$_MODULE['<{smart2pay}prestashop>smart2pay_2063c1608d6e0baf80249c42e2be5804'] = 'value';
-$_MODULE['<{smart2pay}prestashop>smart2pay_c9cc8cce247e49bae79f15173ce97354'] = 'Save';
-$_MODULE['<{smart2pay}prestashop>smart2pay_630f6dc397fe74e52d5189e2c80f282b'] = 'Back to list';
 $_MODULE['<{smart2pay}prestashop>smart2pay_00d23a76e43b46dae9ec7aa9dcbebb32'] = 'Enabled';
 $_MODULE['<{smart2pay}prestashop>smart2pay_0ba29c6a1afacf586b03a26162c72274'] = 'Environment';
 $_MODULE['<{smart2pay}prestashop>smart2pay_16dacd6434bd2ac2e21da34200b5e774'] = 'Post URL Live';
@@ -72,8 +69,9 @@ $_MODULE['<{smart2pay}prestashop>payment_methods_502996d9790340c5fd7b86a5b93b1c9
 $_MODULE['<{smart2pay}prestashop>payment_methods_4c41e0bd957698b58100a5c687d757d9'] = 'Select all';
 $_MODULE['<{smart2pay}prestashop>payment_methods_9b8958acb7be504bb5f55f17c0eea366'] = 'Invert';
 $_MODULE['<{smart2pay}prestashop>payment_methods_6a1854f62e217911db9a2a437d219212'] = 'Select none';
+$_MODULE['<{smart2pay}prestashop>payment_methods_c21f969b5f03d33d43e04f8f136e7682'] = 'default';
 $_MODULE['<{smart2pay}prestashop>payment_methods_d8015e1722b1c54575fec93bd92b8ed1'] = 'Update payment methods';
 $_MODULE['<{smart2pay}prestashop>payment_27266fe4d37bf06589c7c6dbf2d5c067'] = 'Pay by';
-$_MODULE['<{smart2pay}prestashop>payment_93b62ea5d864e5e89574321468487b4a'] = 'via Smart2Pay';
+$_MODULE['<{smart2pay}prestashop>payment_eb7297e94e2cb86e90a6ead067666717'] = 'Fee';
 $_MODULE['<{smart2pay}prestashop>returnpage_45b34557b3337cd6fbc8cfbe2e7eeea0'] = 'Thank you for shopping with us!';
 $_MODULE['<{smart2pay}prestashop>returnpage_5594c60e68029f23a6900f97527d02e3'] = 'In order to complete the payment you will need the details below';
