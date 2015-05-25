@@ -61,7 +61,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.6';
+        $this->version = '1.0.8';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -480,7 +480,6 @@ class Smart2pay extends PaymentModule
                     case self::S2P_STATUS_OPEN:
                         if( !empty( $smart2pay_transaction_arr['method_id'] )
                         and in_array( $smart2pay_transaction_arr['method_id'], array( self::PAYM_BANK_TRANSFER, self::PAYM_MULTIBANCO_SIBS ) )
-                        and !empty( $smart2pay_transaction_arr['payment_status'] )
                         and $smart2pay_transaction_arr['payment_status'] != self::S2P_STATUS_OPEN
                         and !empty( $moduleSettings[self::CONFIG_PREFIX.'SEND_PAYMENT_INSTRUCTIONS'] ) )
                         {
@@ -529,7 +528,7 @@ class Smart2pay extends PaymentModule
                                     null,
 
                                     // template_path
-                                    realpath( dirname( __FILE__ ) . '/mails/' ).'/',
+                                    _PS_MODULE_DIR_ . $this->name . '/mails/',
 
                                     // die
                                     false,
@@ -617,11 +616,7 @@ class Smart2pay extends PaymentModule
                                 }
                             }
 
-                            $this->changeOrderStatus(
-                                $order,
-                                $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_SUCCESS'],
-                                false
-                            );
+                            $this->changeOrderStatus( $order, $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_SUCCESS'] );
 
                             if( !empty( $moduleSettings[self::CONFIG_PREFIX.'NOTIFY_CUSTOMER_BY_EMAIL'] ) )
                             {
@@ -666,7 +661,7 @@ class Smart2pay extends PaymentModule
                                     null,
 
                                     // template_path
-                                    realpath( dirname( __FILE__ ) . '/mails/' ).'/',
+                                    _PS_MODULE_DIR_ . $this->name . '/mails/',
 
                                     // die
                                     false,
@@ -682,26 +677,7 @@ class Smart2pay extends PaymentModule
                             }
 
                             if( !empty( $moduleSettings[self::CONFIG_PREFIX.'CREATE_INVOICE_ON_SUCCESS'] ) )
-                            {
-                                $order->setInvoice( true );
-                                $this->writeLog( 'Order invoice generated.', array( 'order_id' => $order->id ) );
-                            }
-
-                            /*
-                             * Todo - check framework's order shipment
-                             *
-                            if ($payMethod->method_config['auto_ship']) {
-                                if ($order->canShip()) {
-                                    $itemQty = $order->getItemsCollection()->count();
-                                    $shipment = Mage::getModel('sales/service_order', $order)->prepareShipment($itemQty);
-                                    $shipment = new Mage_Sales_Model_Order_Shipment_Api();
-                                    $shipmentId = $shipment->create($order->getIncrementId());
-                                    $order->addStatusHistoryComment('Smart2Pay :: order has been automatically shipped.', $payMethod->method_config['order_status_on_2']);
-                                } else {
-                                    $this->writeLog('Order can not be shipped', 'warning');
-                                }
-                            }
-                            */
+                                $this->check_order_invoices( $order, array( 'check_delivery' => (!empty( $moduleSettings[self::CONFIG_PREFIX.'AUTOMATE_SHIPPING'] )?true:false) ) );
 
                         }
                     break;
@@ -1533,6 +1509,32 @@ class Smart2pay extends PaymentModule
         return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/pre15/payment.php?method_id='.$params['method_id'];
     }
 
+    public function get_notification_link( $params = false )
+    {
+        $this->create_context();
+
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
+
+        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+            return $this->context->link->getModuleLink( 'smart2pay', 'replyHandler', $params );
+
+        return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/pre15/notificationhandler.php';
+    }
+
+    public function get_return_link( $params = false )
+    {
+        $this->create_context();
+
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
+
+        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+            return $this->context->link->getModuleLink( 'smart2pay', 'returnHandler', $params );
+
+        return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/pre15/returnhandler.php';
+    }
+
     /**
      * Hook payment
      *
@@ -1873,30 +1875,105 @@ class Smart2pay extends PaymentModule
      *
      * @return bool
      */
-    public function changeOrderStatus( $order, $statusId, $sendCustomerEmail = false, $mailTemplateVars = array() )
+    public function changeOrderStatus( $order, $statusId )
     {
         $orderState = new OrderState((int) $statusId);
 
         if( !Validate::isLoadedObject( $order ) )
         {
-            $this->writeLog( 'Can not change apply order state #' . $statusId . ' to order - Order cannot be loaded', array( 'type' => 'error' ) );
+            $this->writeLog( 'Can not apply order state #' . $statusId . ' to order - Order cannot be loaded', array( 'type' => 'error' ) );
             return false;
         }
 
         if( !Validate::isLoadedObject( $orderState ) )
         {
-            $this->writeLog( 'Can not change apply order state #' . $statusId . ' to order #' . $order->id . ' - Order state cannot be loaded', array( 'type' => 'error', 'order_id' => $order->id ) );
+            $this->writeLog( 'Can not apply order state #' . $statusId . ' to order #' . $order->id . ' - Order state cannot be loaded', array( 'type' => 'error', 'order_id' => $order->id ) );
             return false;
         }
 
-        $history = new OrderHistory();
-        $history->id_order = (int)$order->id;
-        $history->changeIdOrderState( $statusId, (int)($order->id) );
-
-        if( $sendCustomerEmail )
-            $history->addWithemail( true, $mailTemplateVars );
-        else
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+        {
+            $history = new OrderHistory();
+            $history->id_order = (int)$order->id;
+            $history->changeIdOrderState( $statusId, (int)($order->id) );
             $history->add();
+        } else
+        {
+            if( ($orders_collection = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'orders` WHERE `reference` = \''.pSQL( $order->reference ).'\'' )) )
+            {
+                /** @var Order $single_order */
+                foreach( $orders_collection as $single_order_arr )
+                {
+                    if( !($single_order = new Order( $single_order_arr['id_order'] ))
+                     or !Validate::isLoadedObject( $single_order ) )
+                        continue;
+
+                    $history = new OrderHistory();
+                    $history->id_order = (int)$single_order->id;
+                    $history->changeIdOrderState( $statusId, (int)($single_order->id) );
+                    $history->add();
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param Order $order
+     * @param bool|array $params
+     *
+     * @return bool
+     * @throws PrestaShopException
+     */
+    public function check_order_invoices( $order, $params = false )
+    {
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
+
+        if( empty( $params['automate_shipping'] ) )
+            $params['automate_shipping'] = false;
+
+        if( !Validate::isLoadedObject( $order ) )
+        {
+            $this->writeLog( 'Cannot generate invoices for order - Order cannot be loaded', array( 'type' => 'error' ) );
+            return false;
+        }
+
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+        {
+            $order->setInvoice( true );
+            $this->writeLog( 'Order invoice generated.', array( 'order_id' => $order->id ) );
+
+            // Order delivery depends on invoice generation
+            //if( !empty( $params['automate_shipping'] ) )
+            //{
+            //    $order->setDelivery();
+            //    $this->writeLog( 'Order delivery generated.', array( 'order_id' => $order->id ) );
+            //}
+        } else
+        {
+            if( ($orders_collection = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'orders` WHERE `reference` = \''.pSQL( $order->reference ).'\'' )) )
+            {
+                /** @var Order $single_order */
+                foreach( $orders_collection as $single_order_arr )
+                {
+                    if( !($single_order = new Order( $single_order_arr['id_order'] ))
+                     or !Validate::isLoadedObject( $single_order ) )
+                        continue;
+
+                    $single_order->setInvoice( true );
+                    $this->writeLog( 'Order invoice generated.', array( 'order_id' => $single_order->id ) );
+
+                    // Order delivery depends on invoice generation
+                    //if( !empty( $params['automate_shipping'] ) )
+                    //{
+                    //    $order->setDelivery();
+                    //    $this->writeLog( 'Order delivery generated.', array( 'order_id' => $single_order->id ) );
+                    //}
+                }
+            }
+        }
 
         return true;
     }
@@ -1932,9 +2009,11 @@ class Smart2pay extends PaymentModule
     /**
      * Set or retrieve current country ISO 2 chars code for payment method country
      *
-     * @param null|string $country_iso If parameter is null will return current value for force country (false by default)
+     * @param null|string $country_iso If parameter is null will return current value for force country (false by
+     *     default)
      *
-     * @return bool|string Returns current settings for force country as ISO 2 chars or false if error or nothing set yet
+     * @return bool|string Returns current settings for force country as ISO 2 chars or false if error or nothing set
+     *     yet
      */
     public function force_country( $country_iso = null )
     {
@@ -2252,7 +2331,8 @@ class Smart2pay extends PaymentModule
     }
 
     /**
-     * Keys in returning array should be variable names sent back by Smart2Pay and values should be default values if variables are not found in request
+     * Keys in returning array should be variable names sent back by Smart2Pay and values should be default values if
+     * variables are not found in request
      *
      * @return array
      */
@@ -2461,8 +2541,8 @@ class Smart2pay extends PaymentModule
      * Check if s2p method is available in some particular country
      *
      * @param int $method_id                 Method ID
-     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a country, else
-     *                                      attempts to retrieve it from context->cart->id_address_invoice
+     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a
+     *     country, else attempts to retrieve it from context->cart->id_address_invoice
      *
      * @return bool
      */
@@ -2582,8 +2662,8 @@ class Smart2pay extends PaymentModule
      * Check if s2p method is available in some particular country
      *
      * @param int $method_id                 Method ID
-     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a country, else
-     *                                      attempts to retrieve it from context->cart->id_address_invoice
+     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a
+     *     country, else attempts to retrieve it from context->cart->id_address_invoice
      *
      * @return bool
      */
@@ -2878,6 +2958,13 @@ class Smart2pay extends PaymentModule
                 'required' => true,
                 'size' => '80',
                 '_default' => Smart2Pay_Helper::get_return_url( $this->name ),
+                'desc' => array(
+                    $this->l( 'Default Return URL for this store configuration is: ' ),
+                    $this->get_return_link(),
+                    '',
+                    $this->l( 'Notification URL for this store configuration is: ' ),
+                    $this->get_notification_link(),
+                ),
                 '_validate' => array( 'url', 'notempty' ),
                 '_transform' => array( 'trim' ),
             ),
@@ -3001,6 +3088,10 @@ class Smart2pay extends PaymentModule
                 'label' => $this->l('Automate shipping'),
                 'name' => self::CONFIG_PREFIX.'AUTOMATE_SHIPPING',
                 'required' => false,
+                'desc' => array(
+                    $this->l( 'When payment is completed with success should system try to automate shipping?' ),
+                    $this->l( 'Please note that automate shipping on yes needs Create invoice on success option on yes, as delivery depends on invoice creation.' ),
+                ),
                 'options' => array(
                     'query' => $this->getConfigFormSelectInputOptions('yesno'),
                     'id' => 'id',

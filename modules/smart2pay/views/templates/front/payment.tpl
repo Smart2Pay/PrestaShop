@@ -20,7 +20,7 @@
                 {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
                 {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
                     ({l s='Fee' mod='smart2pay'}:
-                        {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent_format}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{/if})
+                        {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent+1-1}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{/if})
                 {/if}
             </a>
         </p>
@@ -33,7 +33,7 @@
         {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
         {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
             ({l s='Fee' mod='smart2pay'}:
-                {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent_format}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{/if})
+                {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent+1-1}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{/if})
         {/if}
     </a>
 </p>
