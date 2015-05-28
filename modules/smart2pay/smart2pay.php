@@ -61,7 +61,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.9';
+        $this->version = '1.0.10';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -225,6 +225,7 @@ class Smart2pay extends PaymentModule
             'transaction_extra_titles' => $transaction_details_titles,
             'transaction_extra_data' => $transaction_extra_data,
             's2p_transaction' => $transaction_arr,
+            's2p_data' => $data,
             's2p_statuses' => $s2p_statuses,
         ) );
 
