@@ -100,8 +100,11 @@ function s2p_config_js_invert()
                     <td style="width: 50px; text-align: center;"><input type="checkbox" name="enabled_methods[]" id="enabled_methods_{$payment_method.method_id}" value="{$payment_method.method_id}" {if !empty( $payment_method_settings[$payment_method.method_id] )} checked="checked" {/if} /></td>
                     <td style="width: 150px; text-align: center;"><img src="{$logos_path}{$payment_method.logo_url}" style="max-width: 150px;" /></td>
                     <td>
-                        <strong>{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong><br/>
+                        <strong>{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong>
+                        <!--
+                        <br/>
                         {$payment_method.description|escape:'htmlall':'UTF-8'}
+                        -->
                     </td>
                     <td style="white-space: nowrap;">
                         <input type="number" size="8" step="0.01" style="width: 100px; text-align: right;" name="surcharge_percent[{$payment_method.method_id}]" value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_percent}{else}0{/if}" /> %

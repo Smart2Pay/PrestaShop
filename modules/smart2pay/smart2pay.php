@@ -61,7 +61,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.8';
+        $this->version = '1.0.9';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -71,7 +71,7 @@ class Smart2pay extends PaymentModule
         parent::__construct();
 
         $this->displayName = $this->l( 'Smart2Pay' );
-        $this->description = $this->l( 'Secure payments through 90 alternative payment methods.' );
+        $this->description = $this->l( 'Secure payments through 100+ alternative payment options.' );
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
 
@@ -3398,7 +3398,7 @@ class Smart2pay extends PaymentModule
             (62, 'Tenpay', 'tenpay', 'Tenpay description', 'tenpay.png', 1, 1),
             (63, 'TrustPay', 'trustpay', 'TrustPay description', 'trustpay.png', 1, 1),
             (64, 'MangirKart', 'mangirkart', 'MangirKart description', 'mangir_cart.gif', 1, 1),
-            (65, 'Paytrail', 'paytrail', 'Paytrail description', 'paytrail.gif', 1, 1),
+            (65, 'Finish Banks', 'paytrail', 'Paytrail description', 'paytrail.gif', 1, 1),
             (66, 'MTCPay', 'mtcpay', 'MTCPay description', 'mtcpay.png', 1, 1),
             (67, 'DragonPay', 'dragonpay', 'DragonPay description', 'dragon_pay.png', 1, 1),
             (69, 'Credit Card', 's2pcards', 'S2PCards Description', 's2p_cards.gif', 0, 1),
@@ -3450,7 +3450,10 @@ class Smart2pay extends PaymentModule
             (1042, 'Nordea', 'paytrail', 'Nordea description', 'nordea.png', 1, 1),
             (1043, 'Danske bank', 'paytrail', 'Danske description', 'danske_bank.png', 1, 1),
             (1044, 'Cash-in', 'yandexmoney', 'Cash-in description', 'cashinyandex.gif', 1, 1),
-            (1045, 'Cards Russia', 'yandexmoney', 'Cards Russia description', 's2p_cards.gif', 1, 1);
+            (1045, 'Cards Russia', 'yandexmoney', 'Cards Russia description', 's2p_cards.gif', 1, 1),
+            (1051, 'Globe GCash', 'dragonpay', 'Globe GCash description', 'gcashlogo.jpg', 1, 1),
+            (1048, 'BankTransfer Japan', 'degica', 'BankTransfer Japan description', 'degica_bank_transfer.gif', 1, 1),
+            (1046, 'Konbini', 'degica', 'Konbini description', 'degica_kombini.png', 1, 1);
         ") )
         {
             $this->uninstallDatabase();
@@ -4282,7 +4285,10 @@ class Smart2pay extends PaymentModule
                 (538,243,76,99),
                 (539,244,63,1),
                 (540,244,69,2),
-                (541,244,76,99)
+                (541,244,76,99),
+                (542,152,1051,99),
+                (543,110,1048,99),
+                (544,110,1046,99)
         ") )
         {
             $this->uninstallDatabase();
