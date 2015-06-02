@@ -61,7 +61,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.0.10';
+        $this->version = '1.1.0';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -325,7 +325,10 @@ class Smart2pay extends PaymentModule
             $cart->secure_key
         );
 
-        $orderID = Order::getOrderByCartId( $context->cart->id );
+        if( !empty( $this->currentOrder ) )
+            $orderID = $this->currentOrder;
+        else
+            $orderID = Order::getOrderByCartId( $context->cart->id );
 
         if( $moduleSettings[self::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE']
         and $cart_original_amount != $amount_to_pay )
