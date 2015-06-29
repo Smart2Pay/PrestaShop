@@ -32,6 +32,10 @@ class Smart2pay extends PaymentModule
 
     const PAYM_BANK_TRANSFER = 1, PAYM_MULTIBANCO_SIBS = 20;
 
+    const OPT_FEE_CURRENCY_FRONT = 1, OPT_FEE_CURRENCY_ADMIN = 2;
+
+    const OPT_FEE_AMOUNT_SEPARATED = 1, OPT_FEE_AMOUNT_TOTAL_FEE = 2, OPT_FEE_AMOUNT_TOTAL_ORDER = 3;
+
     const DEMO_SIGNATURE = 'fc5fa3b8-746a', DEMO_MID = '1045', DEMO_SID = '30144', DEMO_POSTURL = 'https://apitest.smart2pay.com';
 
     // Tells module if install() or uninstall() methods are currenctly called
@@ -61,7 +65,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.0';
+        $this->version = '1.1.1';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -74,7 +78,6 @@ class Smart2pay extends PaymentModule
         $this->description = $this->l( 'Secure payments through 100+ alternative payment options.' );
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
-
 
         $this->create_context();
     }
@@ -1548,25 +1551,51 @@ class Smart2pay extends PaymentModule
      */
     public function hookPayment( $params )
     {
-        /*
-         * Check for base module to be active
-         */
-        if( !Configuration::get( self::CONFIG_PREFIX.'ENABLED' )
-         or !($payment_methods_arr = $this->get_methods_for_country())
+        $this->create_context();
+
+        $cart = $this->context->cart;
+
+        if( empty( $cart )
+         or !Validate::isLoadedObject( $cart )
+         or !Configuration::get( self::CONFIG_PREFIX.'ENABLED' ) )
+            return '';
+
+        $cart_original_amount = number_format( $cart->getOrderTotal( true, Cart::BOTH ), 2, '.', '' );
+
+        $cart_currency = new Currency( $cart->id_currency );
+
+        $method_params = array();
+        $method_params['cart_amount'] = $cart_original_amount;
+        $method_params['opt_currency'] = Configuration::get( self::CONFIG_PREFIX.'SURFEE_CURRENCY' );
+        $method_params['opt_amount'] = Configuration::get( self::CONFIG_PREFIX.'SURFEE_AMOUNT' );
+
+        if( empty( $cart_currency )
+         or !($payment_methods_arr = $this->get_methods_for_country( null, $cart_currency, $method_params ))
          or empty( $payment_methods_arr['methods'] ) )
             return '';
 
-        $this->create_context();
-
         $this->S2P_add_css( $this->_path . '/views/css/style.css' );
+
+        $display_options = array(
+            'from_admin' => self::OPT_FEE_CURRENCY_ADMIN,
+            'from_front' => self::OPT_FEE_CURRENCY_FRONT,
+
+            'amount_separated' => self::OPT_FEE_AMOUNT_SEPARATED,
+            'amount_total' => self::OPT_FEE_AMOUNT_TOTAL_FEE,
+            'order_total' => self::OPT_FEE_AMOUNT_TOTAL_ORDER,
+        );
 
         $this->smarty->assign(array(
             'this_path' => $this->_path,
             'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
+            'display_options' => $display_options,
+            'cart_amount' => $cart_original_amount,
+            'config_opt_currency' => Configuration::get( self::CONFIG_PREFIX.'SURFEE_CURRENCY' ),
+            'config_opt_amount' => Configuration::get( self::CONFIG_PREFIX.'SURFEE_AMOUNT' ),
             'default_currency' => Currency::getDefaultCurrency()->iso_code,
             'default_currency_id' => Currency::getDefaultCurrency()->id,
             'current_currency_id' => $this->context->currency->id,
-            'methods_detected_currency' => (!empty( $payment_methods_arr['detected_currency'] )?$payment_methods_arr['detected_currency']->id:0),
+            'methods_detected_currency' => $cart_currency->id,
             'payment_methods' => $payment_methods_arr['methods'],
             'methods_country' => self::$cache['methods_country'],
             's2p_module_obj' => $this,
@@ -2550,8 +2579,18 @@ class Smart2pay extends PaymentModule
      *
      * @return bool
      */
-    public function get_methods_for_country( $country_iso = null, $currency_obj = null )
+    public function get_methods_for_country( $country_iso = null, $currency_obj = null, $params = false )
     {
+        if( empty( $params ) or !is_array( $params ) )
+            $params = array();
+
+        if( empty( $params['cart_amount'] ) )
+            $params['cart_amount'] = 0;
+        if( empty( $params['opt_currency'] ) or !in_array( $params['opt_currency'], array( self::OPT_FEE_CURRENCY_FRONT, self::OPT_FEE_CURRENCY_ADMIN ) ) )
+            $params['opt_currency'] = self::OPT_FEE_CURRENCY_FRONT;
+        if( empty( $params['opt_amount'] ) or !in_array( $params['opt_amount'], array( self::OPT_FEE_AMOUNT_SEPARATED, self::OPT_FEE_AMOUNT_TOTAL_FEE, self::OPT_FEE_AMOUNT_TOTAL_ORDER ) ) )
+            $params['opt_amount'] = self::OPT_FEE_AMOUNT_SEPARATED;
+
         /*
          * Check for base module to be active
          * Check for current module to be available
@@ -2646,13 +2685,25 @@ class Smart2pay extends PaymentModule
                 $country_methods_arr['methods'][ $method_id ]['method']   = $all_methods_arr[ $method_id ];
                 $country_methods_arr['methods'][ $method_id ]['settings'] = $all_methods_settings_arr[ $method_id ];
 
+                $cart_total_amount = $params['cart_amount'];
+                if( $params['opt_currency'] == self::OPT_FEE_CURRENCY_ADMIN )
+                    $cart_total_amount = Smart2Pay_Helper::convert_price( $cart_total_amount, $currency_obj, $method_currency_obj );
+
+                $country_methods_arr['methods'][ $method_id ]['settings']['cart_amount'] = $cart_total_amount;
+
                 $country_methods_arr['methods'][ $method_id ]['settings']['surcharge_percent_format'] = number_format( $all_methods_settings_arr[ $method_id ]['surcharge_percent'], 2, '.', '' );
+
+                if( (float)$all_methods_settings_arr[ $method_id ]['surcharge_percent'] == 0 )
+                    $country_methods_arr['methods'][ $method_id ]['settings']['surcharge_percent_amount'] = 0;
+                else
+                    $country_methods_arr['methods'][ $method_id ]['settings']['surcharge_percent_amount'] = Tools::ps_round( ( $cart_total_amount * $all_methods_settings_arr[ $method_id ]['surcharge_percent'] ) / 100, 2 );
 
                 $country_methods_arr['methods'][ $method_id ]['settings']['surcharge_amount_converted'] = $all_methods_settings_arr[ $method_id ]['surcharge_amount'];
                 $country_methods_arr['methods'][ $method_id ]['settings']['surcharge_currency_id'] = $method_currency_obj->id;
+
                 if( !empty( $currency_obj )
                 and $currency_obj->id != $method_currency_obj->id
-                and $all_methods_settings_arr[ $method_id ]['surcharge_amount'] != 0 )
+                and (float)$all_methods_settings_arr[ $method_id ]['surcharge_amount'] != 0 )
                     $country_methods_arr['methods'][ $method_id ]['settings']['surcharge_amount_converted'] = Smart2Pay_Helper::convert_price( $all_methods_settings_arr[ $method_id ]['surcharge_amount'], $method_currency_obj, $currency_obj );
 
                 //$country_methods_arr['methods'][ $method_id ]['settings']['surcharge_amount_format']  = number_format( $all_methods_settings_arr[ $method_id ]['surcharge_amount'], 2, '.', '' );
@@ -2765,6 +2816,34 @@ class Smart2pay extends PaymentModule
                     array(
                         'id' => 1,
                         'name' => $this->l( 'Yes' ),
+                    ),
+                );
+
+            case 'fee_currency':
+                return array(
+                    array(
+                        'id' => self::OPT_FEE_CURRENCY_FRONT,
+                        'name' => $this->l( 'Setup in front-end' ),
+                    ),
+                    array(
+                        'id' => self::OPT_FEE_CURRENCY_ADMIN,
+                        'name' => $this->l( 'Used in payment method setup' ),
+                    ),
+                );
+
+            case 'fee_display':
+                return array(
+                    array(
+                        'id' => self::OPT_FEE_AMOUNT_SEPARATED,
+                        'name' => $this->l( 'Separated percent and fixed amount' ),
+                    ),
+                    array(
+                        'id' => self::OPT_FEE_AMOUNT_TOTAL_FEE,
+                        'name' => $this->l( 'As sum of percent and fixed amount' ),
+                    ),
+                    array(
+                        'id' => self::OPT_FEE_AMOUNT_TOTAL_ORDER,
+                        'name' => $this->l( 'As total amount for the order' ),
                     ),
                 );
 
@@ -3117,6 +3196,36 @@ class Smart2pay extends PaymentModule
                     'name' => 'name',
                 ),
                 '_default' => 0,
+            ),
+            array(
+                'type' => 'select',
+                'label' => $this->l('Surcharge will use currency (display only)'),
+                'name' => self::CONFIG_PREFIX.'SURFEE_CURRENCY',
+                'required' => false,
+                'hint' => array(
+                    $this->l( 'When displaying surcharge amount in checkout flow, what currency to use.' ),
+                ),
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions('fee_currency'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_default' => self::OPT_FEE_CURRENCY_FRONT,
+            ),
+            array(
+                'type' => 'select',
+                'label' => $this->l('Surcharge display amount'),
+                'name' => self::CONFIG_PREFIX.'SURFEE_AMOUNT',
+                'required' => false,
+                'hint' => array(
+                    $this->l( 'How to display surcharge amount in checkout flow.' ),
+                ),
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions('fee_display'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_default' => self::OPT_FEE_CURRENCY_FRONT,
             ),
             array(
                 'type' => 'select',

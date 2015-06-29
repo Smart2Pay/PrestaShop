@@ -19,8 +19,27 @@
                 <img src="{$this_path}views/img/logos/{$method_arr.method.logo_url}" alt="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" class="s2ppaymentlogo" />
                 {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
                 {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
-                    ({l s='Fee' mod='smart2pay'}:
-                        {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent+1-1}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{/if})
+                    {if $config_opt_amount == $display_options.amount_total}
+                        ({l s='Total fee amount' mod='smart2pay'}:
+                        {if $config_opt_currency == $display_options.from_front}
+                            {displayPrice price=($method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount_converted) currency=$methods_detected_currency}
+                        {else}
+                            {displayPrice price=($method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount) currency=$method_arr.settings.surcharge_currency_id}
+                        {/if})
+
+                    {elseif $config_opt_amount == $display_options.order_total}
+
+                        ({l s='You will pay' mod='smart2pay'}
+                        {if $config_opt_currency == $display_options.from_front}
+                            {displayPrice price=($method_arr.settings.cart_amount + $method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount_converted) currency=$methods_detected_currency}
+                        {else}
+                            {displayPrice price=($method_arr.settings.cart_amount + $method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount) currency=$method_arr.settings.surcharge_currency_id}
+                        {/if}
+                        {l s='for order including payment processing fee' mod='smart2pay'})
+                    {else}
+                        ({l s='Fee' mod='smart2pay'}:
+                            {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent+1-1}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{if $config_opt_currency == $display_options.from_front}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{else}{displayPrice price=$method_arr.settings.surcharge_amount currency=$method_arr.settings.surcharge_currency_id}{/if}){/if}
+                    {/if}
                 {/if}
             </a>
         </p>
@@ -32,8 +51,31 @@
         <span style="width: 86px; height: 49px;"><img src="{$this_path}views/img/logos/{$method_arr.method.logo_url}" alt="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" style="max-width: 86px; max-height: 49px;" /></span>
         {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
         {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
-            ({l s='Fee' mod='smart2pay'}:
-                {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent+1-1}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{/if})
+
+            {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
+                {if $config_opt_amount == $display_options.amount_total}
+                    ({l s='Total fee amount' mod='smart2pay'}:
+                    {if $config_opt_currency == $display_options.from_front}
+                        {displayPrice price=($method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount_converted) currency=$methods_detected_currency}
+                    {else}
+                        {displayPrice price=($method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount) currency=$method_arr.settings.surcharge_currency_id}
+                    {/if})
+
+                {elseif $config_opt_amount == $display_options.order_total}
+
+                    ({l s='You will pay' mod='smart2pay'}
+                    {if $config_opt_currency == $display_options.from_front}
+                        {displayPrice price=($method_arr.settings.cart_amount + $method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount_converted) currency=$methods_detected_currency}
+                    {else}
+                        {displayPrice price=($method_arr.settings.cart_amount + $method_arr.settings.surcharge_percent_amount + $method_arr.settings.surcharge_amount) currency=$method_arr.settings.surcharge_currency_id}
+                    {/if}
+                    {l s='for order including payment processing fee' mod='smart2pay'})
+                {else}
+                    ({l s='Fee' mod='smart2pay'}:
+                        {if $method_arr.settings.surcharge_percent != 0}{$method_arr.settings.surcharge_percent+1-1}%{/if}{if $method_arr.settings.surcharge_percent != 0 && $method_arr.settings.surcharge_amount > 0} + {/if}{if $method_arr.settings.surcharge_amount != 0}{if $config_opt_currency == $display_options.from_front}{displayPrice price=$method_arr.settings.surcharge_amount_converted currency=$methods_detected_currency}{else}{displayPrice price=$method_arr.settings.surcharge_amount currency=$method_arr.settings.surcharge_currency_id}{/if}){/if}
+                {/if}
+            {/if}
+
         {/if}
     </a>
 </p>
