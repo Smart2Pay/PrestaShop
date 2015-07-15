@@ -65,7 +65,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.1';
+        $this->version = '1.1.2';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -1060,6 +1060,13 @@ class Smart2pay extends PaymentModule
             )
         );
 
+        $form_buffer = '';
+
+        if( @file_exists( Smart2Pay_Helper::get_documentation_path() ) )
+        {
+            $form_buffer .= '<p><strong>NOTE</strong>: For a better understanding of our plugin, please check our integration guide: <a href="'.Smart2Pay_Helper::get_documentation_url().'" style="text-decoration: underline;">'.Smart2Pay_Helper::get_documentation_file_name().'</a></p>';
+        }
+
         $form_data = array();
         $form_data['submit_action'] = 'submit_main_data';
 
@@ -1068,10 +1075,8 @@ class Smart2pay extends PaymentModule
         foreach( $this->getConfigFormInputNames() as $name )
             $form_values[ $name ] = Configuration::get( $name );
 
-
-
         if( version_compare( _PS_VERSION_, '1.5', '<' ) )
-            $form_buffer = Smart2Pay_Helper::generate_ancient_form( $fields_form, $form_data, $form_values );
+            $form_buffer .= Smart2Pay_Helper::generate_ancient_form( $fields_form, $form_data, $form_values );
 
         else
         {
@@ -1109,7 +1114,7 @@ class Smart2pay extends PaymentModule
 
             $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
 
-            $form_buffer = $helper->generateForm( $fields_form );
+            $form_buffer .= $helper->generateForm( $fields_form );
         }
 
         return $form_buffer;

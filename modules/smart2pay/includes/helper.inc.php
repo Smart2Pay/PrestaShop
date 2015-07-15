@@ -49,6 +49,21 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
                     $templatePath, $die );
         }
 
+        public static function get_documentation_file_name()
+        {
+            return 'Smart2Pay_PrestaShop_Integration_Guide.pdf';
+        }
+
+        public static function get_documentation_url()
+        {
+            return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/smart2pay/'.self::get_documentation_file_name();
+        }
+
+        public static function get_documentation_path()
+        {
+            return _PS_MODULE_DIR_.'smart2pay/'.self::get_documentation_file_name();
+        }
+
         public static function get_return_url( $module_name )
         {
             if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
