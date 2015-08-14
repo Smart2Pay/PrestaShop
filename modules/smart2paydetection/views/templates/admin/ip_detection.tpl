@@ -25,7 +25,9 @@
 
             <strong>{l s='Please note that in order to have higher rates of detection you should update database file as often as possible.' mod='smart2paydetection'}</strong><br/>
 
-            {l s='You can download database file from following location: ' mod='smart2paydetection'} <a href="http://dev.maxmind.com/geoip/geoip2/geolite2/" target="_blank">http://dev.maxmind.com/geoip/geoip2/geolite2/</a>.
+            {l s='You can download database file from following location: ' mod='smart2paydetection'}
+            <a href="http://dev.maxmind.com/geoip/geoip2/geolite2/" target="_blank">http://dev.maxmind.com/geoip/geoip2/geolite2/</a>
+            (Downloads &gt; GeoLite2 Country &gt; MaxMind DB binary format).
 
         </div>
 

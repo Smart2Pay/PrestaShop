@@ -72,7 +72,6 @@ function s2p_config_js_invert()
         <div style="text-align: center">{l s='No payment methods defined in database.' mod='smart2pay'}</div>
         {else}
         <small>
-            {l s='Surcharge amount is provided in shop\'s default currency.' mod='smart2pay'}<br/>
             {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}
         </small>
         <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
@@ -100,7 +99,13 @@ function s2p_config_js_invert()
                     <td style="width: 50px; text-align: center;"><input type="checkbox" name="enabled_methods[]" id="enabled_methods_{$payment_method.method_id}" value="{$payment_method.method_id}" {if !empty( $payment_method_settings[$payment_method.method_id] )} checked="checked" {/if} /></td>
                     <td style="width: 150px; text-align: center;"><img src="{$logos_path}{$payment_method.logo_url}" style="max-width: 150px;" /></td>
                     <td>
-                        <strong>{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong>
+                        <strong>{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong><br/>
+                        <div id="s2p_meth_countries_{$payment_method.method_id}" style="height: 30px; overflow: hidden;text-overflow: ellipsis;display:inline-block;">
+                        <strong>{l s='Available in following countries' mod='smart2pay'}</strong> (<a href="javascript:void(0);" style="text-decoration: underline;" onclick="$('#s2p_meth_countries_{$payment_method.method_id}').css('overflow','visible').css('height','auto');">show all</a>):
+                        {if !empty( $method_countries[$payment_method.method_id] )}{$already_displayed = false}
+                            {foreach $method_countries[$payment_method.method_id] as $ccountry}{if !empty( $countries_by_id[$ccountry] )}{if $already_displayed}, {/if}{$countries_by_id[$ccountry].name}{$already_displayed = true}{/if}{/foreach}
+                        {/if}
+                        </div>
                         <!--
                         <br/>
                         {$payment_method.description|escape:'htmlall':'UTF-8'}
