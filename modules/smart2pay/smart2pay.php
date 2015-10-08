@@ -21,7 +21,10 @@ include_once( _PS_MODULE_DIR_.'smart2pay/includes/helper.inc.php' );
 
 class Smart2pay extends PaymentModule
 {
-    const S2P_STATUS_OPEN = 1, S2P_STATUS_SUCCESS = 2, S2P_STATUS_CANCELLED = 3, S2P_STATUS_FAILED = 4, S2P_STATUS_EXPIRED = 5, S2P_STATUS_PROCESSING = 7;
+    const S2P_STATUS_OPEN = 1, S2P_STATUS_SUCCESS = 2, S2P_STATUS_CANCELLED = 3, S2P_STATUS_FAILED = 4, S2P_STATUS_EXPIRED = 5, S2P_STATUS_PENDING_CUSTOMER = 6,
+        S2P_STATUS_PENDING_PROVIDER = 7, S2P_STATUS_SUBMITTED = 8, S2P_STATUS_AUTHORIZED = 9, S2P_STATUS_APPROVED = 10, S2P_STATUS_CAPTURED = 11, S2P_STATUS_REJECTED = 12,
+        S2P_STATUS_PENDING_CAPTURE = 13, S2P_STATUS_EXCEPTION = 14, S2P_STATUS_PENDING_CANCEL = 15, S2P_STATUS_REVERSED = 16, S2P_STATUS_COMPLETED = 17, S2P_STATUS_PROCESSING = 18,
+        S2P_STATUS_DISPUTED = 19, S2P_STATUS_CHARGEBACK = 20;
 
     const CONFIG_PREFIX = 'S2P_';
     const S2PD_CONFIG_PREFIX = 'S2PD_';
@@ -67,7 +70,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.3';
+        $this->version = '1.1.6';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -88,6 +91,9 @@ class Smart2pay extends PaymentModule
     {
         if( version_compare( _PS_VERSION_, '1.5', '<' ) )
         {
+            /** @var Cart $cart */
+            /** @var Cookie $cookie */
+            /** @var Smarty $smarty */
             global $smarty, $cookie, $cart;
 
             if( is_object( $cookie ) )
@@ -106,14 +112,31 @@ class Smart2pay extends PaymentModule
             if( empty( $this->context ) )
                 $this->context = new stdClass();
 
+            if( empty( $this->context->shop ) )
+                $this->context->shop = new stdClass();
+
+            /** @var Currency $this->context->currency */
+            /** @var Cart $this->context->cart */
+            /** @var Cookie $this->context->cookie */
+            /** @var Smarty $this->smarty */
             $this->smarty = $smarty;
             $this->context->smarty = $smarty;
             $this->context->cart = $cart;
             $this->context->language = $language;
             $this->context->cookie = $cookie;
             $this->context->currency = $currency;
+            $this->context->currency = $currency;
+
+            //$this->context->shop->id_shop = 1;
+            //$this->context->shop->id_shop_group = 1;
         }
     }
+
+    public function get_current_shop_id()
+    {
+
+    }
+
 
     public function S2P_add_css( $file )
     {
@@ -197,7 +220,8 @@ class Smart2pay extends PaymentModule
             self::S2P_STATUS_SUCCESS => $moduleSettings[self::CONFIG_PREFIX.'MESSAGE_SUCCESS'],
             self::S2P_STATUS_CANCELLED => $moduleSettings[self::CONFIG_PREFIX.'MESSAGE_CANCELED'],
             self::S2P_STATUS_FAILED => $moduleSettings[self::CONFIG_PREFIX.'MESSAGE_FAILED'],
-            self::S2P_STATUS_PROCESSING => $moduleSettings[self::CONFIG_PREFIX.'MESSAGE_PENDING'],
+            self::S2P_STATUS_PENDING_PROVIDER => $moduleSettings[self::CONFIG_PREFIX.'MESSAGE_PENDING'],
+            self::S2P_STATUS_AUTHORIZED => $moduleSettings[self::CONFIG_PREFIX.'MESSAGE_PENDING'],
         );
 
         $s2p_statuses = array(
@@ -206,7 +230,8 @@ class Smart2pay extends PaymentModule
             'cancelled' => self::S2P_STATUS_CANCELLED,
             'failed' => self::S2P_STATUS_FAILED,
             'expired' => self::S2P_STATUS_EXPIRED,
-            'processing' => self::S2P_STATUS_PROCESSING,
+            'processing' => self::S2P_STATUS_PENDING_PROVIDER,
+            'authorized' => self::S2P_STATUS_AUTHORIZED,
         );
 
         $data = (int) Tools::getValue( 'data', 0 );
@@ -247,10 +272,14 @@ class Smart2pay extends PaymentModule
         $context = $this->context;
         $cart = $this->context->cart;
 
-        if( empty( $cart ) )
+        if( empty( $cart )
+         or !($cart_products = $cart->getProducts()) )
         {
             $this->writeLog( 'Couldn\'t get cart from context', array( 'type' => 'error' ) );
             self::redirect_to_step1();
+
+            // just to make IDE not highlight variables as "might not be initialized"
+            exit;
         }
 
         $cart_currency = new Currency( $cart->id_currency );
@@ -308,6 +337,28 @@ class Smart2pay extends PaymentModule
         $total_surcharge = $surcharge_percent_amount + $surcharge_order_amount;
         $amount_to_pay += $total_surcharge;
 
+        if( !($shipping_price = Smart2Pay_Helper::get_total_shipping_cost( $cart )) )
+            $shipping_price = 0;
+
+        $articles_params = array();
+        $articles_params['transport_amount'] = $shipping_price;
+        $articles_params['total_surcharge'] = $total_surcharge;
+        $articles_params['amount_to_pay'] = $amount_to_pay;
+
+        $articles_str = '';
+        $articles_diff = 0;
+        if( ($articles_check = Smart2Pay_Helper::cart_products_to_string( $cart_products, $cart_original_amount, $articles_params )) )
+        {
+            $articles_str = $articles_check['buffer'];
+
+            if( !empty( $articles_check['total_difference_amount'] )
+            and $articles_check['total_difference_amount'] >= -0.01 and $articles_check['total_difference_amount'] <= 0.01 )
+            {
+                $articles_diff = $articles_check['total_difference_amount'];
+                $amount_to_pay += $articles_diff;
+            }
+        }
+
         $this->validateOrder(
             $cart->id,
             $moduleSettings[ self::CONFIG_PREFIX . 'NEW_ORDER_STATUS' ],
@@ -342,9 +393,9 @@ class Smart2pay extends PaymentModule
 
             if( Validate::isLoadedObject( $order ) )
             {
-                $order->total_paid += $total_surcharge;
+                $order->total_paid += $total_surcharge + $articles_diff;
                 if( property_exists( $order, 'total_paid_tax_incl' ) )
-                    $order->total_paid_tax_incl += $total_surcharge;
+                    $order->total_paid_tax_incl += $total_surcharge + $articles_diff;
 
                 $order->update();
 
@@ -401,6 +452,7 @@ class Smart2pay extends PaymentModule
             'RedirectInIframe'  => (!empty( $moduleSettings[self::CONFIG_PREFIX.'REDIRECT_IN_IFRAME'] )?1:0),
             'SkinID'            => (!empty( $moduleSettings[self::CONFIG_PREFIX.'SKIN_ID'] )?$moduleSettings[self::CONFIG_PREFIX.'SKIN_ID']:null),
             'SiteID'            => $site_id,
+            'Articles'          => $articles_str,
         );
 
         $notSetPaymentData = array();
@@ -1024,6 +1076,8 @@ class Smart2pay extends PaymentModule
 
         if( !($all_currencies_arr = Currency::getCurrencies()) )
             $all_currencies_arr = array();
+
+        //var_dump( $all_currencies_arr );
 
         $this->context->smarty->assign( array(
             'module_path' => $this->_path,
@@ -3710,7 +3764,7 @@ class Smart2pay extends PaymentModule
             (1054, 'BII VA', 'biiva', 'BII VA Description', '1054_BII-VA.gif', 1, 1),
             (1055, 'Kartuku', 'kartuku', 'Kartuku Description', '1055_Kartuku.gif', 1, 1),
             (1056, 'CIMB Clicks', 'cimbclicks', 'CIMBClicks Description', '1056_Cimb_Clicks.gif', 1, 1),
-            (1057, 'Mandiri e-Cass', 'mandiriecass', 'Mandiri e-Cass Description', '1057_Mandiri_ecash.gif', 1, 1),
+            (1057, 'Mandiri e-Cash', 'mandiriecash', 'Mandiri e-Cash Description', '1057_Mandiri_ecash.gif', 1, 1),
             (1058, 'IB Muamalat', 'ibmuamalat', 'IB Muamalat Description', '1058_IB_Muamalat.gif', 1, 1),
             (1059, 'T-Cash', 'tcash', 'T-Cash Description', '1059_T-cash.gif', 1, 1),
             (1060, 'Indosat Dompetku', 'indosatdompetku', 'Indosat Dompetku Description', '1060_Indosat_Dompetku.gif', 1, 1),
@@ -4012,6 +4066,7 @@ class Smart2pay extends PaymentModule
                 (2,13,1),
                 (2,14,2),
                 (2,76,99),
+                (2,81,99),
                 (3,76,99),
                 (4,76,99),
                 (5,76,99),
@@ -4020,6 +4075,7 @@ class Smart2pay extends PaymentModule
                 (7,22,99),
                 (7,74,99),
                 (7,81,99),
+                (7,1003,99),
                 (8,76,99),
                 (9,76,99),
                 (10,76,99),
@@ -4035,6 +4091,7 @@ class Smart2pay extends PaymentModule
                 (13,23,6),
                 (13,69,7),
                 (13,76,99),
+                (13,75,99),
                 (13,78,99),
                 (13,1052,99),
                 (14,18,1),
@@ -4042,12 +4099,12 @@ class Smart2pay extends PaymentModule
                 (14,69,3),
                 (14,76,99),
                 (14,40,99),
-                (14,75,99),
                 (14,78,99),
                 (15,76,99),
                 (16,76,99),
                 (16,74,99),
                 (16,81,99),
+                (16,1003,99),
                 (17,69,2),
                 (17,76,99),
                 (17,78,99),
@@ -4069,6 +4126,7 @@ class Smart2pay extends PaymentModule
                 (22,76,99),
                 (22,40,99),
                 (22,78,99),
+                (22,81,99),
                 (23,13,1),
                 (23,14,2),
                 (23,76,99),
@@ -4124,6 +4182,7 @@ class Smart2pay extends PaymentModule
                 (46,62,2),
                 (46,28,3),
                 (46,76,99),
+                (46,81,99),
                 (47,1019,2),
                 (47,1020,3),
                 (47,1021,4),
@@ -4150,6 +4209,7 @@ class Smart2pay extends PaymentModule
                 (54,69,7),
                 (54,76,99),
                 (54,78,99),
+                (54,81,99),
                 (55,4,1),
                 (55,9,2),
                 (55,40,3),
@@ -4186,6 +4246,8 @@ class Smart2pay extends PaymentModule
                 (62,69,6),
                 (62,76,99),
                 (62,78,99),
+                (62,1003,99),
+                (62,81,99),
                 (63,13,1),
                 (63,14,2),
                 (63,76,99),
@@ -4238,9 +4300,11 @@ class Smart2pay extends PaymentModule
                 (76,69,8),
                 (76,76,99),
                 (76,78,99),
+                (76,1003,99),
                 (77,76,99),
                 (78,76,99),
                 (78,74,99),
+                (78,1003,99),
                 (79,76,99),
                 (80,14,1),
                 (80,76,99),
@@ -4304,7 +4368,10 @@ class Smart2pay extends PaymentModule
                 (101,69,3),
                 (101,76,99),
                 (101,78,99),
+                (101,1003,99),
+                (101,81,99),
                 (102,76,99),
+                (102,1003,99),
                 (103,76,99),
                 (104,13,1),
                 (104,14,2),
@@ -4330,17 +4397,20 @@ class Smart2pay extends PaymentModule
                 (110,1047,99),
                 (110,1049,99),
                 (110,1050,99),
+                (110,1003,99),
                 (111,76,99),
                 (112,76,99),
                 (112,22,99),
                 (112,74,99),
                 (112,81,99),
+                (112,1003,99),
                 (113,76,99),
                 (114,76,99),
                 (115,76,99),
                 (116,76,99),
                 (117,76,99),
                 (118,76,99),
+                (118,1003,99),
                 (119,13,1),
                 (119,14,2),
                 (119,76,99),
@@ -4365,6 +4435,8 @@ class Smart2pay extends PaymentModule
                 (129,76,99),
                 (129,40,99),
                 (129,78,99),
+                (129,1003,99),
+                (129,81,99),
                 (130,1,1),
                 (130,40,2),
                 (130,73,3),
@@ -4379,6 +4451,7 @@ class Smart2pay extends PaymentModule
                 (131,76,99),
                 (131,78,99),
                 (131,81,99),
+                (131,1003,99),
                 (132,76,99),
                 (133,76,99),
                 (134,76,99),
@@ -4386,6 +4459,7 @@ class Smart2pay extends PaymentModule
                 (135,22,99),
                 (135,74,99),
                 (135,81,99),
+                (135,1003,99),
                 (136,76,99),
                 (137,76,99),
                 (138,76,99),
@@ -4461,6 +4535,7 @@ class Smart2pay extends PaymentModule
                 (166,14,2),
                 (166,76,99),
                 (167,76,99),
+                (167,1003,99),
                 (168,40,1),
                 (168,76,99),
                 (168,72,99),
@@ -4566,13 +4641,16 @@ class Smart2pay extends PaymentModule
                 (209,1036,3),
                 (209,1037,4),
                 (209,76,99),
+                (209,1003,99),
                 (210,76,99),
                 (210,22,99),
                 (210,74,99),
                 (210,81,99),
+                (210,1003,99),
                 (211,76,99),
                 (212,76,99),
                 (212,74,99),
+                (212,81,99),
                 (213,13,1),
                 (213,14,2),
                 (213,76,99),
@@ -4587,6 +4665,8 @@ class Smart2pay extends PaymentModule
                 (216,69,9),
                 (216,76,99),
                 (216,78,99),
+                (216,1003,99),
+                (216,81,99),
                 (217,76,99),
                 (218,76,99),
                 (219,76,99),
@@ -4604,16 +4684,21 @@ class Smart2pay extends PaymentModule
                 (224,40,3),
                 (224,76,99),
                 (224,78,99),
+                (224,1003,99),
                 (225,76,99),
                 (225,40,99),
                 (226,76,99),
                 (226,74,99),
+                (226,1003,99),
+                (226,81,99),
                 (227,76,99),
                 (228,76,99),
                 (229,76,99),
                 (230,76,99),
                 (231,76,99),
                 (232,76,99),
+                (232,1003,99),
+                (232,81,99),
                 (233,76,99),
                 (234,76,99),
                 (235,76,99),

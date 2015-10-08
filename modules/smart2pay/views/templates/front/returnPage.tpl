@@ -43,7 +43,7 @@
     {include file="{$front_tpl_dir}payment_failed.tpl"}
 {elseif $s2p_data == $s2p_statuses.expired }
     {include file="{$front_tpl_dir}payment_expired.tpl"}
-{elseif $s2p_data == $s2p_statuses.processing }
+{elseif $s2p_data == $s2p_statuses.processing || $s2p_data == $s2p_statuses.authorized }
     {include file="{$front_tpl_dir}payment_processing.tpl"}
 {/if}
 {/if}

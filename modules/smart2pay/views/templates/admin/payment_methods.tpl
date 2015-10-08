@@ -72,7 +72,8 @@ function s2p_config_js_invert()
         <div style="text-align: center">{l s='No payment methods defined in database.' mod='smart2pay'}</div>
         {else}
         <small>
-            {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}
+            {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}<br/>
+            {l s='NOTE: Payment method settings apply for all stores.' mod='smart2pay'}
         </small>
         <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
         <table class="table" style="{if $smarty.const._PS_VERSION_ >= 1.5}width: 80%;{else}width: 100%;{/if} margin: 0 auto;">
