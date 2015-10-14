@@ -48,7 +48,7 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.7';
+        $this->version = '1.1.8';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -191,11 +191,16 @@ class Smart2paydetection extends Module
             return false;
         }
 
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Decoder.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/InvalidDatabaseException.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Metadata.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Util.php';
+        if( !class_exists( 'MaxMind\Db\Reader' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader.php';
+        if( !class_exists( 'MaxMind\Db\Reader\Decoder' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Decoder.php';
+        if( !class_exists( 'MaxMind\Db\Reader\InvalidDatabaseException' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/InvalidDatabaseException.php';
+        if( !class_exists( 'MaxMind\Db\Reader\Metadata' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Metadata.php';
+        if( !class_exists( 'MaxMind\Db\Reader\Util' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Util.php';
 
         if( empty( $ip ) )
             $ip = (!empty( $_SERVER['REMOTE_ADDR'] )?$_SERVER['REMOTE_ADDR']:false);
@@ -271,11 +276,16 @@ class Smart2paydetection extends Module
      */
     public function getContent()
     {
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Decoder.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/InvalidDatabaseException.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Metadata.php';
-        require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Util.php';
+        if( !class_exists( 'MaxMind\Db\Reader' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader.php';
+        if( !class_exists( 'MaxMind\Db\Reader\Decoder' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Decoder.php';
+        if( !class_exists( 'MaxMind\Db\Reader\InvalidDatabaseException' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/InvalidDatabaseException.php';
+        if( !class_exists( 'MaxMind\Db\Reader\Metadata' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Metadata.php';
+        if( !class_exists( 'MaxMind\Db\Reader\Util' ) )
+            require_once _PS_MODULE_DIR_ . 'smart2paydetection/Db/Reader/Util.php';
 
         $this->create_context();
 
