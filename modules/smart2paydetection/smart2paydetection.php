@@ -48,7 +48,7 @@ class Smart2paydetection extends Module
     {
         $this->name = 'smart2paydetection';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.4';
+        $this->version = '1.1.7';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );

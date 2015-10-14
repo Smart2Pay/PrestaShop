@@ -35,7 +35,7 @@
 {if !empty( $s2p_data )}
 {if $s2p_data == $s2p_statuses.open }
     {include file="{$front_tpl_dir}payment_open.tpl"}
-{elseif $s2p_data == $s2p_statuses.success }
+{elseif $s2p_data == $s2p_statuses.success || $s2p_data == $s2p_statuses.authorized }
     {include file="{$front_tpl_dir}payment_success.tpl"}
 {elseif $s2p_data == $s2p_statuses.cancelled }
     {include file="{$front_tpl_dir}payment_canceled.tpl"}
@@ -43,7 +43,7 @@
     {include file="{$front_tpl_dir}payment_failed.tpl"}
 {elseif $s2p_data == $s2p_statuses.expired }
     {include file="{$front_tpl_dir}payment_expired.tpl"}
-{elseif $s2p_data == $s2p_statuses.processing || $s2p_data == $s2p_statuses.authorized }
+{elseif $s2p_data == $s2p_statuses.processing }
     {include file="{$front_tpl_dir}payment_processing.tpl"}
 {/if}
 {/if}

@@ -70,7 +70,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.6';
+        $this->version = '1.1.7';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -1660,7 +1660,7 @@ class Smart2pay extends PaymentModule
     {
         $this->create_context();
 
-        $cart = $this->context->cart;
+        $cart = (!empty( $this->context )?$this->context->cart:false);
 
         if( empty( $cart )
          or !Validate::isLoadedObject( $cart )
