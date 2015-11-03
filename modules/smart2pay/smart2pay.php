@@ -70,7 +70,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.7';
+        $this->version = '1.1.8';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -4732,9 +4732,12 @@ class Smart2pay extends PaymentModule
      */
     private function createCustomOrderStatuses()
     {
+        if( !($all_languages = Language::getLanguages( false )) )
+            $all_languages = array();
+
         foreach( $this->getPaymentStatesOrderStatuses() as $status )
         {
-            if( ($existingStatus = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'order_state_lang` WHERE `name` = \'' . pSQL( $status['orderStatusName'] ) . '\'' )) )
+            if( ($existingStatus = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'order_state_lang` WHERE `name` = \'' . pSQL( $status['orderStatusName'] ) . '\' LIMIT 0, 1' )) )
                 $statusID = $existingStatus[0]['id_order_state'];
 
             else
@@ -4754,10 +4757,21 @@ class Smart2pay extends PaymentModule
                 }
 
                 $statusID = Db::getInstance()->Insert_ID();
+            }
+
+            $statusID = intval( $statusID );
+
+            foreach( $all_languages as $language_arr )
+            {
+                if( empty( $language_arr['id_lang'] ) )
+                    continue;
+
+                if( Db::getInstance()->executeS( 'SELECT id_order_state FROM `'._DB_PREFIX_.'order_state_lang` WHERE `id_order_state` = \'' . $statusID . '\' AND `id_lang` = \''.$language_arr['id_lang'].'\' LIMIT 0, 1' ) )
+                    continue;
 
                 Db::getInstance()->execute(
                     'INSERT INTO `'._DB_PREFIX_.'order_state_lang` (`id_order_state`, `id_lang`, `name`) '.
-                    'VALUES(' . (int)$statusID . ', 1, \'' . pSQL( $status['orderStatusName'] ). '\')'
+                    'VALUES(' . $statusID . ', \''.$language_arr['id_lang'].'\', \'' . pSQL( $status['orderStatusName'] ). '\')'
                 );
             }
 
