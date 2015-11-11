@@ -41,13 +41,19 @@
         <div style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%;">
             <div id="iframe-wrapper" style="position: fixed; display: table; margin: 0px auto; margin-top: 50px; width: 100%">
                 <div style="margin: 0px auto; display: table;">
+                {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"] == 0}
+                    <div id="s2p_loading_content" style="margin: 20% auto 0 auto; width:80%; background-color: white;border: 2px solid lightgrey; text-align: center; padding: 40px;">
+                        <img src="{$this_path}views/img/ajax-loader.gif" alt="{l s='Loading...' mod='smart2pay'}" />
+                        <p style="margin: 20px auto;">{l s='Redirecting. Please wait...' mod='smart2pay'}</p>
+                    </div>
+                {/if}
                 {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"]
                     && $moduleSettings["{$settings_prefix}SKIP_PAYMENT_PAGE"]
                     && ($paymentData['MethodID'] == 1001 || $paymentData['MethodID'] == 1002 || $paymentData['MethodID'] == 76)
                 }
-                    <iframe style='border: none; margin: 0px auto; background-color: #ffffff;' id="merchantIframe" name="merchantIframe" src="" width="780" height="500"></iframe>
+                    <iframe style="border: none; margin: 0px auto; background-color: #ffffff;" id="merchantIframe" name="merchantIframe" src="" width="780" height="500"></iframe>
                 {else}
-                    <iframe style='border: none; margin: 0px auto; background-color: transparent;' id="merchantIframe" name="merchantIframe" src="" width="900" height="800"></iframe>
+                    <iframe style="border: none; margin: 0px auto; background-color: transparent;" id="merchantIframe" name="merchantIframe" src="" width="900" height="800"></iframe>
                 {/if}
                 </div>
             </div>
@@ -59,9 +65,13 @@
 {literal}
 function modalIframe()
 {
-    jQuery("#iframe-container").appendTo('body');
-    jQuery("#iframe-container").show();
-    jQuery("#iframe-container").css({height: document.getElementsByTagName('html')[0].scrollHeight});
+    var iframe_container_obj = jQuery("#iframe-container");
+    if( iframe_container_obj )
+    {
+        iframe_container_obj.appendTo('body');
+        iframe_container_obj.show();
+        iframe_container_obj.css({height: document.getElementsByTagName('html')[0].scrollHeight});
+    }
 }
 {/literal}
 

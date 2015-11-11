@@ -55,6 +55,8 @@ class Smart2pay extends PaymentModule
         'all_countries' => array(),
         'all_id_countries' => array(),
         'all_method_countries' => array(),
+        'all_method_countries_enabled' => array(),
+        'all_method_countries_details' => array(),
         'method_details' => array(),
         'method_settings' => array(),
         'methods_country' => '',
@@ -70,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.8';
+        $this->version = '1.1.10';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -471,6 +473,8 @@ class Smart2pay extends PaymentModule
         $paymentData['Hash'] = $this->computeHash( $messageToHash, $moduleSettings['signature'] );
 
         $this->context->smarty->assign( array(
+            'this_path' => $this->_path,
+            'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
             'paymentData' => $paymentData,
             'messageToHash' => $messageToHash,
             'settings_prefix' => self::CONFIG_PREFIX,
@@ -946,6 +950,7 @@ class Smart2pay extends PaymentModule
             $all_methods_arr = $this->get_all_methods();
 
             $enabled_methods_arr = Tools::getValue( 'enabled_methods', array() );
+            $enabled_method_countries = Tools::getValue( 'enabled_method_countries', array() );
             $surcharge_percents_arr = Tools::getValue( 'surcharge_percent', array() );
             $surcharge_amounts_arr = Tools::getValue( 'surcharge_amount', array() );
             $surcharge_currencies_arr = Tools::getValue( 'surcharge_currency', array() );
@@ -977,6 +982,45 @@ class Smart2pay extends PaymentModule
                 if( !$this->save_method_settings( $method_id, $method_settings ) )
                     $post_data['errors_buffer'] .= $this->displayError( 'Error saving details for payment method '.$all_methods_arr[$method_id]['display_name'].'.' );
             }
+
+            $all_method_countries = $this->get_method_countries_all();
+            $method_countries_enabled = $this->get_method_countries_enabled();
+            foreach( $enabled_method_countries as $method_id => $country_methods )
+            {
+                if( empty( $all_method_countries[$method_id] ) or !is_array( $all_method_countries[$method_id] ) )
+                    continue;
+
+                $selected_method_countries = array();
+                if( !empty( $country_methods ) )
+                {
+                    if( !($tmp_countries_arr = explode( ',', $country_methods )) )
+                        $tmp_countries_arr = array();
+
+                    foreach( $tmp_countries_arr as $country_id )
+                    {
+                        $country_id = intval( $country_id );
+                        if( empty( $country_id ) )
+                            continue;
+
+                        $selected_method_countries[] = $country_id;
+                    }
+                }
+
+                if( !empty( $method_countries_enabled[$method_id] )
+                and !array_diff( $method_countries_enabled[$method_id], $selected_method_countries )
+                and !array_diff( $selected_method_countries, $method_countries_enabled[$method_id] ) )
+                    continue;
+
+                if( !Db::getInstance()->execute( 'UPDATE `'._DB_PREFIX_.'smart2pay_country_method` SET enabled = 0 WHERE method_id = \''.$method_id.'\'' )
+                 or (count( $selected_method_countries )
+                      and !Db::getInstance()->execute( 'UPDATE `'._DB_PREFIX_.'smart2pay_country_method` SET enabled = 1 WHERE method_id = \''.$method_id.'\' AND country_id IN ('.implode( ',', $selected_method_countries ).')' ))
+                 )
+                {
+                    $post_data['errors_buffer'] .= $this->displayError( 'Error saving country details for payment method '.$all_methods_arr[$method_id]['display_name'].'.' );
+                }
+            }
+
+            $this->refresh_method_countries();
 
             if( empty( $valid_ids ) )
                 Db::getInstance()->execute( 'TRUNCATE TABLE `'._DB_PREFIX_.'smart2pay_method_settings`' );
@@ -1074,10 +1118,20 @@ class Smart2pay extends PaymentModule
 
         $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
 
+        $comma_countries_methods_arr = array();
+        if( ($methods_countries_enabled = $this->get_method_countries_enabled()) )
+        {
+            foreach( $methods_countries_enabled as $method_id => $countries_methods_arr )
+            {
+                if( empty( $method_id ) or !is_array( $countries_methods_arr ) )
+                    continue;
+
+                $comma_countries_methods_arr[$method_id] = implode( ',', $countries_methods_arr );
+            }
+        }
+
         if( !($all_currencies_arr = Currency::getCurrencies()) )
             $all_currencies_arr = array();
-
-        //var_dump( $all_currencies_arr );
 
         $this->context->smarty->assign( array(
             'module_path' => $this->_path,
@@ -1086,7 +1140,8 @@ class Smart2pay extends PaymentModule
             'default_currency_iso' => Currency::getDefaultCurrency()->iso_code,
             'all_currencies' => $all_currencies_arr,
             'countries_by_id' => $this->get_smart2pay_id_countries(),
-            'method_countries' => $this->get_method_countries_all(),
+            'method_countries' => $this->get_method_countries_all_with_details(), // $this->get_method_countries_all(),
+            'comma_countries_methods' => $comma_countries_methods_arr,
             'payment_methods' => $this->get_all_methods(),
             'payment_method_settings' => $this->get_all_method_settings(),
         ) );
@@ -1115,7 +1170,7 @@ class Smart2pay extends PaymentModule
         //            foreach( $all_method_countries[$method_id] as $country_id )
         //            {
         //                if( empty( $all_countries[$country_id] ) )
-        //                    echo 'pula country ['.$country_id.']';
+        //                    echo 'no country ['.$country_id.']';
         //
         //                $str_country .= (empty( $str_country )?'"':', ').$all_countries[$country_id]['name'].' ('.$all_countries[$country_id]['code'].')';
         //            }
@@ -2313,10 +2368,17 @@ class Smart2pay extends PaymentModule
      *
      * @return array|null
      */
-    public function get_method_countries_all()
+    public function get_method_countries_all_with_details()
     {
-        if( !empty( self::$cache['all_method_countries'] ) )
-            return self::$cache['all_method_countries'];
+        if( !empty( self::$cache['all_method_countries_details'] ) )
+            return self::$cache['all_method_countries_details'];
+
+        if( empty( self::$cache['all_method_countries'] ) )
+            self::$cache['all_method_countries'] = array();
+        if( empty( self::$cache['all_method_countries_enabled'] ) )
+            self::$cache['all_method_countries_enabled'] = array();
+        if( empty( self::$cache['all_method_countries_details'] ) )
+            self::$cache['all_method_countries_details'] = array();
 
         if( ($methods_countries = Db::getInstance()->executeS(
 
@@ -2324,8 +2386,6 @@ class Smart2pay extends PaymentModule
             ' FROM `'._DB_PREFIX_.'smart2pay_country_method` CM '.
             ' LEFT JOIN `'._DB_PREFIX_.'smart2pay_country` C ON C.country_id = CM.country_id '.
             ' ORDER BY CM.method_id ASC, C.name ASC'
-
-            //'SELECT * FROM `'._DB_PREFIX_.'smart2pay_country_method` ORDER BY method_id ASC, `priority` ASC'
         )) )
         {
             foreach( $methods_countries as $method_country )
@@ -2336,12 +2396,62 @@ class Smart2pay extends PaymentModule
 
                 if( empty( self::$cache['all_method_countries'][$method_country['method_id']] ) )
                     self::$cache['all_method_countries'][$method_country['method_id']] = array();
+                if( empty( self::$cache['all_method_countries_enabled'][$method_country['method_id']] ) )
+                    self::$cache['all_method_countries_enabled'][$method_country['method_id']] = array();
+                if( empty( self::$cache['all_method_countries_details'][$method_country['method_id']] ) )
+                    self::$cache['all_method_countries_details'][$method_country['method_id']] = array();
 
                 self::$cache['all_method_countries'][$method_country['method_id']][] = $method_country['country_id'];
+                self::$cache['all_method_countries_details'][$method_country['method_id']][] = $method_country;
+
+                if( !empty( $method_country['enabled'] ) )
+                    self::$cache['all_method_countries_enabled'][$method_country['method_id']][] = $method_country['country_id'];
             }
         }
 
+        return self::$cache['all_method_countries_details'];
+    }
+
+    /**
+     * Get countries of payment method (enabled or not).
+     *
+     * @return array
+     */
+    public function get_method_countries_all()
+    {
+        if( !empty( self::$cache['all_method_countries'] ) )
+            return self::$cache['all_method_countries'];
+
+        $this->get_method_countries_all_with_details();
+
         return self::$cache['all_method_countries'];
+    }
+
+    /**
+     * Get countries of payment method (only enabled ones).
+     *
+     * @return array
+     */
+    public function get_method_countries_enabled()
+    {
+        if( !empty( self::$cache['all_method_countries_enabled'] ) )
+            return self::$cache['all_method_countries_enabled'];
+
+        $this->get_method_countries_all_with_details();
+
+        return self::$cache['all_method_countries_enabled'];
+    }
+
+    /**
+     * Refresh countries of payment method from database
+     */
+    public function refresh_method_countries()
+    {
+        self::$cache['all_method_countries'] = array();
+        self::$cache['all_method_countries_enabled'] = array();
+        self::$cache['all_method_countries_details'] = array();
+
+        $this->get_method_countries_all_with_details();
     }
 
     /**
@@ -2802,7 +2912,7 @@ class Smart2pay extends PaymentModule
                     'SELECT CM.method_id '.
                     ' FROM '._DB_PREFIX_.'smart2pay_country_method CM '.
                     ' LEFT JOIN '._DB_PREFIX_.'smart2pay_country C ON C.country_id = CM.country_id '.
-                    ' WHERE C.code = \''.pSQL( $country_iso ).'\''
+                    ' WHERE C.code = \''.pSQL( $country_iso ).'\' AND CM.enabled = 1'
                 )) )
             return false;
 
@@ -2943,7 +3053,7 @@ class Smart2pay extends PaymentModule
             'SELECT CM.method_id '.
             ' FROM '._DB_PREFIX_.'smart2pay_country_method CM '.
             ' LEFT JOIN '._DB_PREFIX_.'smart2pay_country C ON C.country_id = CM.country_id '.
-            ' WHERE C.code = \''.pSQL( $country_iso ).'\' AND CM.method_id = ' . $method_id
+            ' WHERE C.code = \''.pSQL( $country_iso ).'\' AND CM.method_id = ' . $method_id . ' AND CM.enabled = 1'
         );
 
         /*
@@ -4048,10 +4158,11 @@ class Smart2pay extends PaymentModule
         if( !Db::getInstance()->Execute("
             CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_country_method` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
-                `country_id` int(11) default NULL,
-                `method_id` int(11) default NULL,
-                `priority` int(2) default NULL,
-                PRIMARY KEY (`id`), KEY `country_id` (`country_id`), KEY `method_id` (`method_id`)
+                `country_id` int(11) DEFAULT '0',
+                `method_id` int(11) DEFAULT '0',
+                `priority` int(2) DEFAULT '99',
+                `enabled` tinyint(2) DEFAULT '1' COMMENT 'Tells if country is active for method',
+                PRIMARY KEY (`id`), KEY `country_id` (`country_id`), KEY `method_id` (`method_id`), KEY `enabled` (`enabled`)
             ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
         ") )
         {

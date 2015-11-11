@@ -63,6 +63,7 @@ $_MODULE['<{smart2pay}prestashop>order_payment_logs_5352601a9516c0ff896e60e8a5da
 $_MODULE['<{smart2pay}prestashop>payment_methods_af01f8c298aa063d9c7490f00eddd2df'] = 'Payment Methods';
 $_MODULE['<{smart2pay}prestashop>payment_methods_cb0733a5717056586ec73b995f27dabe'] = 'No payment methods defined in database.';
 $_MODULE['<{smart2pay}prestashop>payment_methods_308c2519b06025a2ce8764a955c34006'] = 'If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.';
+$_MODULE['<{smart2pay}prestashop>payment_methods_b4e745815b65fde206cbbf1b6ef0dd86'] = 'NOTE: Payment method settings apply for all stores.';
 $_MODULE['<{smart2pay}prestashop>payment_methods_3f3d064b6c177cc47540a4bb55d5a587'] = 'Enabled?';
 $_MODULE['<{smart2pay}prestashop>payment_methods_49ee3087348e8d44e1feda1917443987'] = 'Name';
 $_MODULE['<{smart2pay}prestashop>payment_methods_70a2468998d90207df5ed8727c31e7b2'] = 'Surcharge';
@@ -70,9 +71,13 @@ $_MODULE['<{smart2pay}prestashop>payment_methods_502996d9790340c5fd7b86a5b93b1c9
 $_MODULE['<{smart2pay}prestashop>payment_methods_4c41e0bd957698b58100a5c687d757d9'] = 'Select all';
 $_MODULE['<{smart2pay}prestashop>payment_methods_9b8958acb7be504bb5f55f17c0eea366'] = 'Invert';
 $_MODULE['<{smart2pay}prestashop>payment_methods_6a1854f62e217911db9a2a437d219212'] = 'Select none';
+$_MODULE['<{smart2pay}prestashop>payment_methods_7516eeae2e0b5f4df1134c392e6fe445'] = 'Customize countries';
+$_MODULE['<{smart2pay}prestashop>payment_methods_a066788ee00c0aa4df52e350763764fe'] = 'Method active for following countries';
+$_MODULE['<{smart2pay}prestashop>payment_methods_02f047349ae6bbfaecbd5df85e29458d'] = 'Update method';
+$_MODULE['<{smart2pay}prestashop>payment_methods_40e9524e215f1f69a52418b00789fc82'] = 'NOTE: Changes are saved when you submit the form using button under table of methods';
+$_MODULE['<{smart2pay}prestashop>payment_methods_d8015e1722b1c54575fec93bd92b8ed1'] = 'Update payment methods';
 $_MODULE['<{smart2pay}prestashop>payment_methods_f59bb4952d735b58e6248719852a2cea'] = 'Available in following countries';
 $_MODULE['<{smart2pay}prestashop>payment_methods_c21f969b5f03d33d43e04f8f136e7682'] = 'default';
-$_MODULE['<{smart2pay}prestashop>payment_methods_d8015e1722b1c54575fec93bd92b8ed1'] = 'Update payment methods';
 $_MODULE['<{smart2pay}prestashop>payment_27266fe4d37bf06589c7c6dbf2d5c067'] = 'Pay by';
 $_MODULE['<{smart2pay}prestashop>payment_95c3ccfcf1d30c29064d7870c740062f'] = 'Total fee amount';
 $_MODULE['<{smart2pay}prestashop>payment_592053fe9983ea36f31593f943da0b6b'] = 'You will pay';
