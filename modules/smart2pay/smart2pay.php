@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.10';
+        $this->version = '1.1.11';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -1747,6 +1747,8 @@ class Smart2pay extends PaymentModule
             'order_total' => self::OPT_FEE_AMOUNT_TOTAL_ORDER,
         );
 
+        $moduleSettings = $this->getSettings();
+
         $this->smarty->assign(array(
             'this_path' => $this->_path,
             'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
@@ -1761,6 +1763,8 @@ class Smart2pay extends PaymentModule
             'payment_methods' => $payment_methods_arr['methods'],
             'methods_country' => self::$cache['methods_country'],
             's2p_module_obj' => $this,
+            'settings_prefix' => self::CONFIG_PREFIX,
+            'moduleSettings' => $moduleSettings,
         ));
 
         return $this->fetchTemplate( 'payment.tpl' );
@@ -3520,6 +3524,21 @@ class Smart2pay extends PaymentModule
                     'name' => 'name',
                 ),
                 '_default' => self::OPT_FEE_CURRENCY_FRONT,
+            ),
+            array(
+                'type' => 'select',
+                'label' => $this->l('Show loading modal'),
+                'name' => self::CONFIG_PREFIX.'LOADING_MODAL',
+                'required' => false,
+                'hint' => array(
+                    $this->l( 'Show a loading modal window when user selects a payment method and when he/she is redirected to payment gateway.' ),
+                ),
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_default' => 0,
             ),
             array(
                 'type' => 'select',

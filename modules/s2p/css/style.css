@@ -1,8 +1,0 @@
-.smart2pay--admin-logs-container { max-height: 300px; overflow: auto; }
-
-.smart2pay--admin-logs-item-type, .smart2pay--admin-logs-item-date { color: black !important; }
-.smart2pay--admin-logs-item-date { width: 150px; text-align: center; }
-
-.smart2pay--admin-logs-item-text { color: black; clear: both; }
-
-.smart2pay--admin-logs-item-file, .smart2pay--admin-logs-item-line { color: #535353; }
