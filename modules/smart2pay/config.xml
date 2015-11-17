@@ -2,7 +2,7 @@
 <module>
 	<name>smart2pay</name>
 	<displayName><![CDATA[Smart2Pay]]></displayName>
-	<version><![CDATA[1.1.11]]></version>
+	<version><![CDATA[1.1.12]]></version>
 	<description><![CDATA[Secure payments through 100+ alternative payment options.]]></description>
 	<author><![CDATA[Smart2Pay]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>

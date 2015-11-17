@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.11';
+        $this->version = '1.1.12';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -309,6 +309,8 @@ class Smart2pay extends PaymentModule
             $this->writeLog( 'Payment method #' . $method_id . ' ('.$payment_method['method_details']['display_name'].') has an invalid currency code ['.(!empty( $payment_method['method_settings']['surcharge_currency'] )?$payment_method['method_settings']['surcharge_currency']:'???').'].', array( 'type' => 'error' ) );
             // Todo - give some feedback to the user
             self::redirect_to_step1();
+            // IDE fix (exit is called in redirect_to_step1())
+            exit;
         }
 
         $site_id = $moduleSettings[self::CONFIG_PREFIX.'SITE_ID'] ? $moduleSettings[self::CONFIG_PREFIX.'SITE_ID'] : null;
@@ -436,6 +438,11 @@ class Smart2pay extends PaymentModule
         else
             $payment_description = $moduleSettings[self::CONFIG_PREFIX.'CUSTOM_PRODUCT_DESCRIPTION'];
 
+        $first_name = trim( $customer->firstname );
+        $last_name = trim( $customer->lastname );
+        // if first name and last name are empty full name should be empty too
+        $full_name = trim( $first_name.' '.$last_name );
+
         $paymentData = array(
             'MerchantID'        => $moduleSettings['mid'],
             'MerchantTransactionID' => $orderID,
@@ -443,9 +450,9 @@ class Smart2pay extends PaymentModule
             'Currency'          => $cart_currency->iso_code,
             'ReturnURL'         => $moduleSettings[self::CONFIG_PREFIX.'RETURN_URL'],
             'IncludeMethodIDs'  => $method_id,
-            'CustomerName'      => $customer->firstname . ' ' . $customer->lastname,
-            'CustomerFirstName' => $customer->firstname,
-            'CustomerLastName'  => $customer->lastname,
+            'CustomerName'      => $full_name,
+            'CustomerFirstName' => $first_name,
+            'CustomerLastName'  => $last_name,
             'CustomerEmail'     => $customer->email,
             'Country'           => $payment_method['country_iso'],
             'MethodID'          => $method_id,
