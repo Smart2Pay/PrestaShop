@@ -9,6 +9,7 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
+{if $moduleSettings["{$settings_prefix}LOADING_MODAL"]}
 <script type="text/javascript">
 {literal}
 function s2p_display_loading_layer()
@@ -49,7 +50,7 @@ function s2p_display_loading_layer_close()
             </div>
         </div>
     </div>
-
+{/if}
 {if !empty( $payment_methods )}
     {foreach from=$payment_methods key=method_id item=method_arr name=methodsLoop}
         {if $smarty.const._PS_VERSION_ >= 1.6}

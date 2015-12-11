@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.12';
+        $this->version = '1.1.13';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -442,6 +442,13 @@ class Smart2pay extends PaymentModule
         $last_name = trim( $customer->lastname );
         // if first name and last name are empty full name should be empty too
         $full_name = trim( $first_name.' '.$last_name );
+
+        if( $first_name === '' )
+            $first_name = null;
+        if( $last_name === '' )
+            $last_name = null;
+        if( $full_name === '' )
+            $full_name = null;
 
         $paymentData = array(
             'MerchantID'        => $moduleSettings['mid'],
