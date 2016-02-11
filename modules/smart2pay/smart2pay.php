@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.13';
+        $this->version = '1.1.14';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -1820,6 +1820,48 @@ class Smart2pay extends PaymentModule
         return true;
     }
 
+    public function validate_ip( $ip )
+    {
+        if( function_exists( 'filter_var' ) and defined( 'FILTER_VALIDATE_IP' ) )
+            return filter_var( $ip, FILTER_VALIDATE_IP );
+
+        if( !($ip_numbers = explode( '.', $ip ))
+        or !is_array( $ip_numbers ) or count( $ip_numbers ) != 4 )
+            return false;
+
+        $parsed_ip = '';
+        foreach( $ip_numbers as $ip_part )
+        {
+            $ip_part = intval( $ip_part );
+            if( $ip_part < 0 or $ip_part > 255 )
+                return false;
+
+            $parsed_ip = ($parsed_ip!=''?'.':'').$ip_part;
+        }
+
+        return $parsed_ip;
+    }
+
+    public function guess_ip()
+    {
+        if( !($settings_arr = $this->getSettings())
+         or empty( $settings_arr[self::CONFIG_PREFIX.'PROXY_IP'] ) )
+            return (!empty( $_SERVER['REMOTE_ADDR'] )?$_SERVER['REMOTE_ADDR']:'');
+
+        $guessed_ip = '';
+        if( !empty( $_SERVER['HTTP_CLIENT_IP'] ) )
+            $guessed_ip = $this->validate_ip( $_SERVER['HTTP_CLIENT_IP'] );
+
+        if( empty( $guessed_ip )
+        and !empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) )
+            $guessed_ip = $this->validate_ip( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+
+        if( empty( $guessed_ip ) )
+            $guessed_ip = (!empty( $_SERVER['REMOTE_ADDR'] )?$_SERVER['REMOTE_ADDR']:'');
+
+        return $guessed_ip;
+    }
+
     public function detect_country( $ip = false )
     {
         if( !($settings_arr = $this->getSettings())
@@ -1841,7 +1883,7 @@ class Smart2pay extends PaymentModule
         }
 
         if( empty( $ip ) )
-            $ip = (!empty( $_SERVER['REMOTE_ADDR'] )?$_SERVER['REMOTE_ADDR']:'');
+            $ip = $this->guess_ip();
 
         if( empty( $ip ) )
             return false;
@@ -3390,6 +3432,23 @@ class Smart2pay extends PaymentModule
                     $this->l( 'Plugin will try detecting visitor\'s country by IP. Country is important for plugin as payment methods are displayed depending on country.' ),
                     $this->l( 'Country detection is available when you install and activate Smart2Pay Detection plugin.' ),
                     $this->l( 'If you select Yes and country detection plugin is not installed, plugin will use as fallback country set in customer\'s billing address.' ),
+                ),
+                'required' => false,
+                'options' => array(
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+                '_default' => 0,
+            ),
+            array(
+                'type' => 'select',
+                'label' => $this->l( 'Use IP sent by proxy' ),
+                'name' => self::CONFIG_PREFIX.'PROXY_IP',
+                'desc' => array(
+                    $this->l( 'If your site is behind a firewall IP in headers might be set for every request to firewall IP.' ),
+                    $this->l( 'If HTTP_CLIENT_IP or HTTP_X_FORWARDED_FOR header is set by firewall to the actual IP of customer, this option tells plugin to check first if such variables are set in headers and if set use that as customer IP.' ),
+                    $this->l( 'Plugin will check first if HTTP_CLIENT_IP is a valid IP, then HTTP_X_FORWARDED_FOR.' ),
                 ),
                 'required' => false,
                 'options' => array(
