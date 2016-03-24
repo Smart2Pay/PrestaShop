@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.14';
+        $this->version = '1.1.15';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -1231,7 +1231,7 @@ class Smart2pay extends PaymentModule
             )
         );
 
-        $form_buffer = '';
+        $form_buffer = 'Plugin version: '.$this->version.'<br/>';
 
         if( @file_exists( Smart2Pay_Helper::get_documentation_path() ) )
         {
