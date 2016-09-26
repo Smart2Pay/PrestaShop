@@ -85,7 +85,7 @@
         </div>
         </form>
 
-        {if !empty( $detection_result ) }
+        {if !empty( $detection_result )}
         <table class="table" style="width: 80%; margin: 0 auto;">
             <tbody>
             <tr>

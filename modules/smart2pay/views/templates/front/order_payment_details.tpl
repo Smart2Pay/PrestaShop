@@ -44,7 +44,7 @@
                         ({if !empty( $order_currency_id )}{displayPrice price=$transaction_arr.surcharge_order_percent currency=$order_currency_id}{else}{$transaction_arr.surcharge_order_percent} {$order_currency_iso}{/if})
                     {/if}
 
-                    {if $transaction_arr.surcharge_order_amount != 0 && $transaction_arr.surcharge_order_percent != 0 }
+                    {if $transaction_arr.surcharge_order_amount != 0 && $transaction_arr.surcharge_order_percent != 0}
                         =
                         {if !empty( $order_currency_id )}
                             {displayPrice price=$transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent currency=$order_currency_id}

@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.15';
+        $this->version = '1.1.16';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -2974,7 +2974,10 @@ class Smart2pay extends PaymentModule
                     ' LEFT JOIN '._DB_PREFIX_.'smart2pay_country C ON C.country_id = CM.country_id '.
                     ' WHERE C.code = \''.pSQL( $country_iso ).'\' AND CM.enabled = 1'
                 )) )
+        {
+            $this->writeLog( 'No methods for country ['.$country_iso.']', array( 'type' => 'detection' ) );
             return false;
+        }
 
         $all_methods_arr = $this->get_all_methods();
         $all_methods_settings_arr = $this->get_all_method_settings();
@@ -3063,6 +3066,8 @@ class Smart2pay extends PaymentModule
                 //$country_methods_arr['methods'][ $method_id ]['settings']['surcharge_amount_format']  = number_format( $all_methods_settings_arr[ $method_id ]['surcharge_amount'], 2, '.', '' );
             }
         }
+
+        $this->writeLog( 'Found ['.count( $country_methods_arr['methods'] ).'] methods for country ['.$country_iso.']', array( 'type' => 'detection' ) );
 
         return $country_methods_arr;
     }

@@ -9,6 +9,7 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
+<div id="s2p_payment_methods_container">
 {if $moduleSettings["{$settings_prefix}LOADING_MODAL"]}
 <script type="text/javascript">
 {literal}
@@ -37,19 +38,18 @@ function s2p_display_loading_layer_close()
 }
 {/literal}
 </script>
-<div id="s2p_payment_methods_container">
-    <div id="s2p_loader_container" style="display: none; position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000">
-        <div style="position: relative; width: 100%; height: 100%;">
-            <div style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; background: #333; opacity: 0.5; filter:alpha(opacity=50)"></div>
-            <div style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%;">
-                <div id="s2p_loading_content" style="margin: 20% auto 0 auto; width:80%; background-color: white;border: 2px solid lightgrey; text-align: center; padding: 40px;">
-                    <img src="{$this_path}views/img/ajax-loader.gif" alt="{l s='Loading...' mod='smart2pay'}" />
-                    <p style="margin: 20px auto;">{l s='Redirecting. Please wait...' mod='smart2pay'}</p>
-                    <div style="float:right;"><a href="javascript:s2p_display_loading_layer_close()">{l s='Close' mod='smart2pay'}</a></div>
-                </div>
+<div id="s2p_loader_container" style="display: none; position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 10000">
+    <div style="position: relative; width: 100%; height: 100%;">
+        <div style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; background: #333; opacity: 0.5; filter:alpha(opacity=50)"></div>
+        <div style="position: absolute; top: 0px; left: 0px; width: 100%; height: 100%;">
+            <div id="s2p_loading_content" style="margin: 20% auto 0 auto; width:80%; background-color: white;border: 2px solid lightgrey; text-align: center; padding: 40px;">
+                <img src="{$this_path}views/img/ajax-loader.gif" alt="{l s='Loading...' mod='smart2pay'}" />
+                <p style="margin: 20px auto;">{l s='Redirecting. Please wait...' mod='smart2pay'}</p>
+                <div style="float:right;"><a href="javascript:s2p_display_loading_layer_close()">{l s='Close' mod='smart2pay'}</a></div>
             </div>
         </div>
     </div>
+</div>
 {/if}
 {if !empty( $payment_methods )}
     {foreach from=$payment_methods key=method_id item=method_arr name=methodsLoop}
@@ -60,7 +60,7 @@ function s2p_display_loading_layer_close()
             <a class="s2ppaymentmethod" href="{$s2p_module_obj->get_payment_link( ['method_id' => {$method_arr.method.method_id}] )}" {if $moduleSettings["{$settings_prefix}LOADING_MODAL"]} onclick="s2p_display_loading_layer()" {/if} title="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}">
                 <img src="{$this_path}views/img/logos/{$method_arr.method.logo_url}" alt="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" class="s2ppaymentlogo" />
                 {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
-                {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
+                {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0}
                     {if $config_opt_amount == $display_options.amount_total}
                         ({l s='Total fee amount' mod='smart2pay'}:
                         {if $config_opt_currency == $display_options.from_front}
@@ -92,9 +92,9 @@ function s2p_display_loading_layer_close()
     <a href="{$s2p_module_obj->get_payment_link( ['method_id' => {$method_arr.method.method_id}] )}" {if $moduleSettings["{$settings_prefix}LOADING_MODAL"]} onclick="s2p_display_loading_layer()" {/if} title="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" {if $smarty.const._PS_VERSION_ < 1.5}style="min-height: 50px"{/if}>
         <span style="width: 86px; height: 49px;"><img src="{$this_path}views/img/logos/{$method_arr.method.logo_url}" alt="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" style="max-width: 86px; max-height: 49px;" /></span>
         {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
-        {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
+        {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0}
 
-            {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0 }
+            {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0}
                 {if $config_opt_amount == $display_options.amount_total}
                     ({l s='Total fee amount' mod='smart2pay'}:
                     {if $config_opt_currency == $display_options.from_front}

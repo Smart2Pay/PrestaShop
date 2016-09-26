@@ -47,10 +47,7 @@
                         <p style="margin: 20px auto;">{l s='Redirecting. Please wait...' mod='smart2pay'}</p>
                     </div>
                 {/if}
-                {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"]
-                    && $moduleSettings["{$settings_prefix}SKIP_PAYMENT_PAGE"]
-                    && ($paymentData['MethodID'] == 1001 || $paymentData['MethodID'] == 1002 || $paymentData['MethodID'] == 76)
-                }
+                {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"] && $moduleSettings["{$settings_prefix}SKIP_PAYMENT_PAGE"] && ($paymentData['MethodID'] == 1001 || $paymentData['MethodID'] == 1002 || $paymentData['MethodID'] == 76)}
                     <iframe style="border: none; margin: 0px auto; background-color: #ffffff;" id="merchantIframe" name="merchantIframe" src="" width="780" height="500"></iframe>
                 {else}
                     <iframe style="border: none; margin: 0px auto; background-color: transparent;" id="merchantIframe" name="merchantIframe" src="" width="900" height="800"></iframe>
@@ -73,7 +70,6 @@ function modalIframe()
         iframe_container_obj.css({height: document.getElementsByTagName('html')[0].scrollHeight});
     }
 }
-{/literal}
 
 jQuery(document).ready(function()
 {
@@ -86,16 +82,17 @@ jQuery(document).ready(function()
      * Auto-send form if not debug form required
      *
      */
+    {/literal}
     {if !$moduleSettings["{$settings_prefix}DEBUG_FORM"]}
         jQuery("#s2pform").submit();
     {/if}
+    {literal}
 
     /*
      *
      * Get/Parse smart2pay message
      *
      */
-    {literal}
     var onmessage = function(e)
     {
         if (e.data == 'close_HPP')
@@ -125,6 +122,6 @@ jQuery(document).ready(function()
     {
         window.attachEvent( 'onmessage', onmessage );
     }
-    {/literal}
 });
 </script>
+{/literal}

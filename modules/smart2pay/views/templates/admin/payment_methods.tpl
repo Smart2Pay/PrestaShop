@@ -341,8 +341,7 @@ $(document).ready(function(){
                             {foreach $all_currencies as $ccurrency}
                             <option value="{$ccurrency['iso_code']}"
                                     {if ((!empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['iso_code'] == $payment_method_settings[$payment_method.method_id]['surcharge_currency'])
-                                         || (empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['id_currency'] == $default_currency_id) )
-                                    } selected="selected" {/if}>{$ccurrency['iso_code']}{if $ccurrency['id_currency'] == $default_currency_id} ({l s='default' mod='smart2pay'}){/if}</option>
+                                         || (empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['id_currency'] == $default_currency_id) )} selected="selected" {/if}>{$ccurrency['iso_code']}{if $ccurrency['id_currency'] == $default_currency_id} ({l s='default' mod='smart2pay'}){/if}</option>
                             {/foreach}
                             </select>
                         {/if}
