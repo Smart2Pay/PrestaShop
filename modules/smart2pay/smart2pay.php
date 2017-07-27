@@ -1,6 +1,6 @@
 <?php
 /**
- * 2015 Smart2Pay
+ * 2017 Smart2Pay
  *
  * DISCLAIMER
  *
@@ -8,7 +8,7 @@
  * in the future.
  *
  * @author    Smart2Pay
- * @copyright 2015 Smart2Pay
+ * @copyright 2017 Smart2Pay
  * @license   http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
 **/
 /**
@@ -72,7 +72,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.1.16';
+        $this->version = '1.2.0';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -94,9 +94,10 @@ class Smart2pay extends PaymentModule
         if( version_compare( _PS_VERSION_, '1.5', '<' ) )
         {
             /** @var Cart $cart */
+            /** @var Controller $controller */
             /** @var Cookie $cookie */
             /** @var Smarty $smarty */
-            global $smarty, $cookie, $cart;
+            global $smarty, $cookie, $cart, $controller;
 
             if( is_object( $cookie ) )
             {
@@ -117,6 +118,9 @@ class Smart2pay extends PaymentModule
             if( empty( $this->context->shop ) )
                 $this->context->shop = new stdClass();
 
+            if( empty( $this->context->controller ) )
+                $this->context->controller = new stdClass();
+
             /** @var Currency $this->context->currency */
             /** @var Cart $this->context->cart */
             /** @var Cookie $this->context->cookie */
@@ -127,7 +131,7 @@ class Smart2pay extends PaymentModule
             $this->context->language = $language;
             $this->context->cookie = $cookie;
             $this->context->currency = $currency;
-            $this->context->currency = $currency;
+            $this->context->controller = $controller;
 
             //$this->context->shop->id_shop = 1;
             //$this->context->shop->id_shop_group = 1;
@@ -139,21 +143,49 @@ class Smart2pay extends PaymentModule
 
     }
 
-
-    public function S2P_add_css( $file )
+    public function S2P_add_css( $file, $file_name = '' )
     {
+        if( $file_name == '' )
+            $file_name = basename( $file );
+
         if( version_compare( _PS_VERSION_, '1.5', '<' ) )
             Tools::addCSS( $file, 'all' );
-        else
+        elseif( version_compare( _PS_VERSION_, '1.7', '<' )
+             or !@is_a( $this->context->controller, 'FrontController' ) )
             $this->context->controller->addCSS( $file );
+        else
+            $this->context->controller->registerStylesheet( 'modules-'.$this->name.'_'.$file_name, 'modules/'.$this->name.'/views/css/'.$file_name, array( 'media' => 'all', 'priority' => 150 ) );
     }
 
-    public static function redirect_to_step1()
+    public function redirect_to_step1( $messages_arr = false )
     {
+        if( version_compare( _PS_VERSION_, '1.7', '>=' )
+        and !empty( $messages_arr ) and is_array( $messages_arr )
+        and $this->context
+        and $this->context->controller
+        and @is_a( $this->context->controller, 'FrontController' ) )
+        {
+            // Try adding messages in order form
+            $messages_keys = array( 'errors', 'warning', 'success', 'info', );
+
+            foreach( $messages_keys as $key )
+            {
+                if( empty( $messages_arr[$key] ) or !is_array( $messages_arr[$key] )
+                 or !@property_exists( $this->context->controller, $key ) )
+                    continue;
+
+                $this->context->controller->$key = array_merge( $this->context->controller->$key, $messages_arr[$key] );
+
+                $this->context->controller->redirectWithNotifications( '/order?step=3' );
+            }
+        }
+
         if( version_compare( _PS_VERSION_, '1.5', '<' ) )
-            Tools::redirect( 'order.php?step=1' );
+            Tools::redirect( 'order.php?step=3' );
+        elseif( version_compare( _PS_VERSION_, '1.7', '<' ) )
+            Tools::redirect( 'index.php?controller=order&step=3' );
         else
-            Tools::redirect( 'index.php?controller=order&step=1' );
+            Tools::redirect( '/order?step=3' );
     }
 
     /**
@@ -278,7 +310,7 @@ class Smart2pay extends PaymentModule
          or !($cart_products = $cart->getProducts()) )
         {
             $this->writeLog( 'Couldn\'t get cart from context', array( 'type' => 'error' ) );
-            self::redirect_to_step1();
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Couldn\'t get cart from context.' ) ) ) );
 
             // just to make IDE not highlight variables as "might not be initialized"
             exit;
@@ -288,7 +320,7 @@ class Smart2pay extends PaymentModule
         $customer = new Customer( $cart->id_customer );
 
         if( !Validate::isLoadedObject( $customer ) )
-            self::redirect_to_step1();
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Couldn\'t load customer data.' ) ) ) );
 
         $moduleSettings = $this->getSettings();
 
@@ -299,7 +331,7 @@ class Smart2pay extends PaymentModule
         {
             $this->writeLog( 'Payment method #' . $method_id . ' could not be loaded, or it is not available', array( 'type' => 'error' ) );
             // Todo - give some feedback to the user
-            self::redirect_to_step1();
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Payment method could not be loaded or it is not available.' ) ) ) );
         }
 
         if( empty( $payment_method['method_settings']['surcharge_currency'] )
@@ -308,7 +340,7 @@ class Smart2pay extends PaymentModule
         {
             $this->writeLog( 'Payment method #' . $method_id . ' ('.$payment_method['method_details']['display_name'].') has an invalid currency code ['.(!empty( $payment_method['method_settings']['surcharge_currency'] )?$payment_method['method_settings']['surcharge_currency']:'???').'].', array( 'type' => 'error' ) );
             // Todo - give some feedback to the user
-            self::redirect_to_step1();
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Payment method has an invalid currency code.' ) ) ) );
             // IDE fix (exit is called in redirect_to_step1())
             exit;
         }
@@ -1291,6 +1323,55 @@ class Smart2pay extends PaymentModule
         return $form_buffer;
     }
 
+    private function _get_hooks_by_version()
+    {
+        $hooks_arr = array();
+        $hooks_arr['header'] = true;
+
+        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
+        {
+            // Displaying invoices (1.5+ doesn't offer access to pdf renderer)
+            $hooks_arr['PDFInvoice'] = true;
+            // box right above product listing
+            $hooks_arr['orderDetailDisplayed'] = true;
+            // Order content for 1.5
+            $hooks_arr['adminOrder'] = true;
+        }
+
+        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+        {
+            // box right above product listing
+            $hooks_arr['displayOrderDetail'] = true;
+        }
+
+        if( version_compare( _PS_VERSION_, '1.5', '>=' )
+        and version_compare( _PS_VERSION_, '1.6', '<' ) )
+        {
+            // Order content for 1.5
+            $hooks_arr['displayAdminOrder'] = true;
+        }
+
+        if( version_compare( _PS_VERSION_, '1.6', '>=' ) )
+        {
+            $hooks_arr['displayAdminOrderTabOrder'] = true; // Order tabs
+            $hooks_arr['displayAdminOrderContentOrder'] = true; // Order tab content
+        }
+
+        if( version_compare( _PS_VERSION_, '1.7', '<' ) )
+        {
+            // Pre 1.7 fron payment options display hook
+            $hooks_arr['payment'] = true;
+        }
+
+        if( version_compare( _PS_VERSION_, '1.7', '>=' ) )
+        {
+            // Post 1.7 fron payment options display hook
+            $hooks_arr['paymentOptions'] = true;
+        }
+
+        return array_keys( $hooks_arr );
+    }
+
     /**
      * Install
      *
@@ -1300,63 +1381,26 @@ class Smart2pay extends PaymentModule
     {
         self::$maintenance_functionality = true;
 
-        if( !parent::install()
-
-         // Displaying payment options
-         or !$this->registerHook( 'payment' )
-
-         // Displaying invoices (1.5+ doesn't offer access to pdf renderer)
-         or (version_compare( _PS_VERSION_, '1.5', '<' ) and !$this->registerHook( 'PDFInvoice' ))
-
-         // Displaying order details (public)
-         or (
-
-             version_compare( _PS_VERSION_, '1.5', '>=' )
-
-             and
-
-             !$this->registerHook( 'displayOrderDetail' ) // box right above product listing
-         )
-
-         or (
-
-             version_compare( _PS_VERSION_, '1.5', '<' )
-
-             and
-
-             !$this->registerHook( 'orderDetailDisplayed' ) // box right above product listing
-         )
-
-         // Displaying payment options (admin)
-         or (
-                version_compare( _PS_VERSION_, '1.6', '>=' )
-
-                and
-
-            (
-               !$this->registerHook( 'displayAdminOrderTabOrder' ) // Order tabs
-            or !$this->registerHook( 'displayAdminOrderContentOrder' ) // Order tab content
-            )
-         )
-
-         or (
-                version_compare( _PS_VERSION_, '1.5', '<' )
-
-                and
-
-                !$this->registerHook( 'adminOrder' ) // Order content for 1.5
-         )
-
-         or (
-                version_compare( _PS_VERSION_, '1.5', '>=' ) and version_compare( _PS_VERSION_, '1.6', '<' )
-
-                and
-
-                !$this->registerHook( 'displayAdminOrder' ) // Order content for 1.5
-         ) )
+        if( !parent::install() )
         {
             self::$maintenance_functionality = false;
             return false;
+        }
+
+        if( !($hooks_arr = $this->_get_hooks_by_version())
+         or !is_array( $hooks_arr ) )
+        {
+            self::$maintenance_functionality = false;
+            return false;
+        }
+
+        foreach( $hooks_arr as $hook_name )
+        {
+            if( !$this->registerHook( $hook_name ) )
+            {
+                self::$maintenance_functionality = false;
+                return false;
+            }
         }
 
         if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
@@ -1422,6 +1466,16 @@ class Smart2pay extends PaymentModule
 
         if( version_compare( _PS_VERSION_, '1.5', '<' ) )
             $settingsCleanedSuccessfully = true;
+
+        if( ($hooks_arr = $this->_get_hooks_by_version())
+        and is_array( $hooks_arr ) )
+        {
+            foreach( $hooks_arr as $hook_name )
+            {
+                if( !$this->unregisterHook( $hook_name ) )
+                    return false;
+            }
+        }
 
         if( !parent::uninstall() || !$settingsCleanedSuccessfully )
         {
@@ -1506,6 +1560,9 @@ class Smart2pay extends PaymentModule
             return '';
 
         $this->create_context();
+
+        if( function_exists( 'smartyRegisterFunction' ) )
+            smartyRegisterFunction( $this->context->smarty, 'function', 'S2P_displayPrice', array( 'Tools', 'displayPriceSmarty' ) );
 
         if( !empty( $transaction_arr['extra_data'] ) )
             $transaction_extra_data = Smart2Pay_Helper::parse_string( $transaction_arr['extra_data'] );
@@ -1680,16 +1737,64 @@ class Smart2pay extends PaymentModule
         return $this->hookDisplayAdminOrderContentOrder( $hook_params );
     }
 
-    public function get_payment_link( $params )
+    public function get_payment_link( $params = false )
     {
         if( empty( $params ) or !is_array( $params )
-         or empty( $params['method_id'] ) or !(int)$params['method_id'] )
+         or (
+             (empty( $params['method_id'] ) or !(int)$params['method_id'])
+            and
+             (empty( $params['link_for_form'] ) or !(int)$params['link_for_form'])
+            ) )
             return '#';
 
-        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
-            return $this->context->link->getModuleLink( 'smart2pay', 'payment', array( 'method_id' => $params['method_id'] ) );
+        if( empty( $params['method_id'] ) or !(int)$params['method_id'] )
+            $params['method_id'] = 0;
 
-        return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/pre15/payment.php?method_id='.$params['method_id'];
+        $url_params_arr = array();
+        $url_params_str = '';
+        if( !empty( $params['method_id'] ) )
+        {
+            $url_params_arr['method_id'] = $params['method_id'];
+            $url_params_str = '?method_id='.$params['method_id'];
+        }
+
+        if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+            return $this->context->link->getModuleLink( 'smart2pay', 'payment', $url_params_arr );
+
+        return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/pre15/payment.php?'.$url_params_str;
+    }
+
+    /**
+     * @param FrontController $front_controller Which controller will do the redirect
+     * @param string $to_controller To which controller are we redirecting
+     * @param array|bool $to_params Parameters to be passed to controller
+     * @param array|bool $messages_arr Messages array ('error', 'warning', 'success' or 'info' keys should be arrays)
+     *
+     * @return bool
+     */
+    private function _redirect_to_page( $front_controller, $to_controller, $to_params = false, $messages_arr = false )
+    {
+        if( empty( $front_controller )
+         or !is_a( $front_controller, 'FrontController' ) )
+            return false;
+
+        if( !empty( $messages_arr ) and is_array( $messages_arr ) )
+        {
+            $messages_keys = array( 'error', 'warning', 'success', 'info' );
+            foreach( $messages_keys as $key )
+            {
+                if( empty( $messages_arr[$key] ) or !is_array( $messages_arr[$key] ) )
+                    continue;
+
+                $front_controller->$key = array_merge( $front_controller->$key, $messages_arr[$key] );
+            }
+        }
+
+        if( empty( $to_params ) or !is_array( $to_params ) )
+            $to_params = array();
+
+        $front_controller->redirectWithNotifications( $this->context->link->getPageLink( $to_controller, true, null, array(
+            'step' => '3')));
     }
 
     public function get_notification_link( $params = false )
@@ -1718,6 +1823,80 @@ class Smart2pay extends PaymentModule
         return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/pre15/returnhandler.php';
     }
 
+    public function hookHeader()
+    {
+        $this->create_context();
+
+        $is_front = true;
+        if( @class_exists( 'FrontController', false )
+        and $this->context->controller
+        and !@is_a( Context::getContext()->controller, 'FrontController' ) )
+            $is_front = false;
+
+        elseif( $this->context->controller
+            and !empty( $this->context->controller->controller_type ) )
+        {
+            if( !in_array( $this->context->controller->controller_type, array( 'front', 'modulefront' ) ) )
+                $is_front = false;
+        }
+
+        else
+        {
+            // include all...
+            $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/style.css' );
+            $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
+
+            return;
+        }
+
+        if( $is_front )
+            $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/style.css' );
+        else
+            $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
+    }
+
+    public function hookPaymentOptions( $params )
+    {
+        $cart = (!empty( $this->context )?$this->context->cart:false);
+
+        if( empty( $cart )
+         or !Validate::isLoadedObject( $cart )
+         or !Configuration::get( self::CONFIG_PREFIX.'ENABLED' )
+         or !($template_data = $this->get_payment_template_data())
+         or empty( $template_data['payment_methods'] ) )
+            return;
+
+        if( function_exists( 'smartyRegisterFunction' ) )
+            smartyRegisterFunction( $this->context->smarty, 'function', 'S2P_displayPrice', array( 'Tools', 'displayPriceSmarty' ) );
+
+        $template_data['test_price'] = Tools::displayPrice( 5, $template_data['methods_detected_currency'] );
+
+        // $this->context->smarty->assign( $template_data );
+        $this->S2P_add_css( $this->_path . '/views/css/style.css' );
+
+        $payment_options = array();
+        foreach( $template_data['payment_methods'] as $method_id => $method_arr )
+        {
+            $payment_option = new PrestaShop\PrestaShop\Core\Payment\PaymentOption();
+            $payment_option
+                      //->setCallToActionText( $this->l( 'Pay using ' ).$method_arr['method']['display_name'] )
+                      ->setAction( $this->get_payment_link( array( 'method_id' => $method_arr['method']['method_id'] ) ) )
+                      ->setLogo( $this->_path.'views/img/logos/'.$method_arr['method']['logo_url'] )
+            ;
+
+            $payment_options[] = $payment_option;
+        }
+
+        return $payment_options;
+
+        // $payment_option = new PrestaShop\PrestaShop\Core\Payment\PaymentOption();
+        // $payment_option->setCallToActionText( $this->trans('Pay using Smart2Pay', array(), 'Modules.Smart2Pay.Admin' ) )
+        //           ->setForm( $this->fetch( 'module:smart2pay/views/templates/front/payment_1_7.tpl' ) )
+        // ;
+        //
+        // return array( $payment_option );
+    }
+
     /**
      * Hook payment
      *
@@ -1733,8 +1912,23 @@ class Smart2pay extends PaymentModule
 
         if( empty( $cart )
          or !Validate::isLoadedObject( $cart )
-         or !Configuration::get( self::CONFIG_PREFIX.'ENABLED' ) )
+         or !Configuration::get( self::CONFIG_PREFIX.'ENABLED' )
+         or !($template_data = $this->get_payment_template_data()) )
             return '';
+
+        $this->S2P_add_css( $this->_path . '/views/css/style.css' );
+
+        $this->smarty->assign( $template_data );
+
+        return $this->fetchTemplate( 'payment.tpl' );
+    }
+
+    private function get_payment_template_data()
+    {
+        if( empty( $this->context ) or empty( $this->context->cart ) )
+            return false;
+
+        $cart = $this->context->cart;
 
         $cart_original_amount = number_format( $cart->getOrderTotal( true, Cart::BOTH ), 2, '.', '' );
 
@@ -1748,9 +1942,7 @@ class Smart2pay extends PaymentModule
         if( empty( $cart_currency )
          or !($payment_methods_arr = $this->get_methods_for_country( null, $cart_currency, $method_params ))
          or empty( $payment_methods_arr['methods'] ) )
-            return '';
-
-        $this->S2P_add_css( $this->_path . '/views/css/style.css' );
+            return false;
 
         $display_options = array(
             'from_admin' => self::OPT_FEE_CURRENCY_ADMIN,
@@ -1763,43 +1955,54 @@ class Smart2pay extends PaymentModule
 
         $moduleSettings = $this->getSettings();
 
-        $this->smarty->assign(array(
-            'this_path' => $this->_path,
-            'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
-            'display_options' => $display_options,
-            'cart_amount' => $cart_original_amount,
-            'config_opt_currency' => Configuration::get( self::CONFIG_PREFIX.'SURFEE_CURRENCY' ),
-            'config_opt_amount' => Configuration::get( self::CONFIG_PREFIX.'SURFEE_AMOUNT' ),
-            'default_currency' => Currency::getDefaultCurrency()->iso_code,
-            'default_currency_id' => Currency::getDefaultCurrency()->id,
-            'current_currency_id' => $this->context->currency->id,
-            'methods_detected_currency' => $cart_currency->id,
-            'payment_methods' => $payment_methods_arr['methods'],
-            'methods_country' => self::$cache['methods_country'],
-            's2p_module_obj' => $this,
-            'settings_prefix' => self::CONFIG_PREFIX,
-            'moduleSettings' => $moduleSettings,
-        ));
+        return
+            array(
+                'this_path' => $this->_path,
+                'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
+                'display_options' => $display_options,
+                'cart_amount' => $cart_original_amount,
+                'config_opt_currency' => Configuration::get( self::CONFIG_PREFIX.'SURFEE_CURRENCY' ),
+                'config_opt_amount' => Configuration::get( self::CONFIG_PREFIX.'SURFEE_AMOUNT' ),
+                'default_currency' => Currency::getDefaultCurrency()->iso_code,
+                'default_currency_id' => Currency::getDefaultCurrency()->id,
+                'current_currency_id' => $this->context->currency->id,
+                'methods_detected_currency' => $cart_currency->id,
+                'payment_methods' => $payment_methods_arr['methods'],
+                'methods_country' => self::$cache['methods_country'],
+                's2p_module_obj' => $this,
+                'settings_prefix' => self::CONFIG_PREFIX,
+                'moduleSettings' => $moduleSettings,
+            );
+    }
 
-        return $this->fetchTemplate( 'payment.tpl' );
+    private function _module_available( $module )
+    {
+        if( version_compare( _PS_VERSION_, '1.7', '>=' ) )
+        {
+            if( !($moduleManagerBuilder = PrestaShop\PrestaShop\Core\Addon\Module\ModuleManagerBuilder::getInstance())
+             or !($moduleManager = $moduleManagerBuilder->build())
+             or !$moduleManager->isInstalled( $module )
+             or !$moduleManager->isEnabled( $module ) )
+                return false;
+
+            return true;
+        }
+
+        if( !Module::isInstalled( $module )
+         or (version_compare( _PS_VERSION_, '1.5', '>=' ) and !Module::isEnabled( $module )) )
+            return false;
+
+        return true;
     }
 
     public function detection_module_available()
     {
-        if( !Module::isInstalled( self::S2P_DETECTOR_NAME )
-         or (version_compare( _PS_VERSION_, '1.5', '>=' ) and !Module::isEnabled( self::S2P_DETECTOR_NAME )) )
-            return false;
-
-        return true;
+        return $this->_module_available( self::S2P_DETECTOR_NAME );
     }
 
     public function payment_module_available()
     {
-        if( !Module::isInstalled( $this->name )
-         or (version_compare( _PS_VERSION_, '1.5', '>=' ) and !Module::isEnabled( $this->name )) )
-            return false;
-
-        return true;
+        return $this->_module_available( $this->name );
     }
 
     public function detection_module_active()
@@ -1918,6 +2121,7 @@ class Smart2pay extends PaymentModule
     /**
      * Get module settings
      *
+     * @param Order|null $order
      * @return array
      */
     public function getSettings( Order $order = null )
@@ -2092,7 +2296,7 @@ class Smart2pay extends PaymentModule
      * Write log
      *
      * @param string $message
-     * @param string $type
+     * @param bool|array $params
      */
     public function writeLog( $message, $params = false )
     {
@@ -2125,8 +2329,6 @@ class Smart2pay extends PaymentModule
      *
      * @param OrderCore  $order
      * @param int        $statusId
-     * @param bool       $sendCustomerEmail
-     * @param array      $mailTemplateVars
      *
      * @return bool
      */
@@ -2424,8 +2626,6 @@ class Smart2pay extends PaymentModule
     /**
      * Get countries of payment method.
      *
-     * @param $method_id
-     *
      * @return array|null
      */
     public function get_method_countries_all_with_details()
@@ -2519,7 +2719,7 @@ class Smart2pay extends PaymentModule
      *
      * @param $method_id
      *
-     * @return array|null
+     * @return array|bool
      */
     public function get_method_countries( $method_id )
     {
@@ -2776,7 +2976,7 @@ class Smart2pay extends PaymentModule
      *
      * @param $method_id
      *
-     * @return array|null
+     * @return array|bool
      */
     public function save_method_settings( $method_id, $params )
     {
@@ -2927,11 +3127,12 @@ class Smart2pay extends PaymentModule
     /**
      * Check if s2p method is available in some particular country
      *
-     * @param int $method_id                 Method ID
-     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a
+     * @param null|string $country_iso   If no iso code is passed along, method checks if module can detect a
      *     country, else attempts to retrieve it from context->cart->id_address_invoice
+     * @param Currency|null $currency_obj
+     * @param bool|array $params
      *
-     * @return bool
+     * @return bool|array
      */
     public function get_methods_for_country( $country_iso = null, $currency_obj = null, $params = false )
     {

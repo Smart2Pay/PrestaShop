@@ -1,3 +1,8 @@
 .s2ppaymentmethod { background-color: #fbfbfb; }
 .s2ppaymentmethod::after { color: #777; content: ""; display: block; font-family: "FontAwesome"; font-size: 25px; height: 22px; margin-top: -11px; position: absolute; right: 15px; top: 50%; width: 14px; }
-.s2ppaymentlogo { max-width: 64px; position: absolute; left: 15px; }
+.s2ppaymentlogo { max-width: 64px; position: absolute; margin: 0 15px; }
+
+.s2p_payment_module17 { margin-left: 32px; height: 40px;  }
+.s2p_payment_module17 label:hover { cursor: pointer; }
+.s2p_payment_method_image { float:left; }
+#s2p_payment_selector { margin-bottom: 25px; }

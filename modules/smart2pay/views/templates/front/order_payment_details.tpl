@@ -26,12 +26,12 @@
                     <strong class="dark">{l s='Method Surcharge' mod='smart2pay'}</strong>:
                     {if $transaction_arr.surcharge_amount != 0}
                         {if !empty( $surcharge_currency_id )}
-                            {displayPrice price=$transaction_arr.surcharge_amount currency=$surcharge_currency_id}
+                            {S2P_displayPrice price=$transaction_arr.surcharge_amount currency=$surcharge_currency_id}
                         {else}
                             {$transaction_arr.surcharge_amount} {$surcharge_currency_iso}
                         {/if}
                         {if $surcharge_currency_id != $order_currency_id && $surcharge_currency_iso != $order_currency_iso}
-                            ({if !empty( $order_currency_id )}{displayPrice price=$transaction_arr.surcharge_order_amount currency=$order_currency_id}{else}{$transaction_arr.surcharge_order_amount} {$order_currency_iso}{/if})
+                            ({if !empty( $order_currency_id )}{S2P_displayPrice price=$transaction_arr.surcharge_order_amount currency=$order_currency_id}{else}{$transaction_arr.surcharge_order_amount} {$order_currency_iso}{/if})
                         {/if}
                     {/if}
 
@@ -41,13 +41,13 @@
 
                     {if $transaction_arr.surcharge_percent != 0}
                         {$transaction_arr.surcharge_percent}%
-                        ({if !empty( $order_currency_id )}{displayPrice price=$transaction_arr.surcharge_order_percent currency=$order_currency_id}{else}{$transaction_arr.surcharge_order_percent} {$order_currency_iso}{/if})
+                        ({if !empty( $order_currency_id )}{S2P_displayPrice price=$transaction_arr.surcharge_order_percent currency=$order_currency_id}{else}{$transaction_arr.surcharge_order_percent} {$order_currency_iso}{/if})
                     {/if}
 
                     {if $transaction_arr.surcharge_order_amount != 0 && $transaction_arr.surcharge_order_percent != 0}
                         =
                         {if !empty( $order_currency_id )}
-                            {displayPrice price=$transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent currency=$order_currency_id}
+                            {S2P_displayPrice price=$transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent currency=$order_currency_id}
                         {else}
                             {$transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent} {$order_currency_iso}
                         {/if}

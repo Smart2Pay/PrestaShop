@@ -34,6 +34,9 @@ class smart2paypaymentModuleFrontController extends ModuleFrontController
 
         $smart2pay_module->prepare_send_form();
 
-        $this->setTemplate('sendForm.tpl');
+        if( version_compare( _PS_VERSION_, '1.7', '<' ) )
+            $this->setTemplate( 'sendForm.tpl' );
+        else
+            $this->setTemplate( 'module:smart2pay/views/templates/front/sendForm_1_7.tpl' );
     }
 }

@@ -36,6 +36,9 @@ class Smart2payreturnHandlerModuleFrontController extends ModuleFrontController
 
         $s2p_module->prepare_return_page();
 
-        $this->setTemplate( 'returnPage.tpl' );
+        if( version_compare( _PS_VERSION_, '1.7', '<' ) )
+            $this->setTemplate( 'returnPage.tpl' );
+        else
+            $this->setTemplate( 'module:smart2pay/views/templates/front/returnPage_1_7.tpl' );
     }
 }
