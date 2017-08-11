@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <module>
-	<name>smart2paydetection</name>
-	<displayName><![CDATA[Smart2Pay Detection]]></displayName>
-	<version><![CDATA[1.1.13]]></version>
-	<description><![CDATA[Smart2Pay Detection is a helper module for Smart2Pay Payment module.]]></description>
-	<author><![CDATA[Smart2Pay]]></author>
-	<tab><![CDATA[payments_gateways]]></tab>
-	<confirmUninstall>Are you sure you want to uninstall Smart2Pay Detection plugin?</confirmUninstall>
-	<is_configurable>1</is_configurable>
-	<need_instance>0</need_instance>
+    <name>smart2paydetection</name>
+    <displayName><![CDATA[Smart2Pay Detection]]></displayName>
+    <version><![CDATA[1.1.13]]></version>
+    <description><![CDATA[Smart2Pay Detection is a helper module for Smart2Pay Payment module.]]></description>
+    <author><![CDATA[Smart2Pay]]></author>
+    <tab><![CDATA[payments_gateways]]></tab>
+	<confirmUninstall><![CDATA[Are you sure you want to uninstall Smart2Pay Detection plugin?]]></confirmUninstall>
+    <is_configurable>1</is_configurable>
+    <need_instance>0</need_instance>
 	<limited_countries></limited_countries>
 </module>

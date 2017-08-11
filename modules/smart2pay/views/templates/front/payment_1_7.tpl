@@ -63,7 +63,7 @@ function s2p_display_loading_layer_close()
             </span>
             <!--<a class="s2ppaymentmethod" href="{$s2p_module_obj->get_payment_link( ['method_id' => {$method_arr.method.method_id}] )}" {if $moduleSettings["{$settings_prefix}LOADING_MODAL"]} onclick="s2p_display_loading_layer()" {/if} title="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}">-->
                 <div class="s2p_payment_method_image">
-                <img src="{$this_path}views/img/logos/{$method_arr.method.logo_url}" alt="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" class="s2ppaymentlogo" style="position:inherit" />
+                <img src="{$method_arr.method.logo_url}" alt="{l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}" class="s2ppaymentlogo" style="position:inherit" />
                 </div>
                 {l s='Pay by' mod='smart2pay'} {$method_arr.method.display_name}
                 {if $method_arr.settings.surcharge_percent != 0 || $method_arr.settings.surcharge_amount != 0}

@@ -14,10 +14,13 @@
 /**
  * Smart2Pay module file
 **/
-if (!defined('_PS_VERSION_'))
+if( !defined( '_PS_VERSION_' ) )
     exit;
 
 include_once( _PS_MODULE_DIR_.'smart2pay/includes/helper.inc.php' );
+include_once( _PS_MODULE_DIR_.'smart2pay/includes/phs_error.php' );
+include_once( _PS_MODULE_DIR_.'smart2pay/includes/phs_params.php' );
+include_once( _PS_MODULE_DIR_.'smart2pay/includes/sdk_interface.inc.php' );
 
 class Smart2pay extends PaymentModule
 {
@@ -33,16 +36,22 @@ class Smart2pay extends PaymentModule
 
     const COOKIE_NAME = 'S2P_COOKIE';
 
-    const PAYM_BANK_TRANSFER = 1, PAYM_MULTIBANCO_SIBS = 20;
+    const PAYM_BANK_TRANSFER = 1, PAYM_MULTIBANCO_SIBS = 20, PAYM_SMARTCARDS = 6;
 
     const OPT_FEE_CURRENCY_FRONT = 1, OPT_FEE_CURRENCY_ADMIN = 2;
 
     const OPT_FEE_AMOUNT_SEPARATED = 1, OPT_FEE_AMOUNT_TOTAL_FEE = 2, OPT_FEE_AMOUNT_TOTAL_ORDER = 3;
 
     const DEMO_SIGNATURE = 'fc5fa3b8-746a', DEMO_MID = '1045', DEMO_SID = '30144', DEMO_POSTURL = 'https://apitest.smart2pay.com';
+    const DEMO_REST_APIKEY = 'GZSRjsQeYI6aJmF7RvIPZWMt8XFIGCI5ZFKmh+fZmhENO93+3J',
+          DEMO_REST_MID = '1045',
+          DEMO_REST_SID = '33608';
 
     // Tells module if install() or uninstall() methods are currenctly called
     private static $maintenance_functionality = false;
+
+    /** @var bool|Smart2Pay_SDK_Interface $s2p_sdk_obj  */
+    private static $s2p_sdk_obj = false;
 
     /**
      * Static cache
@@ -54,6 +63,7 @@ class Smart2pay extends PaymentModule
         'all_method_settings_in_cache' => false,
         'all_countries' => array(),
         'all_id_countries' => array(),
+        'all_codes_countries' => array(),
         'all_method_countries' => array(),
         'all_method_countries_enabled' => array(),
         'all_method_countries_details' => array(),
@@ -72,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.2.0';
+        $this->version = '2.0.0';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -87,6 +97,32 @@ class Smart2pay extends PaymentModule
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
 
         $this->create_context();
+
+        $this->_init_sdk_instance();
+    }
+
+    private function _init_sdk_instance()
+    {
+        if( self::$s2p_sdk_obj )
+            return true;
+
+        if( !(self::$s2p_sdk_obj = new Smart2Pay_SDK_Interface( $this )) )
+        {
+            self::$s2p_sdk_obj = false;
+            return false;
+        }
+
+        $sdk_obj = self::$s2p_sdk_obj;
+
+        if( !$sdk_obj::init_sdk() )
+        {
+            $this->_errors[] = 'Failed initializing Smart2Pay SDK.';
+
+            self::$s2p_sdk_obj = false;
+            return false;
+        }
+
+        return true;
     }
 
     public function create_context()
@@ -185,7 +221,7 @@ class Smart2pay extends PaymentModule
         elseif( version_compare( _PS_VERSION_, '1.7', '<' ) )
             Tools::redirect( 'index.php?controller=order&step=3' );
         else
-            Tools::redirect( '/order?step=3' );
+            Tools::redirect( '/order' );
     }
 
     /**
@@ -306,6 +342,35 @@ class Smart2pay extends PaymentModule
         $context = $this->context;
         $cart = $this->context->cart;
 
+        if( empty( self::$s2p_sdk_obj ) )
+        {
+            $this->writeLog( 'Couldn\'t initialize Smart2Pay SDK.', array( 'type' => 'error' ) );
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Couldn\'t initialize Smart2Pay SDK.' ) ) ) );
+
+            // just to make IDE not highlight variables as "might not be initialized"
+            exit;
+        }
+
+        if( !($moduleSettings = $this->getSettings()) )
+        {
+            $this->writeLog( 'Couldn\'t obtain Smart2Pay plugin settings.', array( 'type' => 'error' ) );
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Couldn\'t obtain Smart2Pay plugin settings.' ) ) ) );
+
+            // just to make IDE not highlight variables as "might not be initialized"
+            exit;
+        }
+
+        $sdk_obj = self::$s2p_sdk_obj;
+
+        if( !($api_credentials = $sdk_obj->get_api_credentials( $moduleSettings )) )
+        {
+            $this->writeLog( 'Couldn\'t obtain Smart2Pay API credentials.', array( 'type' => 'error' ) );
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Couldn\'t obtain Smart2Pay API credentials.' ) ) ) );
+
+            // just to make IDE not highlight variables as "might not be initialized"
+            exit;
+        }
+
         if( empty( $cart )
          or !($cart_products = $cart->getProducts()) )
         {
@@ -322,15 +387,13 @@ class Smart2pay extends PaymentModule
         if( !Validate::isLoadedObject( $customer ) )
             $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Couldn\'t load customer data.' ) ) ) );
 
-        $moduleSettings = $this->getSettings();
-
         $method_id = (int) Tools::getValue( 'method_id', 0 );
 
         if( empty( $method_id )
-         or !($payment_method = $this->method_details_if_available( $method_id )) )
+         or !($payment_method = $this->method_details_if_available( $method_id, null, $moduleSettings['environment'] )) )
         {
-            $this->writeLog( 'Payment method #' . $method_id . ' could not be loaded, or it is not available', array( 'type' => 'error' ) );
-            // Todo - give some feedback to the user
+            $this->writeLog( 'Payment method #'.$method_id.', environment '.$moduleSettings['environment'].' could not be loaded, or it is not available', array( 'type' => 'error' ) );
+
             $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Payment method could not be loaded or it is not available.' ) ) ) );
         }
 
@@ -338,19 +401,21 @@ class Smart2pay extends PaymentModule
          or !($surcharge_currency_id = Currency::getIdByIsoCode( $payment_method['method_settings']['surcharge_currency'] ))
          or !($surcharge_currency_obj = new Currency( $surcharge_currency_id )) )
         {
-            $this->writeLog( 'Payment method #' . $method_id . ' ('.$payment_method['method_details']['display_name'].') has an invalid currency code ['.(!empty( $payment_method['method_settings']['surcharge_currency'] )?$payment_method['method_settings']['surcharge_currency']:'???').'].', array( 'type' => 'error' ) );
-            // Todo - give some feedback to the user
+            $this->writeLog( 'Payment method #'.$method_id.' ('.$payment_method['method_details']['display_name'].'), '.
+                             'environment '.$moduleSettings['environment'].' has an invalid currency code '.
+                             ' ['.(!empty( $payment_method['method_settings']['surcharge_currency'] )?$payment_method['method_settings']['surcharge_currency']:'???').'].', array( 'type' => 'error' ) );
+
             $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Payment method has an invalid currency code.' ) ) ) );
+
             // IDE fix (exit is called in redirect_to_step1())
             exit;
         }
 
-        $site_id = $moduleSettings[self::CONFIG_PREFIX.'SITE_ID'] ? $moduleSettings[self::CONFIG_PREFIX.'SITE_ID'] : null;
-
         /**
          *    Surcharge calculation
          */
-        $cart_original_amount = $amount_to_pay = number_format( $context->cart->getOrderTotal( true, Cart::BOTH ), 2, '.', '' );
+        $cart_original_amount = $amount_to_pay
+            = number_format( $context->cart->getOrderTotal( true, Cart::BOTH ), 2, '.', '' );
 
         $surcharge_percent_amount = 0;
         // Amount in shop currency (base currency)
@@ -422,11 +487,11 @@ class Smart2pay extends PaymentModule
         else
             $orderID = Order::getOrderByCartId( $context->cart->id );
 
+        $order = new Order( $orderID );
+
         if( $moduleSettings[self::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE']
         and $cart_original_amount != $amount_to_pay )
         {
-            $order = new Order( $orderID );
-
             if( Validate::isLoadedObject( $order ) )
             {
                 $order->total_paid += $total_surcharge + $articles_diff;
@@ -434,19 +499,25 @@ class Smart2pay extends PaymentModule
                     $order->total_paid_tax_incl += $total_surcharge + $articles_diff;
 
                 $order->update();
-
             }
         }
         /**
          *    END Surcharge calculation
          */
 
+        $delivery = false;
+        if( Validate::isLoadedObject( $order ) )
+        {
+            $delivery = new Address( (int)$order->id_address_delivery );
+            if( !Validate::isLoadedObject( $delivery ) )
+                $delivery = false;
+        }
+
         $transaction_arr = array();
         $transaction_arr['method_id'] = $method_id;
         $transaction_arr['order_id'] = $orderID;
-        if( !empty( $site_id ) )
-            $transaction_arr['site_id'] = $site_id;
-        $transaction_arr['environment'] = Tools::strtolower( $moduleSettings[self::CONFIG_PREFIX.'ENV'] );
+        $transaction_arr['site_id'] = $api_credentials['site_id'];
+        $transaction_arr['environment'] = strtolower( $moduleSettings['environment'] );
 
         $transaction_arr['surcharge_amount'] = $payment_method['method_settings']['surcharge_amount'];
         $transaction_arr['surcharge_percent'] = $payment_method['method_settings']['surcharge_percent'];
@@ -456,7 +527,15 @@ class Smart2pay extends PaymentModule
         $transaction_arr['surcharge_order_percent'] = $surcharge_percent_amount;
         $transaction_arr['surcharge_order_currency'] = $cart_currency->iso_code;
 
-        $this->save_transaction( $transaction_arr );
+        if( !($new_transaction = $this->save_transaction( $transaction_arr )) )
+        {
+            $this->writeLog( 'Failed creating transaction for order ['.$orderID.'].', array( 'type' => 'error' ) );
+
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Failed creating transaction for order. Please try again.' ) ) ) );
+
+            // IDE fix (exit is called in redirect_to_step1())
+            exit;
+        }
 
         $skipPaymentPage = 0;
         if( $moduleSettings[self::CONFIG_PREFIX.'SKIP_PAYMENT_PAGE']
@@ -482,124 +561,368 @@ class Smart2pay extends PaymentModule
         if( $full_name === '' )
             $full_name = null;
 
-        $paymentData = array(
-            'MerchantID'        => $moduleSettings['mid'],
-            'MerchantTransactionID' => $orderID,
-            'Amount'            => $amount_to_pay * 100,
-            'Currency'          => $cart_currency->iso_code,
-            'ReturnURL'         => $moduleSettings[self::CONFIG_PREFIX.'RETURN_URL'],
-            'IncludeMethodIDs'  => $method_id,
-            'CustomerName'      => $full_name,
-            'CustomerFirstName' => $first_name,
-            'CustomerLastName'  => $last_name,
-            'CustomerEmail'     => $customer->email,
-            'Country'           => $payment_method['country_iso'],
-            'MethodID'          => $method_id,
-            'Description'       => $payment_description,
-            'SkipHPP'           => (!empty( $moduleSettings[self::CONFIG_PREFIX.'SKIP_PAYMENT_PAGE'] )?1:0),
-            'RedirectInIframe'  => (!empty( $moduleSettings[self::CONFIG_PREFIX.'REDIRECT_IN_IFRAME'] )?1:0),
-            'SkinID'            => (!empty( $moduleSettings[self::CONFIG_PREFIX.'SKIN_ID'] )?$moduleSettings[self::CONFIG_PREFIX.'SKIN_ID']:null),
-            'SiteID'            => $site_id,
-            'Articles'          => $articles_str,
+        if( $moduleSettings['environment'] == 'demo' )
+            $merchant_transaction_id = 'PSDEMO_'.$orderID;
+        else
+            $merchant_transaction_id = $orderID;
+
+        $payment_arr = array();
+        $payment_arr['merchanttransactionid'] = $merchant_transaction_id;
+        $payment_arr['amount'] = $amount_to_pay * 100;
+        $payment_arr['currency'] = $cart_currency->iso_code;
+        $payment_arr['methodid'] = $method_id;
+        $payment_arr['description'] = $payment_description;
+        $payment_arr['customer'] = array(
+            'email' => $customer->email,
+            'firstname' => $first_name,
+            'lastname' => $last_name,
         );
 
-        $notSetPaymentData = array();
+        if( !empty( $customer->company ) )
+            $payment_arr['customer']['company'] = $customer->company;
 
-        foreach( $paymentData as $key => $value )
+        $phone = false;
+        $delivery_country = false;
+        $delivery_city = false;
+        $delivery_zipcode = false;
+        $delivery_address = false;
+        if( !empty( $delivery ) )
         {
-            if ( $value === null )
+            $phone = $delivery->phone ? $delivery->phone : $delivery->phone_mobile;
+
+            if( !empty( $delivery->country ) )
             {
-                $notSetPaymentData[$key] = $value;
-                unset( $paymentData[$key] );
+                $country_obj = new Country( $delivery->country );
+                if( Validate::isLoadedObject( $country_obj ) )
+                    $delivery_country = $country_obj->iso_code;
+            }
+
+            $delivery_city = $delivery->city;
+            $delivery_zipcode = $delivery->postcode;
+            $delivery_address = trim( $delivery->address1.' '.$delivery->address2 );
+        }
+
+        $payment_arr['billingaddress'] = array();
+
+        if( !empty( $phone ) )
+            $payment_arr['customer']['phone'] = $phone;
+
+        if( !empty( $delivery_country ) )
+            $payment_arr['billingaddress']['country'] = $delivery_country;
+        if( !empty( $delivery_city ) )
+            $payment_arr['billingaddress']['city'] = $delivery_city;
+        if( !empty( $delivery_zipcode ) )
+            $payment_arr['billingaddress']['zipcode'] = $delivery_zipcode;
+
+        if( !empty( $delivery_address )
+        and strlen( $delivery_address ) > 100 )
+        {
+            $payment_arr['billingaddress']['street'] = Tools::substr( $delivery_address, 0, 100 );
+            $payment_arr['billingaddress']['streetnumber'] = Tools::substr( $delivery_address, 100, 100 );
+        }
+
+        $payment_arr['articles'] = $articles_str;
+
+        // ob_start();
+        // var_dump( $payment_arr );
+        // $buf = ob_get_clean();
+        //
+        // $this->writeLog( '['.$buf.']', array( 'type' => 'error' ) );
+
+        if( $method_id == self::PAYM_SMARTCARDS )
+        {
+            if( !($payment_request = $sdk_obj->card_init_payment( $payment_arr, $moduleSettings )) )
+            {
+                if( !$sdk_obj->has_error() )
+                    $error_msg = 'Couldn\'t initiate request to server.';
+                else
+                    $error_msg = 'Call error: '.$sdk_obj->get_error_message();
+
+                $this->writeLog( $error_msg, array( 'type' => 'error' ) );
+                $this->redirect_to_step1( array( 'errors' => array( $error_msg ) ) );
+
+                exit;
+            }
+        } else
+        {
+            if( !($payment_request = $sdk_obj->init_payment( $payment_arr, $moduleSettings )) )
+            {
+                if( !$sdk_obj->has_error() )
+                    $error_msg = 'Couldn\'t initiate request to server.';
+                else
+                    $error_msg = 'Call error: '.$sdk_obj->get_error_message();
+
+                $this->writeLog( $error_msg, array( 'type' => 'error' ) );
+                $this->redirect_to_step1( array( 'errors' => array( $error_msg ) ) );
+
+                exit;
             }
         }
 
-        $messageToHash = $this->createStringToHash( $paymentData );
+        // ob_start();
+        // var_dump( $payment_request );
+        // $buf = ob_get_clean();
+        //
+        // $this->writeLog( 'Req ['.$buf.']' );
 
-        $paymentData['Hash'] = $this->computeHash( $messageToHash, $moduleSettings['signature'] );
+        $transaction_arr = array();
+        $transaction_arr['order_id'] = $orderID;
+        $transaction_arr['payment_id'] = (!empty( $payment_request['id'] )?$payment_request['id']:0);
+        $transaction_arr['payment_status'] = ((!empty( $payment_request['status'] ) and !empty( $payment_request['status']['id'] ))?$payment_request['status']['id']:0);
 
-        $this->context->smarty->assign( array(
-            'this_path' => $this->_path,
-            'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->name.'/',
-            'paymentData' => $paymentData,
-            'messageToHash' => $messageToHash,
-            'settings_prefix' => self::CONFIG_PREFIX,
-            'moduleSettings' => $moduleSettings,
-            'notSetPaymentData' => $notSetPaymentData,
-        ) );
+        $extra_data_arr = array();
+        if( !empty( $payment_request['referencedetails'] ) and is_array( $payment_request['referencedetails'] ) )
+        {
+            foreach( $payment_request['referencedetails'] as $key => $val )
+            {
+                if( is_null( $val ) )
+                    continue;
 
-        $this->writeLog( 'Message to hash ['.$messageToHash.'], Hash ['.$paymentData['Hash'].']', array( 'order_id' => $orderID ) );
+                $extra_data_arr[$key] = $val;
+            }
+        }
+
+        if( !empty( $extra_data_arr ) )
+            $transaction_arr['extra_data'] = $extra_data_arr;
+
+        if( !($new_transaction = $this->save_transaction( $transaction_arr )) )
+        {
+            $this->writeLog( 'Failed saving transaction with payment id ['.$transaction_arr['payment_id'].'] for order ['.$orderID.'].', array( 'type' => 'error' ) );
+
+            $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Failed saving transaction for order. Please try again.' ) ) ) );
+
+            // IDE fix (exit is called in redirect_to_step1())
+            exit;
+        }
+
+        if( empty( $payment_request['redirecturl'] ) )
+        {
+            $error_msg = 'Redirect URL not provided in API response. Please try again.';
+            $this->writeLog( $error_msg, array( 'type' => 'error' ) );
+            $this->redirect_to_step1( array( 'errors' => array( $error_msg ) ) );
+
+            exit;
+        }
+
+        $this->writeLog( 'Redirecting to payment page for payment id ['.$transaction_arr['payment_id'].'], order ['.$orderID.'].', array( 'type' => 'error' ) );
+
+        Tools::redirect( $payment_request['redirecturl'] );
+
+        return true;
     }
 
     public function prepare_notification()
     {
-        $this->writeLog( '>>> START HANDLE RESPONSE :::' );
+        $this->writeLog( '--- Notification START --------------------' );
 
-        if( !($request_arr = Smart2Pay_Helper::parse_php_input())
-         or !is_array( $request_arr )
-         or !($request_arr = Smart2Pay_Helper::normalize_notification_request( $request_arr )) )
+        include_once( S2P_SDK_DIR_CLASSES . 's2p_sdk_notification.inc.php' );
+        include_once( S2P_SDK_DIR_CLASSES . 's2p_sdk_helper.inc.php' );
+        include_once( S2P_SDK_DIR_METHODS . 's2p_sdk_meth_payments.inc.php' );
+
+        if( !defined( 'S2P_SDK_NOTIFICATION_IDENTIFIER' ) )
+            define( 'S2P_SDK_NOTIFICATION_IDENTIFIER', microtime( true ) );
+
+        S2P_SDK\S2P_SDK_Notification::logging_enabled( false );
+
+        $notification_params = array();
+        $notification_params['auto_extract_parameters'] = true;
+
+        /** @var S2P_SDK\S2P_SDK_Notification $notification_obj */
+        if( !($notification_obj = S2P_SDK\S2P_SDK_Module::get_instance( 'S2P_SDK_Notification', $notification_params ))
+         or $notification_obj->has_error() )
         {
-            $this->writeLog( 'Couldn\'t obtain parameters from request.', array( 'type' => 'error' ) );
-            die();
-        }
-
-        if( empty( $request_arr['MerchantTransactionID'] )
-         or !($order = new Order( $request_arr['MerchantTransactionID'] ))
-         or !Validate::isLoadedObject( $order ) )
-        {
-            $this->writeLog( 'Couldn\'t load order ['.(!empty( $request_arr['MerchantTransactionID'] )?$request_arr['MerchantTransactionID']:0).'] from database.',
-                array( 'type' => 'error', array( 'order_id' => (!empty( $request_arr['MerchantTransactionID'] )?$request_arr['MerchantTransactionID']:0) ) ) );
-            die();
-        }
-
-        try
-        {
-            $moduleSettings = $this->getSettings( $order );
-
-            $recomposedHashString = Smart2Pay_Helper::recompose_hash_string() . $moduleSettings['signature'];
-
-            $this->writeLog( 'NotificationRecevied: "' . Smart2Pay_Helper::get_php_raw_input() . '"', array( 'type' => 'info', 'order_id' => $request_arr['MerchantTransactionID'] ) );
-
-            /*
-             * Message is intact
-             *
-             */
-            if( $this->computeSHA256Hash( $recomposedHashString ) != $request_arr['Hash'] )
-                $this->writeLog( 'Hashes do not match (received: ' . $request_arr['Hash'] . ') vs (recomposed: ' . $this->computeSHA256Hash( $recomposedHashString ) . ')', array( 'type' => 'warning' ) );
-
-            elseif( empty( $request_arr['MerchantTransactionID'] ) )
-                $this->writeLog( 'Unknown order id in request.', array( 'type' => 'error' ) );
-
-            elseif( !($smart2pay_transaction_arr = $this->get_transaction_by_order_id( $request_arr['MerchantTransactionID'] )) )
-                $this->writeLog( 'Order id ['.$request_arr['MerchantTransactionID'].'] not in transactions table.', array( 'type' => 'error', 'order_id' => $request_arr['MerchantTransactionID'] ) );
-
+            if( (S2P_SDK\S2P_SDK_Module::st_has_error() and $error_arr = S2P_SDK\S2P_SDK_Module::st_get_error())
+                or (!empty( $notification_obj ) and $notification_obj->has_error() and ($error_arr = $notification_obj->get_error())) )
+                $error_msg = 'Error ['.$error_arr['error_no'].']: '.$error_arr['display_error'];
             else
-            {
-                $this->writeLog( 'Hashes match', array( 'type' => 'info', 'order_id' => $request_arr['MerchantTransactionID'] ) );
+                $error_msg = 'Error initiating notification object.';
 
-                $customer = new Customer( $order->id_customer );
-                $currency = new Currency( $order->id_currency );
+            $this->writeLog( $error_msg );
+            echo $error_msg;
+            exit;
+        }
 
-                /*
-                 * Check status ID
-                 *
-                 */
-                $request_arr['StatusID'] = (int)$request_arr['StatusID'];
-                switch( $request_arr['StatusID'] )
+        if( !($notification_type = $notification_obj->get_type())
+         or !($notification_title = $notification_obj::get_type_title( $notification_type )) )
+        {
+            $error_msg = 'Unknown notification type.';
+            $error_msg .= 'Input buffer: '.$notification_obj->get_input_buffer();
+
+            $this->writeLog( $error_msg );
+            echo $error_msg;
+            exit;
+        }
+
+        if( !($result_arr = $notification_obj->get_array()) )
+        {
+            $error_msg = 'Couldn\'t extract notification object.';
+            $error_msg .= 'Input buffer: '.$notification_obj->get_input_buffer();
+
+            $this->writeLog( $error_msg );
+            echo $error_msg;
+            exit;
+        }
+
+        $order = null;
+        if( $notification_type == $notification_obj::TYPE_PAYMENT
+        and (
+               empty( $result_arr['payment'] ) or !is_array( $result_arr['payment'] )
+            or empty( $result_arr['payment']['merchanttransactionid'] )
+            or !($order = new Order( $result_arr['payment']['merchanttransactionid'] ))
+            or !Validate::isLoadedObject( $order )
+            ) )
+        {
+            $error_msg = 'Couldn\'t load order as provided in notification.';
+            $this->writeLog( $error_msg );
+            echo $error_msg;
+            exit;
+        }
+
+        if( !($plugin_settings = $this->getSettings( $order ))
+         or empty( self::$s2p_sdk_obj )
+         or !($api_credentials = self::$s2p_sdk_obj->get_api_credentials( $plugin_settings )) )
+        {
+            $error_msg = 'Couldn\'t load Smart2Pay plugin settings.';
+            $this->writeLog( $error_msg );
+            echo $error_msg;
+            exit;
+        }
+
+        \S2P_SDK\S2P_SDK_Module::one_call_settings(
+            array(
+                'api_key' => $api_credentials['api_key'],
+                'site_id' => $api_credentials['site_id'],
+                'environment' => $api_credentials['environment'],
+            ) );
+
+        if( !$notification_obj->check_authentication() )
+        {
+            if( $notification_obj->has_error()
+                and ($error_arr = $notification_obj->get_error()) )
+                $error_msg = 'Error: '.$error_arr['display_error'];
+            else
+                $error_msg = 'Authentication failed.';
+
+            $this->writeLog( $error_msg );
+            echo $error_msg;
+            exit;
+        }
+
+        $this->writeLog( 'Received notification type ['.$notification_title.'].'  );
+
+        switch( $notification_type )
+        {
+            case $notification_obj::TYPE_PAYMENT:
+                if( empty( $result_arr )
+                 or empty( $result_arr['payment'] ) or !is_array( $result_arr['payment'] ) )
                 {
-                    // Status = open
-                    case self::S2P_STATUS_OPEN:
-                        if( !empty( $smart2pay_transaction_arr['method_id'] )
-                        and in_array( $smart2pay_transaction_arr['method_id'], array( self::PAYM_BANK_TRANSFER, self::PAYM_MULTIBANCO_SIBS ) )
-                        and $smart2pay_transaction_arr['payment_status'] != self::S2P_STATUS_OPEN
-                        and !empty( $moduleSettings[self::CONFIG_PREFIX.'SEND_PAYMENT_INSTRUCTIONS'] ) )
+                    $error_msg = 'Couldn\'t extract payment object.';
+                    $error_msg .= 'Input buffer: '.$notification_obj->get_input_buffer();
+
+                    $this->writeLog( $error_msg );
+                    echo $error_msg;
+                    exit;
+                }
+
+                $payment_arr = $result_arr['payment'];
+
+                if( empty( $payment_arr['merchanttransactionid'] )
+                 or empty( $payment_arr['status'] ) or empty( $payment_arr['status']['id'] ) )
+                {
+                    $error_msg = 'MerchantTransactionID or Status not provided.';
+                    $error_msg .= 'Input buffer: '.$notification_obj->get_input_buffer();
+
+                    $this->writeLog( $error_msg );
+                    echo $error_msg;
+                    exit;
+                }
+
+                if( !isset( $payment_arr['amount'] ) or !isset( $payment_arr['currency'] ) )
+                {
+                    $error_msg = 'Amount or Currency not provided.';
+                    $error_msg .= 'Input buffer: '.$notification_obj->get_input_buffer();
+
+                    $this->writeLog( $error_msg, array( 'order_id' => $payment_arr['merchanttransactionid'] ) );
+                    echo $error_msg;
+                    exit;
+                }
+
+                if( !($transaction_arr = $this->get_transaction_by_order_id( $payment_arr['merchanttransactionid'] )) )
+                {
+                    $error_msg = 'Couldn\'t obtain transaction details for id ['.$payment_arr['merchanttransactionid'].'].';
+                    $this->writeLog( $error_msg, array( 'order_id' => $payment_arr['merchanttransactionid'] ) );
+                    echo $error_msg;
+                    exit;
+                }
+
+                // if( (string)($transaction_arr['amount'] * 100) !== (string)$payment_arr['amount']
+                //  or $transaction_arr['currency'] != $payment_arr['currency'] )
+                // {
+                //     $error_msg = 'Transaction details don\'t match ['.
+                //                  ($transaction_arr['amount'] * 100).' != '.$payment_arr['amount'].
+                //                  ' OR '.
+                //                  $transaction_arr['currency'].' != '.$payment_arr['currency'].']';
+                //
+                //     $this->writeLog( array( 'message' => $error_msg, 'order_id' => $payment_arr['merchanttransactionid'] ) );
+                //     echo $error_msg;
+                //     exit;
+                // }
+                //
+                // if( !($order = wc_get_order( $transaction_arr['order_id'] )) )
+                // {
+                //     $error_msg = 'Couldn\'t obtain order details [#'.$transaction_arr['order_id'].']';
+                //
+                //     $this->writeLog( array( 'message' => $error_msg, 'order_id' => $payment_arr['merchanttransactionid'] ) );
+                //     echo $error_msg;
+                //     exit;
+                // }
+
+                if( !($status_title = S2P_SDK\S2P_SDK_Meth_Payments::valid_status( $payment_arr['status']['id'] )) )
+                    $status_title = '(unknown)';
+
+                $edit_arr = array();
+                $edit_arr['order_id'] = $transaction_arr['order_id'];
+                $edit_arr['payment_status'] = $payment_arr['status']['id'];
+
+                if( !($new_transaction_arr = $this->save_transaction( $edit_arr )) )
+                {
+                    $error_msg = 'Couldn\'t save transaction details to database [#'.$transaction_arr['id'].', Order: '.$transaction_arr['order_id'].'].';
+                    $this->writeLog( $error_msg, array( 'order_id' => $payment_arr['merchanttransactionid'] ) );
+                    echo $error_msg;
+                    exit;
+                }
+
+                $this->writeLog( 'Received '.$status_title.' notification for transaction '.$payment_arr['merchanttransactionid'].'.', array( 'order_id' => $payment_arr['merchanttransactionid'] ) );
+
+                $customer = false;
+                $currency = false;
+                if( !empty( $order ) )
+                {
+                    $customer = new Customer( $order->id_customer );
+                    $currency = new Currency( $order->id_currency );
+                }
+
+                // Update database according to payment status
+                switch( $payment_arr['status']['id'] )
+                {
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_CUSTOMER:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_PROVIDER:
+                    break;
+
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_OPEN:
+                        if( !empty( $plugin_settings[self::CONFIG_PREFIX.'SEND_PAYMENT_INSTRUCTIONS'] )
+                        and !empty( $transaction_arr['method_id'] )
+                        and in_array( $transaction_arr['method_id'], array( self::PAYM_BANK_TRANSFER, self::PAYM_MULTIBANCO_SIBS ) )
+                        and $transaction_arr['payment_status'] != self::S2P_STATUS_OPEN
+                        and !empty( $transaction_arr['extra_data'] )
+                        and ($extra_vars_arr = Smart2Pay_Helper::parse_string( $transaction_arr['extra_data'] )) )
                         {
-                            $info_fields = self::defaultTransactionLoggerExtraParams();
+                            $info_fields = self::defaultRestTransactionLoggerExtraParams();
                             $template_vars = array();
                             foreach( $info_fields as $key => $def_val )
                             {
-                                if( array_key_exists( $key, $request_arr ) )
-                                    $template_vars['{'.$key.'}'] = $request_arr[$key];
+                                if( array_key_exists( $key, $extra_vars_arr ) )
+                                    $template_vars['{'.$key.'}'] = $extra_vars_arr[$key];
                                 else
                                     $template_vars['{'.$key.'}'] = $def_val;
                             }
@@ -610,9 +933,9 @@ class Smart2pay extends PaymentModule
                             $template_vars['{OrderDate}'] = Tools::safeOutput( Tools::displayDate( $order->date_add, $order->id_lang, true ) );
                             $template_vars['{OrderPayment}'] = Tools::safeOutput( $order->payment );
 
-                            if( $smart2pay_transaction_arr['method_id'] == self::PAYM_BANK_TRANSFER )
+                            if( $transaction_arr['method_id'] == self::PAYM_BANK_TRANSFER )
                                 $template = 'instructions_bank_transfer';
-                            elseif( $smart2pay_transaction_arr['method_id'] == self::PAYM_MULTIBANCO_SIBS )
+                            elseif( $transaction_arr['method_id'] == self::PAYM_MULTIBANCO_SIBS )
                                 $template = 'instructions_multibanco_sibs';
 
                             if( !empty( $template ) )
@@ -654,39 +977,40 @@ class Smart2pay extends PaymentModule
                         }
                     break;
 
-                    // Status = success
-                    case self::S2P_STATUS_SUCCESS:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_SUCCESS:
                         /*
                          * Check amount  and currency
                          */
+                        $this->writeLog( 'Verifying order status.', array( 'type' => 'info', 'order_id' => $order->id ) );
+
                         $initialOrderAmount = $orderAmount = number_format( Smart2Pay_Helper::get_order_total_amount( $order ), 2, '.', '' );
                         $orderCurrency = $currency->iso_code;
 
                         $surcharge_amount = 0;
                         // Add surcharge if we have something...
-                        if( (float)$smart2pay_transaction_arr['surcharge_order_percent'] != 0 )
-                            $surcharge_amount += (float)$smart2pay_transaction_arr['surcharge_order_percent'];
-                        if( (float)$smart2pay_transaction_arr['surcharge_order_amount'] != 0 )
-                            $surcharge_amount += (float)$smart2pay_transaction_arr['surcharge_order_amount'];
+                        if( (float)$transaction_arr['surcharge_order_percent'] != 0 )
+                            $surcharge_amount += (float)$transaction_arr['surcharge_order_percent'];
+                        if( (float)$transaction_arr['surcharge_order_amount'] != 0 )
+                            $surcharge_amount += (float)$transaction_arr['surcharge_order_amount'];
 
                         $orderAmount += $surcharge_amount;
 
-                        if( !empty( $moduleSettings[self::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE'] ) )
+                        if( !empty( $plugin_settings[self::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE'] ) )
                             $orderAmount_check = number_format( $initialOrderAmount * 100, 0, '.', '' );
                         else
                             $orderAmount_check = number_format( $orderAmount * 100, 0, '.', '' );
 
-                        if( strcmp( $orderAmount_check, $request_arr['Amount'] ) != 0
-                            or $orderCurrency != $request_arr['Currency'] )
-                            $this->writeLog( 'Smart2Pay :: notification has different amount[' . $orderAmount_check . '/' . $request_arr['Amount'] . '] '.
-                                                   ' and/or currency [' . $orderCurrency . '/' . $request_arr['Currency'] . ']. Please contact support@smart2pay.com.', array( 'type' => 'error', 'order_id' => $order->id ) );
+                        if( strcmp( $orderAmount_check, $payment_arr['amount'] ) != 0
+                         or $orderCurrency != $payment_arr['currency'] )
+                            $this->writeLog( 'Smart2Pay :: notification has different amount[' . $orderAmount_check . '/' . $payment_arr['amount'] . '] '.
+                                                   ' and/or currency [' . $orderCurrency . '/' . $payment_arr['currency'] . ']. Please contact support@smart2pay.com.', array( 'type' => 'error', 'order_id' => $order->id ) );
 
-                        elseif( empty( $request_arr['MethodID'] )
-                                or !($method_details = $this->get_method_details( $request_arr['MethodID'] )) )
-                            $this->writeLog( 'Smart2Pay :: Couldn\'t get method details ['.$request_arr['MethodID'].']', array( 'type' => 'error', 'order_id' => $order->id ) );
+                        elseif( empty( $payment_arr['methodid'] )
+                                or !($method_details = $this->get_method_details( $payment_arr['methodid'], $plugin_settings['environment'] )) )
+                            $this->writeLog( 'Smart2Pay :: Couldn\'t get method details ['.$payment_arr['methodid'].']', array( 'type' => 'error', 'order_id' => $order->id ) );
 
                         // PrestaShop updates $order->current_state pretty late so we might get another call from server with a new notification...
-                        elseif( $this->get_quick_last_order_status( $order ) == $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_SUCCESS'] )
+                        elseif( $this->get_quick_last_order_status( $order ) == $plugin_settings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_SUCCESS'] )
                             $this->writeLog( 'Order already on success status.', array( 'type' => 'error', 'order_id' => $order->id ) );
 
                         else
@@ -696,7 +1020,7 @@ class Smart2pay extends PaymentModule
                             $this->writeLog( 'Order ['.(version_compare( _PS_VERSION_, '1.5', '<' )?$order->id:$order->reference).'] has been paid', array( 'order_id' => $order->id ) );
 
                             $order_only_amount = $initialOrderAmount;
-                            if( !empty( $moduleSettings[self::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE'] )
+                            if( !empty( $plugin_settings[self::CONFIG_PREFIX.'ALTER_ORDER_ON_SURCHARGE'] )
                                 and $surcharge_amount != 0 )
                                 $order_only_amount -= $surcharge_amount;
 
@@ -712,7 +1036,7 @@ class Smart2pay extends PaymentModule
                                 $order->addOrderPayment(
                                     $order_only_amount,
                                     ( ! empty( $method_details['display_name'] ) ? $method_details['display_name'] : $this->displayName ),
-                                    $request_arr['PaymentID'],
+                                    $payment_arr['id'],
                                     $currency
                                 );
 
@@ -721,15 +1045,15 @@ class Smart2pay extends PaymentModule
                                     $order->addOrderPayment(
                                         $surcharge_amount,
                                         $this->l( 'Payment Surcharge' ),
-                                        $request_arr['PaymentID'],
+                                        $payment_arr['id'],
                                         $currency
                                     );
                                 }
                             }
 
-                            $this->changeOrderStatus( $order, $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_SUCCESS'] );
+                            $this->changeOrderStatus( $order, $plugin_settings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_SUCCESS'] );
 
-                            if( !empty( $moduleSettings[self::CONFIG_PREFIX.'NOTIFY_CUSTOMER_BY_EMAIL'] ) )
+                            if( !empty( $plugin_settings[self::CONFIG_PREFIX.'NOTIFY_CUSTOMER_BY_EMAIL'] ) )
                             {
                                 $template_vars = array();
 
@@ -787,78 +1111,58 @@ class Smart2pay extends PaymentModule
                                 $this->writeLog( 'Customer notified about payment.', array( 'order_id' => $order->id ) );
                             }
 
-                            if( !empty( $moduleSettings[self::CONFIG_PREFIX.'CREATE_INVOICE_ON_SUCCESS'] ) )
-                                $this->check_order_invoices( $order, array( 'check_delivery' => (!empty( $moduleSettings[self::CONFIG_PREFIX.'AUTOMATE_SHIPPING'] )?true:false) ) );
+                            if( !empty( $plugin_settings[self::CONFIG_PREFIX.'CREATE_INVOICE_ON_SUCCESS'] ) )
+                                $this->check_order_invoices( $order, array( 'check_delivery' => (!empty( $plugin_settings[self::CONFIG_PREFIX.'AUTOMATE_SHIPPING'] )?true:false) ) );
 
                         }
+
+                        $this->writeLog( 'Payment success!', array( 'order_id' => $payment_arr['merchanttransactionid'] ) );
                     break;
 
-                    // Status = canceled
-                    case self::S2P_STATUS_CANCELLED:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_CANCELLED:
                         $this->writeLog( 'Payment canceled', array( 'type' => 'info', 'order_id' => $order->id ) );
-                        $this->changeOrderStatus( $order, $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_CANCEL'] );
+                        $this->changeOrderStatus( $order, $plugin_settings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_CANCEL'] );
                         // There is no way to cancel an order other but changing it's status to canceled
                         // What we do is not changing order status to canceled, but to a user set one, instead
                     break;
 
-                    // Status = failed
-                    case self::S2P_STATUS_FAILED:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_FAILED:
                         $this->writeLog( 'Payment failed', array( 'type' => 'info', 'order_id' => $order->id ) );
-                        $this->changeOrderStatus( $order, $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_FAIL'] );
+                        $this->changeOrderStatus( $order, $plugin_settings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_FAIL'] );
                     break;
 
-                    // Status = expired
-                    case self::S2P_STATUS_EXPIRED:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_EXPIRED:
                         $this->writeLog( 'Payment expired', array( 'type' => 'info', 'order_id' => $order->id ) );
-                        $this->changeOrderStatus($order, $moduleSettings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_EXPIRE']);
+                        $this->changeOrderStatus($order, $plugin_settings[self::CONFIG_PREFIX.'ORDER_STATUS_ON_EXPIRE']);
                     break;
 
-                    default:
-                        $this->writeLog( 'Payment status unknown', array( 'type' => 'error', 'order_id' => $order->id ) );
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PROCESSING:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_AUTHORIZED:
                     break;
                 }
+            break;
 
-                $s2p_transaction_arr = array();
-                $s2p_transaction_arr['order_id'] = $order->id;
-                $s2p_transaction_arr['payment_status'] = $request_arr['StatusID'];
-                if( isset( $request_arr['PaymentID'] ) )
-                    $s2p_transaction_arr['payment_id'] = $request_arr['PaymentID'];
-
-                $s2p_transaction_extra_arr = array();
-                $s2p_default_transaction_extra_arr = self::defaultTransactionLoggerExtraParams();
-                foreach( $s2p_default_transaction_extra_arr as $key => $val )
-                {
-                    if( array_key_exists( $key, $request_arr ) )
-                        $s2p_transaction_extra_arr[$key] = $request_arr[$key];
-                }
-
-                if( !empty( $s2p_transaction_extra_arr ) )
-                    $s2p_transaction_arr['extra_data'] = $s2p_transaction_extra_arr;
-
-                $this->save_transaction( $s2p_transaction_arr );
-
-                // NotificationType IS payment
-                if( Tools::strtolower( $request_arr['NotificationType'] ) == 'payment' )
-                {
-                    // prepare string for hash
-                    $responseHashString = "notificationTypePaymentPaymentId" . $request_arr['PaymentID'] . $moduleSettings['signature'];
-                    // prepare response data
-                    $responseData = array(
-                        'NotificationType' => 'Payment',
-                        'PaymentID' => $request_arr['PaymentID'],
-                        'Hash' => $this->computeSHA256Hash( $responseHashString )
-                    );
-
-                    // output response
-                    echo "NotificationType=Payment&PaymentID=" . $responseData['PaymentID'] . "&Hash=" . $responseData['Hash'];
-                }
-            }
-        } catch( Exception $e )
-        {
-            $this->writeLog( $e->getMessage(), array( 'type' => 'exception', 'order_id' => $request_arr['MerchantTransactionID'] ) );
+            case $notification_obj::TYPE_PREAPPROVAL:
+                $this->writeLog( 'Preapprovals not implemented.' );
+            break;
         }
 
-        $this->writeLog( '::: END HANDLE RESPONSE <<<', array( 'type' => 'info', 'order_id' => $request_arr['MerchantTransactionID'] ) );
+        if( $notification_obj->respond_ok() )
+            $this->writeLog( '--- Sent OK -------------------------------', array( 'type' => 'info', 'order_id' => ($order?$order->id:0) ) );
+
+        else
+        {
+            if( $notification_obj->has_error()
+            and ($error_arr = $notification_obj->get_error()) )
+                $error_msg = 'Error: '.$error_arr['display_error'];
+            else
+                $error_msg = 'Couldn\'t send ok response.';
+
+            $this->writeLog( $error_msg, array( 'type' => 'error', 'order_id' => ($order?$order->id:0) ) );
+            echo $error_msg;
+        }
+
+        exit;
     }
 
     public function clean_methods_cache()
@@ -986,14 +1290,49 @@ class Smart2pay extends PaymentModule
         $post_data['errors_buffer'] = '';
         $post_data['submit'] = '';
 
+        $plugin_settings_arr = $this->getSettings();
+
         /**
          * Check submit for payment method settings
          */
-        if( Tools::isSubmit( 'submit_payment_methods' ) )
+        if( Tools::isSubmit( 'submit_syncronize_methods' ) )
+        {
+            $post_data['submit'] = 'submit_syncronize_methods';
+
+            if( empty( self::$s2p_sdk_obj ) )
+                $post_data['errors_buffer'] .= $this->displayError( 'Error initializing Smart2Pay SDK to syncronize payment methods.' );
+
+            else
+            {
+                $sdk_obj = self::$s2p_sdk_obj;
+
+                if( $sdk_obj->refresh_available_methods() )
+                    $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'Payment method details saved.' ) );
+
+                else
+                {
+                    $error_msg = $this->l( 'Couldn\'t syncronize payment methods with Smart2Pay servers. Please try again later.' );
+                    if( $sdk_obj->has_error() )
+                        $error_msg = $sdk_obj->get_error_message();
+
+                    $post_data['errors_buffer'] .= $this->displayError( $error_msg );
+                }
+
+                $this->refresh_method_countries();
+                $this->clean_methods_cache();
+                $this->get_all_methods( $plugin_settings_arr['environment'] );
+                $this->get_all_method_settings( $plugin_settings_arr['environment'] );
+            }
+        }
+
+        /**
+         * Check submit for payment method settings
+         */
+        elseif( Tools::isSubmit( 'submit_payment_methods' ) )
         {
             $post_data['submit'] = 'submit_payment_methods';
 
-            $all_methods_arr = $this->get_all_methods();
+            $all_methods_arr = $this->get_all_methods( $plugin_settings_arr['environment'] );
 
             $enabled_methods_arr = Tools::getValue( 'enabled_methods', array() );
             $enabled_method_countries = Tools::getValue( 'enabled_method_countries', array() );
@@ -1012,6 +1351,7 @@ class Smart2pay extends PaymentModule
                 $valid_ids[] = $method_id;
 
                 $method_settings = array();
+                $method_settings['environment'] = $plugin_settings_arr['environment'];
                 $method_settings['enabled'] = 1;
                 $method_settings['surcharge_amount'] = (!empty( $surcharge_amounts_arr[$method_id] )?(float)trim( $surcharge_amounts_arr[$method_id] ):0);
                 $method_settings['surcharge_percent'] = (!empty( $surcharge_percents_arr[$method_id] )?(float)trim( $surcharge_percents_arr[$method_id] ):0);
@@ -1029,8 +1369,8 @@ class Smart2pay extends PaymentModule
                     $post_data['errors_buffer'] .= $this->displayError( 'Error saving details for payment method '.$all_methods_arr[$method_id]['display_name'].'.' );
             }
 
-            $all_method_countries = $this->get_method_countries_all();
-            $method_countries_enabled = $this->get_method_countries_enabled();
+            $all_method_countries = $this->get_method_countries_all( $plugin_settings_arr['environment'] );
+            $method_countries_enabled = $this->get_method_countries_enabled( $plugin_settings_arr['environment'] );
             foreach( $enabled_method_countries as $method_id => $country_methods )
             {
                 if( empty( $all_method_countries[$method_id] ) or !is_array( $all_method_countries[$method_id] ) )
@@ -1057,9 +1397,12 @@ class Smart2pay extends PaymentModule
                 and !array_diff( $selected_method_countries, $method_countries_enabled[$method_id] ) )
                     continue;
 
-                if( !Db::getInstance()->execute( 'UPDATE `'._DB_PREFIX_.'smart2pay_country_method` SET enabled = 0 WHERE method_id = \''.$method_id.'\'' )
+                if( !Db::getInstance()->execute( 'UPDATE `'._DB_PREFIX_.'smart2pay_country_method` SET enabled = 0 '.
+                                                 ' WHERE method_id = \''.$method_id.'\' AND environment = \''.$plugin_settings_arr['environment'].'\'' )
                  or (count( $selected_method_countries )
-                      and !Db::getInstance()->execute( 'UPDATE `'._DB_PREFIX_.'smart2pay_country_method` SET enabled = 1 WHERE method_id = \''.$method_id.'\' AND country_id IN ('.implode( ',', $selected_method_countries ).')' ))
+                      and !Db::getInstance()->execute( 'UPDATE `'._DB_PREFIX_.'smart2pay_country_method` SET enabled = 1 '.
+                                                       ' WHERE method_id = \''.$method_id.'\' AND environment = \''.$plugin_settings_arr['environment'].'\''.
+                                                       ' AND country_id IN ('.implode( ',', $selected_method_countries ).')' ))
                  )
                 {
                     $post_data['errors_buffer'] .= $this->displayError( 'Error saving country details for payment method '.$all_methods_arr[$method_id]['display_name'].'.' );
@@ -1072,12 +1415,13 @@ class Smart2pay extends PaymentModule
                 Db::getInstance()->execute( 'TRUNCATE TABLE `'._DB_PREFIX_.'smart2pay_method_settings`' );
 
             else
-                Db::getInstance()->execute( 'DELETE FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE method_id NOT IN ('.implode( ',', $valid_ids ).')' );
+                Db::getInstance()->execute( 'DELETE FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE environment = \''.$plugin_settings_arr['environment'].'\''.
+                                            ' AND method_id NOT IN ('.implode( ',', $valid_ids ).')' );
 
             $this->clean_methods_cache();
 
-            $all_methods_arr = $this->get_all_methods();
-            $this->get_all_method_settings();
+            $all_methods_arr = $this->get_all_methods( $plugin_settings_arr['environment'] );
+            $this->get_all_method_settings( $plugin_settings_arr['environment'] );
 
             if( empty( $post_data['errors_buffer'] ) )
                 $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'Payment method details saved.' ) );
@@ -1109,11 +1453,11 @@ class Smart2pay extends PaymentModule
                 $field_error = '';
 
                 if( in_array( $formValues[self::CONFIG_PREFIX.'ENV'], array( 'demo', 'test' ) )
-                and in_array( $input['name'], array( self::CONFIG_PREFIX.'SIGNATURE_LIVE', self::CONFIG_PREFIX.'POST_URL_LIVE', self::CONFIG_PREFIX.'MID_LIVE' ) ) )
+                and in_array( $input['name'], array( self::CONFIG_PREFIX.'SITE_ID_LIVE', self::CONFIG_PREFIX.'APIKEY_LIVE' ) ) )
                     $skipValidation = true;
 
                 if( in_array( $formValues[self::CONFIG_PREFIX.'ENV'], array( 'demo', 'live' ) )
-                and in_array( $input['name'], array( self::CONFIG_PREFIX.'SIGNATURE_TEST', self::CONFIG_PREFIX.'POST_URL_TEST', self::CONFIG_PREFIX.'MID_TEST' ) ) )
+                and in_array( $input['name'], array( self::CONFIG_PREFIX.'SITE_ID_TEST', self::CONFIG_PREFIX.'APIKEY_TEST' ) ) )
                     $skipValidation = true;
 
                 // Make necessary transformations before validation
@@ -1146,6 +1490,13 @@ class Smart2pay extends PaymentModule
                 }
             }
 
+            $this->getSettings( null, true );
+
+            $this->refresh_method_countries();
+            $this->clean_methods_cache();
+            $this->get_all_methods();
+            $this->get_all_method_settings();
+
             if( empty( $post_data['errors_buffer'] ) )
                 $post_data['success_buffer'] .= $this->displayConfirmation( $this->l( 'Settings updated successfully' ) );
         }
@@ -1161,6 +1512,21 @@ class Smart2pay extends PaymentModule
     public function displayPaymentMethodsForm()
     {
         $this->create_context();
+
+        if( !$this->_init_sdk_instance() )
+            return 'Cannot initiate Smart2Pay SDK. Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
+
+        $sdk_obj = self::$s2p_sdk_obj;
+
+        $plugin_environment = 'demo';
+        if( ($plugin_settings = $this->getSettings())
+        and !empty( $plugin_settings['environment'] ) )
+            $plugin_environment = strtolower( $plugin_settings['environment'] );
+
+        if( !($last_sync_date = $sdk_obj->last_methods_sync_option()) )
+            $last_sync_date = false;
+        if( !($time_to_launch_sync = $sdk_obj->seconds_to_launch_sync_str()) )
+            $time_to_launch_sync = false;
 
         $this->S2P_add_css( _MODULE_DIR_ . $this->name . '/views/css/back-style.css' );
 
@@ -1180,6 +1546,9 @@ class Smart2pay extends PaymentModule
             $all_currencies_arr = array();
 
         $this->context->smarty->assign( array(
+            'plugin_environment' => $plugin_environment,
+            'last_sync_date' => $last_sync_date,
+            'time_to_launch_sync' => $time_to_launch_sync,
             'module_path' => $this->_path,
             'logos_path' => $this->_path.'views/img/logos/',
             'default_currency_id' => Currency::getDefaultCurrency()->id,
@@ -1191,50 +1560,6 @@ class Smart2pay extends PaymentModule
             'payment_methods' => $this->get_all_methods(),
             'payment_method_settings' => $this->get_all_method_settings(),
         ) );
-
-        //if( !($fil = @fopen( '/home/andy/export.csv', 'w' )) )
-        //    echo 'Nu am putut scrie fisierul';
-        //
-        //else
-        //{
-        //
-        //    $all_methods = $this->get_all_methods();
-        //    $all_countries = $this->get_smart2pay_id_countries();
-        //    $all_method_countries = $this->get_method_countries_all();
-        //
-        //    @fputs( $fil, "Method ID,Method Name,Countries\r\n" );
-        //
-        //    ksort( $all_methods );
-        //
-        //    foreach( $all_methods as $method_id => $method_arr )
-        //    {
-        //        $str = $method_id.',"'.$method_arr['display_name'].'",';
-        //
-        //        $str_country = '';
-        //        if( !empty( $all_method_countries[$method_id] ) )
-        //        {
-        //            foreach( $all_method_countries[$method_id] as $country_id )
-        //            {
-        //                if( empty( $all_countries[$country_id] ) )
-        //                    echo 'no country ['.$country_id.']';
-        //
-        //                $str_country .= (empty( $str_country )?'"':', ').$all_countries[$country_id]['name'].' ('.$all_countries[$country_id]['code'].')';
-        //            }
-        //            $str_country .= '"';
-        //        }
-        //
-        //        $str .= $str_country."\r\n";
-        //
-        //        @fputs( $fil, $str );
-        //    }
-        //
-        //    echo 'end';
-        //
-        //    @fflush( $fil );
-        //    @fclose( $fil );
-        //}
-        //
-        //exit;
 
         return $this->fetchTemplate( '/views/templates/admin/payment_methods.tpl' );
     }
@@ -1248,6 +1573,13 @@ class Smart2pay extends PaymentModule
     {
         // Get default language
         $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+
+        if( !$this->_init_sdk_instance() )
+            return 'Cannot initiate Smart2Pay SDK. Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
+
+        $sdk_obj = self::$s2p_sdk_obj;
+        if( !($sdk_version = $sdk_obj::get_sdk_version()) )
+            return 'Cannot get Smart2Pay SDK version. Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
 
         $fields_form = array();
 
@@ -1263,7 +1595,8 @@ class Smart2pay extends PaymentModule
             )
         );
 
-        $form_buffer = 'Plugin version: '.$this->version.'<br/>';
+        $form_buffer = 'Plugin version: '.$this->version.'<br/>'.
+                       'Smart2Pay SDK version: '.$sdk_version.'<br/>';
 
         if( @file_exists( Smart2Pay_Helper::get_documentation_path() ) )
         {
@@ -1583,6 +1916,7 @@ class Smart2pay extends PaymentModule
             'transaction_arr' => $transaction_arr,
             'transaction_extra_titles' => self::transaction_logger_params_to_title(),
             'transaction_extra_data' => $transaction_extra_data,
+            'transaction_extra_titles_rest' => self::rest_transaction_logger_params_to_title(),
         ));
 
         return $this->fetchTemplate( '/views/templates/front/order_payment_details.tpl' );
@@ -1687,6 +2021,7 @@ class Smart2pay extends PaymentModule
             'transaction_arr' => $transaction_arr,
             'transaction_extra_titles' => self::transaction_logger_params_to_title(),
             'transaction_extra_data' => $transaction_extra_data,
+            'transaction_extra_titles_rest' => self::rest_transaction_logger_params_to_title(),
         ) );
 
         return $this->fetchTemplate( '/views/templates/admin/order_payment_details.tpl' ).
@@ -1881,7 +2216,7 @@ class Smart2pay extends PaymentModule
             $payment_option
                       //->setCallToActionText( $this->l( 'Pay using ' ).$method_arr['method']['display_name'] )
                       ->setAction( $this->get_payment_link( array( 'method_id' => $method_arr['method']['method_id'] ) ) )
-                      ->setLogo( $this->_path.'views/img/logos/'.$method_arr['method']['logo_url'] )
+                      ->setLogo( $method_arr['method']['logo_url'] )
             ;
 
             $payment_options[] = $payment_option;
@@ -2124,11 +2459,12 @@ class Smart2pay extends PaymentModule
      * @param Order|null $order
      * @return array
      */
-    public function getSettings( Order $order = null )
+    public function getSettings( Order $order = null, $force = false )
     {
         static $settings = false;
 
-        if( !empty( $settings ) )
+        if( empty( $force )
+        and !empty( $settings ) )
             return $settings;
 
         $id_shop_group = null;
@@ -2155,20 +2491,10 @@ class Smart2pay extends PaymentModule
                 $settings[$settingName] = Configuration::get( $settingName, $id_lang, $id_shop_group, $id_shop );
         }
 
-        $env = Tools::strtoupper( $settings[self::CONFIG_PREFIX.'ENV'] );
+        if( empty( $settings[self::CONFIG_PREFIX.'ENV'] ) )
+            $settings[self::CONFIG_PREFIX.'ENV'] = 'demo';
 
-        if( $env == 'DEMO' )
-        {
-            $settings[self::CONFIG_PREFIX.'SITE_ID'] = self::DEMO_SID;
-            $settings['signature'] = self::DEMO_SIGNATURE;
-            $settings['mid']       = self::DEMO_MID;
-            $settings['posturl']   = self::DEMO_POSTURL;
-        } else
-        {
-            $settings['signature'] = $settings[ self::CONFIG_PREFIX . 'SIGNATURE_' . $env ];
-            $settings['mid']       = $settings[ self::CONFIG_PREFIX . 'MID_' . $env ];
-            $settings['posturl']   = $settings[ self::CONFIG_PREFIX . 'POST_URL_' . $env ];
-        }
+        $settings['environment'] = strtolower( $settings[self::CONFIG_PREFIX.'ENV'] );
 
         return $settings;
     }
@@ -2508,6 +2834,24 @@ class Smart2pay extends PaymentModule
      *
      * @return array
      */
+    public function get_smart2pay_codes_countries()
+    {
+        if( !empty( self::$maintenance_functionality ) )
+            return array();
+
+        if( !empty( self::$cache['all_codes_countries'] ) )
+            return self::$cache['all_codes_countries'];
+
+        $this->get_smart2pay_countries();
+
+        return self::$cache['all_codes_countries'];
+    }
+
+    /**
+     * Get Smart2Pay countries list
+     *
+     * @return array
+     */
     public function get_smart2pay_countries()
     {
         if( !empty( self::$maintenance_functionality ) )
@@ -2524,6 +2868,7 @@ class Smart2pay extends PaymentModule
 
         self::$cache['all_countries'] = array();
         self::$cache['all_id_countries'] = array();
+        self::$cache['all_codes_countries'] = array();
 
         if( empty( $country_rows ) )
             return array();
@@ -2532,6 +2877,7 @@ class Smart2pay extends PaymentModule
         {
             self::$cache['all_countries'][$country_arr['code']] = $country_arr['name'];
             self::$cache['all_id_countries'][$country_arr['country_id']] = array( 'code' => $country_arr['code'], 'name' => $country_arr['name'] );
+            self::$cache['all_codes_countries'][$country_arr['code']] = $country_arr['country_id'];
         }
 
         return self::$cache['all_countries'];
@@ -2540,16 +2886,23 @@ class Smart2pay extends PaymentModule
     /**
      * Get all defined Smart 2 Pay methods which are active. Result is cached per method id.
      *
+     * @param bool|string $environment
      * @return array
      */
-    public function get_all_methods()
+    public function get_all_methods( $environment = false )
     {
         if( !empty( self::$cache['all_method_details_in_cache'] ) and !empty( self::$cache['method_details'] ) )
             return self::$cache['method_details'];
 
+        if( empty( $environment ) )
+        {
+            $plugin_settings_arr = $this->getSettings();
+            $environment = $plugin_settings_arr['environment'];
+        }
+
         self::$cache['method_details'] = array();
 
-        if( ($methods = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `active` = 1 ORDER BY `display_name` ASC' )) )
+        if( ($methods = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `active` = 1 AND environment = \''.$environment.'\' ORDER BY `display_name` ASC' )) )
         {
             foreach( $methods as $method_arr )
             {
@@ -2565,14 +2918,22 @@ class Smart2pay extends PaymentModule
     /**
      * Get payment methods settings. Result is cached per id.
      *
+     * @param bool|string $environment
+     *
      * @return array
      */
-    public function get_all_method_settings()
+    public function get_all_method_settings( $environment = false )
     {
         $this->create_context();
 
         if( !empty( self::$cache['all_method_settings_in_cache'] ) and !empty( self::$cache['method_settings'] ) )
             return self::$cache['method_settings'];
+
+        if( empty( $environment ) )
+        {
+            $plugin_settings_arr = $this->getSettings();
+            $environment = $plugin_settings_arr['environment'];
+        }
 
         self::$cache['method_settings'] = array();
 
@@ -2580,7 +2941,7 @@ class Smart2pay extends PaymentModule
         if( !empty( $this->context->currency ) )
             $default_currency = $this->context->currency;
 
-        if( ($methods = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` ORDER BY `priority` ASC' )) )
+        if( ($methods = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE environment = \''.$environment.'\' ORDER BY `priority` ASC' )) )
         {
             foreach( $methods as $method_arr )
             {
@@ -2604,17 +2965,23 @@ class Smart2pay extends PaymentModule
      * Get payment method details. Result is cached.
      *
      * @param $method_id
+     * @param bool|string $environment
      *
      * @return array|null
      */
-    public function get_method_details( $method_id )
+    public function get_method_details( $method_id, $environment = false )
     {
         $method_id = (int)$method_id;
         if( array_key_exists( $method_id, self::$cache['method_details'] ) )
             return self::$cache['method_details'][$method_id];
 
-        $method = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `method_id` = \'' . $method_id . '\' LIMIT 0, 1' );
+        if( empty( $environment ) )
+        {
+            $plugin_settings_arr = $this->getSettings();
+            $environment = $plugin_settings_arr['environment'];
+        }
 
+        $method = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method` WHERE `method_id` = \''.$method_id.'\' AND environment = \''.$environment.'\' LIMIT 0, 1' );
         if( empty( $method ) )
             return null;
 
@@ -2626,9 +2993,11 @@ class Smart2pay extends PaymentModule
     /**
      * Get countries of payment method.
      *
+     * @param bool|string $environment
+     *
      * @return array|null
      */
-    public function get_method_countries_all_with_details()
+    public function get_method_countries_all_with_details( $environment = false )
     {
         if( !empty( self::$cache['all_method_countries_details'] ) )
             return self::$cache['all_method_countries_details'];
@@ -2640,11 +3009,18 @@ class Smart2pay extends PaymentModule
         if( empty( self::$cache['all_method_countries_details'] ) )
             self::$cache['all_method_countries_details'] = array();
 
+        if( empty( $environment ) )
+        {
+            $plugin_settings_arr = $this->getSettings();
+            $environment = $plugin_settings_arr['environment'];
+        }
+
         if( ($methods_countries = Db::getInstance()->executeS(
 
             'SELECT * '.
             ' FROM `'._DB_PREFIX_.'smart2pay_country_method` CM '.
             ' LEFT JOIN `'._DB_PREFIX_.'smart2pay_country` C ON C.country_id = CM.country_id '.
+            ' WHERE CM.environment = \''.$environment.'\''.
             ' ORDER BY CM.method_id ASC, C.name ASC'
         )) )
         {
@@ -2675,14 +3051,16 @@ class Smart2pay extends PaymentModule
     /**
      * Get countries of payment method (enabled or not).
      *
+     * @param bool|string $environment
+     *
      * @return array
      */
-    public function get_method_countries_all()
+    public function get_method_countries_all( $environment = false )
     {
         if( !empty( self::$cache['all_method_countries'] ) )
             return self::$cache['all_method_countries'];
 
-        $this->get_method_countries_all_with_details();
+        $this->get_method_countries_all_with_details( $environment );
 
         return self::$cache['all_method_countries'];
     }
@@ -2690,41 +3068,45 @@ class Smart2pay extends PaymentModule
     /**
      * Get countries of payment method (only enabled ones).
      *
+     * @param bool|string $environment
+     *
      * @return array
      */
-    public function get_method_countries_enabled()
+    public function get_method_countries_enabled( $environment = false )
     {
         if( !empty( self::$cache['all_method_countries_enabled'] ) )
             return self::$cache['all_method_countries_enabled'];
 
-        $this->get_method_countries_all_with_details();
+        $this->get_method_countries_all_with_details( $environment );
 
         return self::$cache['all_method_countries_enabled'];
     }
 
     /**
      * Refresh countries of payment method from database
+     * @param bool|string $environment
      */
-    public function refresh_method_countries()
+    public function refresh_method_countries( $environment = false )
     {
         self::$cache['all_method_countries'] = array();
         self::$cache['all_method_countries_enabled'] = array();
         self::$cache['all_method_countries_details'] = array();
 
-        $this->get_method_countries_all_with_details();
+        $this->get_method_countries_all_with_details( $environment );
     }
 
     /**
      * Get countries of payment method.
      *
      * @param $method_id
+     * @param bool|string $environment
      *
      * @return array|bool
      */
-    public function get_method_countries( $method_id )
+    public function get_method_countries( $method_id, $environment = false )
     {
         if( empty( self::$cache['all_method_countries'] ) )
-            $this->get_method_countries_all();
+            $this->get_method_countries_all( $environment );
 
         $method_id = (int)$method_id;
         if( array_key_exists( $method_id, self::$cache['all_method_countries'] ) )
@@ -2736,17 +3118,26 @@ class Smart2pay extends PaymentModule
     /**
      * Get payment method settings. Result is cached.
      *
-     * @param $method_id
+     * @param int $method_id
+     * @param bool|string $environment
      *
      * @return array|null
      */
-    public function get_method_settings( $method_id )
+    public function get_method_settings( $method_id, $environment = false )
     {
-        $method_id = (int)$method_id;
+        $method_id = intval( $method_id );
         if( array_key_exists( $method_id, self::$cache['method_settings'] ) )
             return self::$cache['method_settings'][$method_id];
 
-        $method = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE `method_id` = \'' . $method_id . '\' LIMIT 0, 1' );
+        if( empty( $environment ) )
+        {
+            if( !($plugin_settings_arr = $this->getSettings()) )
+                return null;
+
+            $environment = $plugin_settings_arr['environment'];
+        }
+
+        $method = Db::getInstance()->executeS( 'SELECT * FROM `'._DB_PREFIX_.'smart2pay_method_settings` WHERE `method_id` = \''.$method_id.'\' AND environment = \''.$environment.'\' LIMIT 0, 1' );
 
         if( empty( $method ) )
             return null;
@@ -2917,6 +3308,25 @@ class Smart2pay extends PaymentModule
         );
     }
 
+    public static function rest_transaction_logger_params_to_title()
+    {
+        return array(
+            'bankcode' => 'Bank Code',
+            'bankname' => 'Bank Name',
+            'entityid' => 'Entity ID',
+            'entitynumber' => 'Entity Number',
+            'referenceid' => 'Reference ID',
+            'referencenumber' => 'Reference Number',
+            'swift_bic' => 'SWIFT / BIC',
+            'accountcurrency' => 'Account Currency',
+            'accountnumber' => 'Account Number',
+            'accountholder' => 'Account Holder',
+            'iban' => 'IBAN',
+            'qrcodeurl' => 'QR Code URL',
+            'amounttopay' => 'Amount to Pay',
+        );
+    }
+
     /**
      * Keys in returning array should be variable names sent back by Smart2Pay and values should be default values if
      * variables are not found in request
@@ -2940,6 +3350,31 @@ class Smart2pay extends PaymentModule
             // Common to method id 20 and 1
             'ReferenceNumber' => '',
             'AmountToPay' => '',
+        );
+    }
+
+    /**
+     * Keys in returning array should be variable names sent back by Smart2Pay and values should be default values if
+     * variables are not found in request
+     *
+     * @return array
+     */
+    public static function defaultRestTransactionLoggerExtraParams()
+    {
+        return array(
+            'bankcode' => '',
+            'bankname' => '',
+            'entityid' => '',
+            'entitynumber' => '',
+            'referenceid' => '',
+            'referencenumber' => '',
+            'swift_bic' => '',
+            'accountcurrency' => '',
+            'accountnumber' => '',
+            'accountholder' => '',
+            'iban' => '',
+            'qrcodeurl' => '',
+            'amounttopay' => '',
         );
     }
 
@@ -2982,9 +3417,12 @@ class Smart2pay extends PaymentModule
     {
         $method_id = (int)$method_id;
         if( empty( $method_id )
-         or empty( $params ) or !is_array( $params ) )
+         or empty( $params ) or !is_array( $params )
+         or !($plugin_settings_arr = $this->getSettings()) )
             return false;
 
+        if( empty( $params['environment'] ) )
+            $params['environment'] = $plugin_settings_arr['environment'];
         if( isset( $params['enabled'] ) )
             $params['enabled'] = (!empty( $params['enabled'] )?1:0);
         if( isset( $params['surcharge_amount'] ) )
@@ -2995,9 +3433,9 @@ class Smart2pay extends PaymentModule
             $params['priority'] = (int)$params['priority'];
 
         $new_settings_arr = array();
-        if( !($current_settings = $this->get_method_settings( $method_id )) )
+        if( !($current_settings = $this->get_method_settings( $method_id, $params['environment'] )) )
         {
-            // if payment method is new and we don't have a currency set return error...
+            // if payment method is new and we don't have a currency set, return error...
             if( empty( $params['surcharge_currency'] ) )
                 return false;
 
@@ -3013,6 +3451,7 @@ class Smart2pay extends PaymentModule
 
             $insert_arr = array();
             $insert_arr['method_id'] = $method_id;
+            $insert_arr['environment'] = $params['environment'];
             $insert_arr['enabled'] = $params['enabled'];
             $insert_arr['surcharge_percent'] = $params['surcharge_percent'];
             $insert_arr['surcharge_amount'] = $params['surcharge_amount'];
@@ -3039,7 +3478,6 @@ class Smart2pay extends PaymentModule
 
                 $new_settings_arr = $insert_arr;
             }
-
         } else
         {
             // we edit...
@@ -3061,12 +3499,11 @@ class Smart2pay extends PaymentModule
                 $edit_arr['last_update'] = array( 'raw_field' => true, 'value' => 'NOW()' );
             }
 
-
             if( !empty( $edit_arr ) )
             {
                 //if( !Db::getInstance()->update( 'smart2pay_method_settings', $edit_arr, 'method_id = \''.$method_id.'\'', 0, false, false ) )
                 if( !($sql = Smart2Pay_Helper::quick_edit( _DB_PREFIX_.'smart2pay_method_settings', $edit_arr ))
-                 or !Db::getInstance()->execute( $sql.' WHERE method_id = \''.$method_id.'\'' ) )
+                 or !Db::getInstance()->execute( $sql.' WHERE id = \''.$current_settings['id'].'\'' ) )
                     $new_settings_arr = false;
 
                 else
@@ -3276,25 +3713,32 @@ class Smart2pay extends PaymentModule
     /**
      * Check if s2p method is available in some particular country
      *
-     * @param int $method_id                 Method ID
-     * @param null|string $countryISOCode   If no iso code is passed along, method checks if module can detect a
+     * @param int $method_id Method ID
+     * @param null|string $country_iso If no iso code is passed along, method checks if module can detect a
      *     country, else attempts to retrieve it from context->cart->id_address_invoice
+     * @param string|bool $environment
      *
-     * @return bool
+     * @return bool|array
      */
-    public function method_details_if_available( $method_id, $country_iso = null )
+    public function method_details_if_available( $method_id, $country_iso = null, $environment = false )
     {
         $method_id = (int)$method_id;
         if( empty( $method_id ) )
             return false;
+
+        if( empty( $environment ) )
+        {
+            $plugin_settings_arr = $this->getSettings();
+            $environment = $plugin_settings_arr['environment'];
+        }
 
         /*
          * Check for base module to be active
          * Check for current module to be available
          */
         if( !Configuration::get( self::CONFIG_PREFIX.'ENABLED' )
-         or !($method_details = $this->get_method_details( $method_id ))
-         or !($method_settings = $this->get_method_settings( $method_id ))
+         or !($method_details = $this->get_method_details( $method_id, $environment ))
+         or !($method_settings = $this->get_method_settings( $method_id, $environment ))
          or empty( $method_details['active'] )
          or empty( $method_settings['enabled'] ) )
             return false;
@@ -3313,13 +3757,13 @@ class Smart2pay extends PaymentModule
                 return false;
         }
 
-        $this->writeLog( 'Using method ID ['.$method_id.'] for country ['.$country_iso.'].', array( 'type' => 'detection' ) );
+        $this->writeLog( 'Using method ID ['.$method_id.'] for country ['.$country_iso.'], environment ['.$environment.'].', array( 'type' => 'detection' ) );
 
         $country_method = Db::getInstance()->executeS(
             'SELECT CM.method_id '.
             ' FROM '._DB_PREFIX_.'smart2pay_country_method CM '.
             ' LEFT JOIN '._DB_PREFIX_.'smart2pay_country C ON C.country_id = CM.country_id '.
-            ' WHERE C.code = \''.pSQL( $country_iso ).'\' AND CM.method_id = ' . $method_id . ' AND CM.enabled = 1'
+            ' WHERE C.code = \''.pSQL( $country_iso ).'\' AND CM.method_id = '.$method_id.' AND CM.environment = \''.$environment.'\' AND CM.enabled = 1'
         );
 
         /*
@@ -3532,44 +3976,35 @@ class Smart2pay extends PaymentModule
             ),
             array(
                 'type' => 'text',
-                'label' => $this->l('Post URL Live'),
-                'name' => self::CONFIG_PREFIX.'POST_URL_LIVE',
-                'required' => true,
-                'size' => '80',
-                '_default' => 'https://api.smart2pay.com',
-                '_validate' => array( 'url', 'notempty' ),
-            ),
-            array(
-                'type' => 'text',
-                'label' => $this->l('Post URL Test'),
-                'name' => self::CONFIG_PREFIX.'POST_URL_TEST',
-                'required' => true,
-                'size' => '80',
-                '_default' => 'https://apitest.smart2pay.com',
-                '_validate' => array( 'url', 'notempty' ),
-            ),
-            array(
-                'type' => 'text',
-                'label' => $this->l('MID Live'),
-                'name' => self::CONFIG_PREFIX.'MID_LIVE',
-                'required' => true,
+                'label' => $this->l('Site ID Live'),
+                'name' => self::CONFIG_PREFIX.'SITE_ID_LIVE',
                 '_transform' => array( 'intval' ),
+                '_validate' => array( 'notempty' ),
+                'required' => true,
+            ),
+            array(
+                'type' => 'text',
+                'label' => $this->l('APIKey Live'),
+                'name' => self::CONFIG_PREFIX.'APIKEY_LIVE',
+                'required' => true,
+                '_transform' => array( 'trim' ),
                 '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
-                'label' => $this->l('MID Test'),
-                'name' => self::CONFIG_PREFIX.'MID_TEST',
-                'required' => true,
+                'label' => $this->l('Site ID Test'),
+                'name' => self::CONFIG_PREFIX.'SITE_ID_TEST',
                 '_transform' => array( 'intval' ),
                 '_validate' => array( 'notempty' ),
+                'required' => true,
             ),
             array(
                 'type' => 'text',
-                'label' => $this->l('Site ID'),
-                'name' => self::CONFIG_PREFIX.'SITE_ID',
-                '_transform' => array( 'intval' ),
+                'label' => $this->l('APIKey Test'),
+                'name' => self::CONFIG_PREFIX.'APIKEY_TEST',
                 'required' => true,
+                '_transform' => array( 'trim' ),
+                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
@@ -3577,22 +4012,6 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'SKIN_ID',
                 '_transform' => array( 'intval' ),
                 'required' => true,
-            ),
-            array(
-                'type' => 'text',
-                'label' => $this->l('Signature Live'),
-                'name' => self::CONFIG_PREFIX.'SIGNATURE_LIVE',
-                'required' => true,
-                '_transform' => array( 'trim' ),
-                '_validate' => array( 'notempty' ),
-            ),
-            array(
-                'type' => 'text',
-                'label' => $this->l('Signature Test'),
-                'name' => self::CONFIG_PREFIX.'SIGNATURE_TEST',
-                'required' => true,
-                '_transform' => array( 'trim' ),
-                '_validate' => array( 'notempty' ),
             ),
             array(
                 'type' => 'text',
@@ -3988,8 +4407,8 @@ class Smart2pay extends PaymentModule
                 `surcharge_order_amount` decimal(6,2) NOT NULL,
                 `surcharge_order_percent` decimal(6,2) NOT NULL,
                 `surcharge_order_currency` varchar(3) DEFAULT NULL COMMENT 'Currency ISO 3',
-                `last_update` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-                `created` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+                `last_update` timestamp NOT NULL DEFAULT NULL,
+                `created` timestamp NOT NULL DEFAULT NULL,
                  PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `payment_id` (`payment_id`), KEY `order_id` (`order_id`)
                 ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
 
@@ -4017,15 +4436,16 @@ class Smart2pay extends PaymentModule
 
         if( !Db::getInstance()->execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method_settings` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
+                `environment` varchar(50) default NULL,
                 `method_id` int(11) NOT NULL DEFAULT '0',
                 `enabled` tinyint(2) NOT NULL DEFAULT '0',
                 `surcharge_percent` decimal(6,2) NOT NULL DEFAULT '0.00',
                 `surcharge_amount` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT 'Amount of surcharge',
                 `surcharge_currency` varchar(3) DEFAULT NULL COMMENT 'ISO 3 currency code of fixed surcharge amount',
                 `priority` tinyint(4) NOT NULL DEFAULT '10' COMMENT '1 means first',
-                `last_update` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-                `configured` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-                PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `enabled` (`enabled`)
+                `last_update` timestamp NOT NULL DEFAULT NULL,
+                `configured` timestamp NOT NULL DEFAULT NULL,
+                PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `environment` (`environment`), KEY `enabled` (`enabled`)
                 ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Smart2Pay method configurations';
         ") )
             return false;
@@ -4049,136 +4469,16 @@ class Smart2pay extends PaymentModule
 
         Db::getInstance()->Execute( "DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_method`" );
         if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method` (
-                `method_id` int(11) NOT NULL AUTO_INCREMENT,
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `method_id` int(11) NOT NULL DEFAULT 0,
+                `environment` varchar(50) default NULL,
                 `display_name` varchar(255) default NULL,
-                `provider_value` varchar(255) default NULL,
                 `description` text ,
                 `logo_url` varchar(255) default NULL,
-                `guaranteed` int(1) default NULL,
-                `active` int(1) default NULL,
-                PRIMARY KEY (`method_id`), KEY `active` (`active`)
+                `guaranteed` int(1) default 0,
+                `active` tinyint(2) default 0,
+                PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `environment` (`environment`), KEY `active` (`active`)
             ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
-        ") )
-        {
-            $this->uninstallDatabase();
-            return false;
-        }
-
-        if( !Db::getInstance()->Execute("
-            INSERT INTO `" . _DB_PREFIX_ . "smart2pay_method` (`method_id`, `display_name`, `provider_value`, `description`, `logo_url`, `guaranteed`, `active`) VALUES
-            (1, 'Bank Transfer', 'banktransfer', 'Bank Transfer description', 'bank_transfer_logo_v6.png', 1, 1),
-            (2, 'iDEAL', 'ideal', 'iDEAL description', 'ideal.png', 1, 1),
-            (3, 'MrCash', 'mrcash', 'MrCash description', 'mrcash.png', 1, 1),
-            (4, 'Giropay', 'giropay', 'Giropay description', 'giropay.png', 1, 1),
-            (5, 'EPS', 'eps', 'EPS description', 'eps-e-payment-standard.png', 1, 1),
-            (8, 'UseMyFunds', 'umb', 'UseMyFunds description', 'umb.png', 1, 1),
-            (9, 'Sofort Banking', 'dp24', 'Sofort Banking description', 'dp24_sofort.png', 0, 1),
-            (12, 'Przelewy24', 'p24', 'Przelewy24 description', 'p24.png', 1, 1),
-            (13, 'OneCard', 'onecard', 'OneCard description', 'onecard.png', 1, 1),
-            (14, 'CashU', 'cashu', 'CashU description', 'cashu.png', 1, 1),
-            (18, 'POLi', 'poli', 'POLi description', 'poli.png', 0, 1),
-            (19, 'DineroMail', 'dineromail', 'DineroMail description', 'dineromail.png', 0, 1),
-            (20, 'Multibanco SIBS', 'sibs', 'Multibanco SIBS description', 'sibs_mb.png', 1, 1),
-            (22, 'Moneta Wallet', 'moneta', 'Moneta Wallet description', 'moneta.png', 1, 1),
-            (23, 'Paysera', 'paysera', 'Paysera description', 'paysera.gif', 1, 1),
-            (24, 'Alipay', 'alipay', 'Alipay description', 'alipay.png', 1, 1),
-            (25, 'Abaqoos', 'abaqoos', 'Abaqoos description', 'abaqoos.png', 1, 1),
-            (27, 'ePlatby for eKonto', 'ebanka', 'eBanka description', 'eKonto.png', 1, 1),
-            (28, 'Ukash', 'ukash', 'Ukash description', 'ukash.png', 1, 1),
-            (29, 'Trustly', 'trustly', 'Trustly description', 'trustly.png', 1, 1),
-            (32, 'Debito Banco do Brasil', 'debitobdb', 'Debito Banco do Brasil description', 'banco_do_brasil.gif', 1, 1),
-            (33, 'CuentaDigital', 'cuentadigital', 'CuentaDigital description', 'cuentadigital.png', 1, 0),
-            (34, 'CardsBrazil', 'cardsbrl', 'CardsBrazil description', 'cards_brl.gif', 0, 1),
-            (35, 'PaysBuy', 'paysbuy', 'PaysBuy description', 'paysbuy.png', 0, 1),
-            (36, 'Mazooma', 'mazooma', 'Mazooma description', 'mazooma.png', 0, 0),
-            (37, 'eNETS Debit', 'enets', 'eNETS Debit description', 'enets.png', 1, 1),
-            (40, 'Paysafecard', 'paysafecard', 'Paysafecard description', 'paysafecard.png', 1, 1),
-            (42, 'PayPal', 'paypal', 'PayPal description', 'paypal.png', 1, 0),
-            (43, 'PagTotal', 'pagtotal', 'PagTotal description', 'pagtotal.png', 0, 0),
-            (44, 'Payeasy', 'payeasy', 'Payeasy description', 'payeasy.png', 1, 1),
-            (46, 'MercadoPago', 'mercadopago', 'MercadoPago description', 'mercadopago.png', 0, 1),
-            (47, 'Mozca', 'mozca', 'Mozca description', 'mozca.png', 0, 0),
-            (49, 'ToditoCash', 'toditocash', 'ToditoCash description', 'todito_cash.png', 1, 1),
-            (58, 'PayWithMyBank', 'pwmb', 'PayWithMyBank description', 'pwmb.png', 1, 1),
-            (62, 'Tenpay', 'tenpay', 'Tenpay description', 'tenpay.png', 1, 1),
-            (63, 'TrustPay', 'trustpay', 'TrustPay description', 'trustpay.png', 1, 1),
-            (64, 'MangirKart', 'mangirkart', 'MangirKart description', 'mangir_cart.gif', 1, 1),
-            (65, 'Finish Banks', 'paytrail', 'Paytrail description', 'paytrail.gif', 1, 1),
-            (66, 'MTCPay', 'mtcpay', 'MTCPay description', 'mtcpay.png', 1, 1),
-            (67, 'DragonPay', 'dragonpay', 'DragonPay description', 'dragon_pay.png', 1, 1),
-            (69, 'Credit Card', 's2pcards', 'S2PCards Description', 's2p_cards.gif', 0, 1),
-            (72, 'PagoEfectivo', 'pagoefectivo', 'PagoEfectivo Description', 'pago_efectivo.gif', 1, 1),
-            (73, 'MyBank', 'mybank', 'MyBank Description', 'mybank.png', 1, 1),
-            (74, 'Yandex.Money', 'yandexmoney', 'YandexMoney description', 'yandex_money.png', 1, 1),
-            (75, 'Klarna Invoice', 'klarnainvoice', 'KlarnaInvoice description', 'klarna.gif', 1, 1),
-            (76, 'Bitcoin', 'bitcoin', 'Bitcoin description', 'bitcoin.png', 1, 1),
-            (77, 'VoguePay', 'voguepay', 'VoguePay Description', 'voguepay.gif', 1, 1),
-            (78, 'Skrill', 'skrill', 'Skrill Description', 'skrill.jpg', 1, 1),
-            (79, 'Pay by mobile', 'paybymobile', 'Pay by mobile Description', 'pay_by_mobile_v1.gif', 1, 1),
-            (81, 'WebMoney Transfer', 'webmoneytransfer', 'WebMoney Transfer Description', 'webmoney.gif', 1, 1),
-            (1000, 'Boleto', 'paganet', 'Boleto description', 'boleto_bancario.png', 1, 1),
-            (1001, 'Debito', 'paganet', 'Debito description', 'debito_bradesco.png', 1, 0),
-            (1002, 'Transferencia', 'paganet', 'Transferencia description', 'bradesco_transferencia.png', 1, 1),
-            (1003, 'QIWI Wallet', 'qiwi', 'QIWI Wallet description', 'qiwi_wallet.png', 1, 1),
-            (1004, 'Beeline', 'qiwi', 'Beeline description', 'beeline.png', 1, 1),
-            (1005, 'Megafon', 'qiwi', 'Megafon description', 'megafon.png', 1, 1),
-            (1006, 'MTS', 'qiwi', 'MTS description', 'mts.gif', 1, 1),
-            (1007, 'WebMoney', 'moneta', 'WebMoney description', 'webmoney.png', 1, 0),
-            (1008, 'Yandex', 'moneta', 'Yandex description', 'yandex.png', 1, 0),
-            (1009, 'Alliance Online', 'asiapay', 'Alliance Online description', 'alliance_online.gif', 1, 0),
-            (1010, 'AmBank', 'asiapay', 'AmBank description', 'ambank_group.png', 1, 1),
-            (1011, 'CIMB Clicks', 'asiapay', 'CIMB Clicks description', 'cimb_clicks.png', 1, 1),
-            (1012, 'FPX', 'asiapay', 'FPX description', 'fpx.png', 1, 1),
-            (1013, 'Hong Leong Bank Transfer', 'asiapay', 'Hong Leong Bank Transfer description', 'hong_leong.png', 1, 1),
-            (1014, 'Maybank2U', 'asiapay', 'Maybank2U description', 'maybank2u.png', 1, 1),
-            (1015, 'Meps Cash', 'asiapay', 'Meps Cash description', 'meps_cash.png', 1, 1),
-            (1016, 'Mobile Money', 'asiapay', 'Mobile Money description', 'mobile_money.png', 1, 1),
-            (1017, 'RHB', 'asiapay', 'RHB description', 'rhb.png', 1, 1),
-            (1018, 'Webcash', 'asiapay', 'Webcash description', 'web_cash.gif', 1, 0),
-            (1019, 'Credit Cards Colombia', 'pagosonline', 'Credit Cards Colombia description', 'cards_colombia.gif', 1, 1),
-            (1020, 'PSE', 'pagosonline', 'PSE description', 'pse.png', 1, 1),
-            (1021, 'ACH Debit', 'pagosonline', 'ACH Debit description', 'ach.png', 1, 1),
-            (1022, 'Via Baloto', 'pagosonline', 'Via Baloto description', 'payment_via_baloto.png', 1, 1),
-            (1023, 'Referenced Payment', 'pagosonline', 'Referenced Payment description', 'payment_references.png', 1, 1),
-            (1024, 'Mandiri', 'asiapay', 'Mandiri description', 'mandiri.png', 1, 1),
-            (1025, 'XL Tunai', 'asiapay', 'XL Tunai description', 'xltunai.png', 1, 1),
-            (1026, 'Bancomer Pago referenciado', 'dineromaildirect', 'Bancomer Pago referenciado description', 'bancomer.png', 1, 1),
-            (1027, 'Santander Pago referenciado', 'dineromaildirect', 'Santander Pago referenciado description', 'santander.gif', 1, 1),
-            (1028, 'ScotiaBank Pago referenciado', 'dineromaildirect', 'ScotiaBank Pago referenciado description', 'scotiabank.gif', 1, 1),
-            (1029, '7-Eleven Pago en efectivo', 'dineromaildirect', '7-Eleven Pago en efectivo description', '7-Eleven.gif', 1, 1),
-            (1030, 'Oxxo Pago en efectivo', 'dineromaildirect', 'Oxxo Pago en efectivo description', 'oxxo.gif', 1, 1),
-            (1031, 'IXE Pago referenciado', 'dineromaildirect', 'IXE Pago referenciado description', 'IXe.gif', 1, 1),
-            (1033, 'Cards Thailand', 'paysbuy', 'Cards Thailand description', 'cards_brl.gif', 1, 0),
-            (1034, 'PayPal Thailand', 'paysbuy', 'PayPalThailand description', 'paypal.png', 1, 0),
-            (1035, 'AMEXThailand', 'paysbuy', 'AMEXThailand description', 'american_express.png', 1, 0),
-            (1036, 'Cash Options Thailand', 'paysbuy', 'Cash Options Thailand description', 'counter-service-thailand_paysbuy-cash.png', 1, 1),
-            (1037, 'Online Banking Thailand', 'paysbuy', 'OnlineBankingThailand description', 'online_banking_thailanda.png', 1, 1),
-            (1038, 'PaysBuy Wallet', 'paysbuy', 'PaysBuy Wallet description', 'paysbuy.png', 1, 1),
-            (1039, 'Pagos en efectivo Chile', 'dineromaildirect', 'Pagos en efectivo Chile description', 'pagos_en_efectivo_servipag_bci_chile.png', 1, 1),
-            (1040, 'Pagos en efectivo Argentina', 'dineromaildirect', 'Pagos en efectivo Argentina description', 'argentina_banks.png', 1, 0),
-            (1041, 'OP-Pohjola', 'paytrail', 'OP-Pohjola description', 'op-pohjola.png', 1, 1),
-            (1042, 'Nordea', 'paytrail', 'Nordea description', 'nordea.png', 1, 1),
-            (1043, 'Danske bank', 'paytrail', 'Danske description', 'danske_bank.png', 1, 1),
-            (1044, 'Cash-in', 'yandexmoney', 'Cash-in description', 'cashinyandex.gif', 1, 1),
-            (1045, 'Cards Russia', 'yandexmoney', 'Cards Russia description', 's2p_cards.gif', 1, 1),
-            (1048, 'BankTransfer Japan', 'degica', 'BankTransfer Japan description', 'degica_bank_transfer.gif', 1, 1),
-            (1046, 'Konbini', 'degica', 'Konbini description', 'degica_kombini.png', 1, 1),
-            (1047, 'Cards Japan', 'cardsjapan', 'Cards Japan Description', 'degica_cards.gif', 1, 1),
-            (1049, 'PayEasy Japan', 'payeasyjapan', 'PayEasy Japan Description', 'degica_payeasy.gif', 1, 1),
-            (1050, 'WebMoney Japan', 'webmoneyjapan', 'WebMoney Japan Description', 'degica_webmoney.gif', 1, 1),
-            (1051, 'Globe GCash', 'dragonpay', 'Globe GCash description', 'gcashlogo.jpg', 1, 1),
-            (1052, 'Klarna Checkout', 'klarnacheckout', 'Klarna Checkout Description', 'klarna_checkout.gif', 1, 1),
-            (1053, 'Credit Cards Indonesia', 'creditcardsindonesia', 'Credit Cards Indonesia Description', '1053_credit_cards.gif', 1, 1),
-            (1054, 'BII VA', 'biiva', 'BII VA Description', '1054_BII-VA.gif', 1, 1),
-            (1055, 'Kartuku', 'kartuku', 'Kartuku Description', '1055_Kartuku.gif', 1, 1),
-            (1056, 'CIMB Clicks', 'cimbclicks', 'CIMBClicks Description', '1056_Cimb_Clicks.gif', 1, 1),
-            (1057, 'Mandiri e-Cash', 'mandiriecash', 'Mandiri e-Cash Description', '1057_Mandiri_ecash.gif', 1, 1),
-            (1058, 'IB Muamalat', 'ibmuamalat', 'IB Muamalat Description', '1058_IB_Muamalat.gif', 1, 1),
-            (1059, 'T-Cash', 'tcash', 'T-Cash Description', '1059_T-cash.gif', 1, 1),
-            (1060, 'Indosat Dompetku', 'indosatdompetku', 'Indosat Dompetku Description', '1060_Indosat_Dompetku.gif', 1, 1),
-            (1061, 'Mandiri ATM Automatic', 'mandiriatmautomatic', 'Mandiri ATM Automatic Description', '1061_Mandiri_atm_automatic.gif', 1, 1),
-            (1062, 'Pay4ME', 'pay4me', 'Pay4ME Description', '1062_pay4me.gif', 1, 1),
-            (1063, 'Danamon Online Banking', 'danamononlinebanking', 'Danamon Online Banking Description', '1063_Danamon.gif', 1, 1);
         ") )
         {
             $this->uninstallDatabase();
@@ -4199,253 +4499,251 @@ class Smart2pay extends PaymentModule
             return false;
         }
 
-
         if( !Db::getInstance()->Execute("
-            INSERT INTO `" . _DB_PREFIX_ . "smart2pay_country` (`country_id`, `code`, `name`) VALUES
-            (1, 'AD', 'Andorra'),
-            (2, 'AE', 'United Arab Emirates'),
-            (3, 'AF', 'Afghanistan'),
-            (4, 'AG', 'Antigua and Barbuda'),
-            (5, 'AI', 'Anguilla'),
-            (6, 'AL', 'Albania'),
-            (7, 'AM', 'Armenia'),
-            (8, 'AN', 'Netherlands Antilles'),
-            (9, 'AO', 'Angola'),
-            (10, 'AQ', 'Antarctica'),
-            (11, 'AR', 'Argentina'),
-            (12, 'AS', 'American Samoa'),
-            (13, 'AT', 'Austria'),
-            (14, 'AU', 'Australia'),
-            (15, 'AW', 'Aruba'),
-            (16, 'AZ', 'Azerbaijan'),
-            (17, 'BA', 'Bosnia & Herzegowina'),
-            (18, 'BB', 'Barbados'),
-            (19, 'BD', 'Bangladesh'),
-            (20, 'BE', 'Belgium'),
-            (21, 'BF', 'Burkina Faso'),
-            (22, 'BG', 'Bulgaria'),
-            (23, 'BH', 'Bahrain'),
-            (24, 'BI', 'Burundi'),
-            (25, 'BJ', 'Benin'),
-            (26, 'BM', 'Bermuda'),
-            (27, 'BN', 'Brunei Darussalam'),
-            (28, 'BO', 'Bolivia'),
-            (29, 'BR', 'Brazil'),
-            (30, 'BS', 'Bahamas'),
-            (31, 'BT', 'Bhutan'),
-            (32, 'BV', 'Bouvet Island'),
-            (33, 'BW', 'Botswana'),
-            (34, 'BY', 'Belarus (formerly known as Byelorussia)'),
-            (35, 'BZ', 'Belize'),
-            (36, 'CA', 'Canada'),
-            (37, 'CC', 'Cocos (Keeling) Islands'),
-            (38, 'CD', 'Congo, Democratic Republic of the (formerly Zalre)'),
-            (39, 'CF', 'Central African Republic'),
-            (40, 'CG', 'Congo'),
-            (41, 'CH', 'Switzerland'),
-            (42, 'CI', 'Ivory Coast (Cote d''Ivoire)'),
-            (43, 'CK', 'Cook Islands'),
-            (44, 'CL', 'Chile'),
-            (45, 'CM', 'Cameroon'),
-            (46, 'CN', 'China'),
-            (47, 'CO', 'Colombia'),
-            (48, 'CR', 'Costa Rica'),
-            (50, 'CU', 'Cuba'),
-            (51, 'CV', 'Cape Verde'),
-            (52, 'CX', 'Christmas Island'),
-            (53, 'CY', 'Cyprus'),
-            (54, 'CZ', 'Czech Republic'),
-            (55, 'DE', 'Germany'),
-            (56, 'DJ', 'Djibouti'),
-            (57, 'DK', 'Denmark'),
-            (58, 'DM', 'Dominica'),
-            (59, 'DO', 'Dominican Republic'),
-            (60, 'DZ', 'Algeria'),
-            (61, 'EC', 'Ecuador'),
-            (62, 'EE', 'Estonia'),
-            (63, 'EG', 'Egypt'),
-            (64, 'EH', 'Western Sahara'),
-            (65, 'ER', 'Eritrea'),
-            (66, 'ES', 'Spain'),
-            (67, 'ET', 'Ethiopia'),
-            (68, 'FI', 'Finland'),
-            (69, 'FJ', 'Fiji Islands'),
-            (70, 'FK', 'Falkland Islands (Malvinas)'),
-            (71, 'FM', 'Micronesia, Federated States of'),
-            (72, 'FO', 'Faroe Islands'),
-            (73, 'FR', 'France'),
-            (74, 'FX', 'France, Metropolitan'),
-            (75, 'GA', 'Gabon'),
-            (76, 'GB', 'United Kingdom'),
-            (77, 'GD', 'Grenada'),
-            (78, 'GE', 'Georgia'),
-            (79, 'GF', 'French Guiana'),
-            (80, 'GH', 'Ghana'),
-            (81, 'GI', 'Gibraltar'),
-            (82, 'GL', 'Greenland'),
-            (83, 'GM', 'Gambia'),
-            (84, 'GN', 'Guinea'),
-            (85, 'GP', 'Guadeloupe'),
-            (86, 'GQ', 'Equatorial Guinea'),
-            (87, 'GR', 'Greece'),
-            (88, 'GS', 'South Georgia and the South Sandwich Islands'),
-            (89, 'GT', 'Guatemala'),
-            (90, 'GU', 'Guam'),
-            (91, 'GW', 'Guinea-Bissau'),
-            (92, 'GY', 'Guyana'),
-            (93, 'HK', 'Hong Kong'),
-            (94, 'HM', 'Heard and McDonald Islands'),
-            (95, 'HN', 'Honduras'),
-            (96, 'HR', 'Croatia (local name: Hrvatska)'),
-            (97, 'HT', 'Haiti'),
-            (98, 'HU', 'Hungary'),
-            (99, 'ID', 'Indonesia'),
-            (100, 'IE', 'Ireland'),
-            (101, 'IL', 'Israel'),
-            (102, 'IN', 'India'),
-            (103, 'IO', 'British Indian Ocean Territory'),
-            (104, 'IQ', 'Iraq'),
-            (105, 'IR', 'Iran, Islamic Republic of'),
-            (106, 'IS', 'Iceland'),
-            (107, 'IT', 'Italy'),
-            (108, 'JM', 'Jamaica'),
-            (109, 'JO', 'Jordan'),
-            (110, 'JP', 'Japan'),
-            (111, 'KE', 'Kenya'),
-            (112, 'KG', 'Kyrgyzstan'),
-            (113, 'KH', 'Cambodia (formerly Kampuchea)'),
-            (114, 'KI', 'Kiribati'),
-            (115, 'KM', 'Comoros'),
-            (116, 'KN', 'Saint Kitts (Christopher) and Nevis'),
-            (117, 'KP', 'Korea, Democratic People''s Republic of (North Korea)'),
-            (118, 'KR', 'Korea, Republic of (South Korea)'),
-            (119, 'KW', 'Kuwait'),
-            (120, 'KY', 'Cayman Islands'),
-            (121, 'KZ', 'Kazakhstan'),
-            (122, 'LA', 'Lao People''s Democratic Republic (formerly Laos)'),
-            (123, 'LB', 'Lebanon'),
-            (124, 'LC', 'Saint Lucia'),
-            (125, 'LI', 'Liechtenstein'),
-            (126, 'LK', 'Sri Lanka'),
-            (127, 'LR', 'Liberia'),
-            (128, 'LS', 'Lesotho'),
-            (129, 'LT', 'Lithuania'),
-            (130, 'LU', 'Luxembourg'),
-            (131, 'LV', 'Latvia'),
-            (132, 'LY', 'Libyan Arab Jamahiriya'),
-            (133, 'MA', 'Morocco'),
-            (134, 'MC', 'Monaco'),
-            (135, 'MD', 'Moldova, Republic of'),
-            (136, 'MG', 'Madagascar'),
-            (137, 'MH', 'Marshall Islands'),
-            (138, 'MK', 'Macedonia, the Former Yugoslav Republic of'),
-            (139, 'ML', 'Mali'),
-            (140, 'MM', 'Myanmar (formerly Burma)'),
-            (141, 'MN', 'Mongolia'),
-            (142, 'MO', 'Macao (also spelled Macau)'),
-            (143, 'MP', 'Northern Mariana Islands'),
-            (144, 'MQ', 'Martinique'),
-            (145, 'MR', 'Mauritania'),
-            (146, 'MS', 'Montserrat'),
-            (147, 'MT', 'Malta'),
-            (148, 'MU', 'Mauritius'),
-            (149, 'MV', 'Maldives'),
-            (150, 'MW', 'Malawi'),
-            (151, 'MX', 'Mexico'),
-            (152, 'MY', 'Malaysia'),
-            (153, 'MZ', 'Mozambique'),
-            (154, 'NA', 'Namibia'),
-            (155, 'NC', 'New Caledonia'),
-            (156, 'NE', 'Niger'),
-            (157, 'NF', 'Norfolk Island'),
-            (158, 'NG', 'Nigeria'),
-            (159, 'NI', 'Nicaragua'),
-            (160, 'NL', 'Netherlands'),
-            (161, 'NO', 'Norway'),
-            (162, 'NP', 'Nepal'),
-            (163, 'NR', 'Nauru'),
-            (164, 'NU', 'Niue'),
-            (165, 'NZ', 'New Zealand'),
-            (166, 'OM', 'Oman'),
-            (167, 'PA', 'Panama'),
-            (168, 'PE', 'Peru'),
-            (169, 'PF', 'French Polynesia'),
-            (170, 'PG', 'Papua New Guinea'),
-            (171, 'PH', 'Philippines'),
-            (172, 'PK', 'Pakistan'),
-            (173, 'PL', 'Poland'),
-            (174, 'PM', 'St Pierre and Miquelon'),
-            (175, 'PN', 'Pitcairn Island'),
-            (176, 'PR', 'Puerto Rico'),
-            (177, 'PT', 'Portugal'),
-            (178, 'PW', 'Palau'),
-            (179, 'PY', 'Paraguay'),
-            (180, 'QA', 'Qatar'),
-            (181, 'RE', 'Reunion'),
-            (182, 'RO', 'Romania'),
-            (183, 'RU', 'Russian Federation'),
-            (184, 'RW', 'Rwanda'),
-            (185, 'SA', 'Saudi Arabia'),
-            (186, 'SB', 'Solomon Islands'),
-            (187, 'SC', 'Seychelles'),
-            (188, 'SD', 'Sudan'),
-            (189, 'SE', 'Sweden'),
-            (190, 'SG', 'Singapore'),
-            (191, 'SH', 'St Helena'),
-            (192, 'SI', 'Slovenia'),
-            (193, 'SJ', 'Svalbard and Jan Mayen Islands'),
-            (194, 'SK', 'Slovakia'),
-            (195, 'SL', 'Sierra Leone'),
-            (196, 'SM', 'San Marino'),
-            (197, 'SN', 'Senegal'),
-            (198, 'SO', 'Somalia'),
-            (199, 'SR', 'Suriname'),
-            (200, 'ST', 'Sco Tom'),
-            (201, 'SU', 'Union of Soviet Socialist Republics'),
-            (202, 'SV', 'El Salvador'),
-            (203, 'SY', 'Syrian Arab Republic'),
-            (204, 'SZ', 'Swaziland'),
-            (205, 'TC', 'Turks and Caicos Islands'),
-            (206, 'TD', 'Chad'),
-            (207, 'TF', 'French Southern and Antarctic Territories'),
-            (208, 'TG', 'Togo'),
-            (209, 'TH', 'Thailand'),
-            (210, 'TJ', 'Tajikistan'),
-            (211, 'TK', 'Tokelau'),
-            (212, 'TM', 'Turkmenistan'),
-            (213, 'TN', 'Tunisia'),
-            (214, 'TO', 'Tonga'),
-            (215, 'TP', 'East Timor'),
-            (216, 'TR', 'Turkey'),
-            (217, 'TT', 'Trinidad and Tobago'),
-            (218, 'TV', 'Tuvalu'),
-            (219, 'TW', 'Taiwan, Province of China'),
-            (220, 'TZ', 'Tanzania, United Republic of'),
-            (221, 'UA', 'Ukraine'),
-            (222, 'UG', 'Uganda'),
-            (223, 'UM', 'United States Minor Outlying Islands'),
-            (224, 'US', 'United States of America'),
-            (225, 'UY', 'Uruguay'),
-            (226, 'UZ', 'Uzbekistan'),
-            (227, 'VA', 'Holy See (Vatican City State)'),
-            (228, 'VC', 'Saint Vincent and the Grenadines'),
-            (229, 'VE', 'Venezuela'),
-            (230, 'VG', 'Virgin Islands (British)'),
-            (231, 'VI', 'Virgin Islands (US)'),
-            (232, 'VN', 'Viet Nam'),
-            (233, 'VU', 'Vanautu'),
-            (234, 'WF', 'Wallis and Futuna Islands'),
-            (235, 'WS', 'Samoa'),
-            (236, 'XO', 'West Africa'),
-            (237, 'YE', 'Yemen'),
-            (238, 'YT', 'Mayotte'),
-            (239, 'ZA', 'South Africa'),
-            (240, 'ZM', 'Zambia'),
-            (241, 'ZW', 'Zimbabwe'),
-            (242, 'PS', 'Palestinian Territory'),
-            (243, 'ME', 'Montenegro'),
-            (244, 'RS', 'Serbia')
-        ") )
+            INSERT INTO `" . _DB_PREFIX_ . "smart2pay_country` (`code`, `name`) VALUES
+            ('AD', 'Andorra'),
+            ('AE', 'United Arab Emirates'),
+            ('AF', 'Afghanistan'),
+            ('AG', 'Antigua and Barbuda'),
+            ('AI', 'Anguilla'),
+            ('AL', 'Albania'),
+            ('AM', 'Armenia'),
+            ('AN', 'Netherlands Antilles'),
+            ('AO', 'Angola'),
+            ('AQ', 'Antarctica'),
+            ('AR', 'Argentina'),
+            ('AS', 'American Samoa'),
+            ('AT', 'Austria'),
+            ('AU', 'Australia'),
+            ('AW', 'Aruba'),
+            ('AZ', 'Azerbaijan'),
+            ('BA', 'Bosnia & Herzegowina'),
+            ('BB', 'Barbados'),
+            ('BD', 'Bangladesh'),
+            ('BE', 'Belgium'),
+            ('BF', 'Burkina Faso'),
+            ('BG', 'Bulgaria'),
+            ('BH', 'Bahrain'),
+            ('BI', 'Burundi'),
+            ('BJ', 'Benin'),
+            ('BM', 'Bermuda'),
+            ('BN', 'Brunei Darussalam'),
+            ('BO', 'Bolivia'),
+            ('BR', 'Brazil'),
+            ('BS', 'Bahamas'),
+            ('BT', 'Bhutan'),
+            ('BV', 'Bouvet Island'),
+            ('BW', 'Botswana'),
+            ('BY', 'Belarus (formerly known as Byelorussia)'),
+            ('BZ', 'Belize'),
+            ('CA', 'Canada'),
+            ('CC', 'Cocos (Keeling) Islands'),
+            ('CD', 'Congo, Democratic Republic of the (formerly Zalre)'),
+            ('CF', 'Central African Republic'),
+            ('CG', 'Congo'),
+            ('CH', 'Switzerland'),
+            ('CI', 'Ivory Coast (Cote d''Ivoire)'),
+            ('CK', 'Cook Islands'),
+            ('CL', 'Chile'),
+            ('CM', 'Cameroon'),
+            ('CN', 'China'),
+            ('CO', 'Colombia'),
+            ('CR', 'Costa Rica'),
+            ('CU', 'Cuba'),
+            ('CV', 'Cape Verde'),
+            ('CX', 'Christmas Island'),
+            ('CY', 'Cyprus'),
+            ('CZ', 'Czech Republic'),
+            ('DE', 'Germany'),
+            ('DJ', 'Djibouti'),
+            ('DK', 'Denmark'),
+            ('DM', 'Dominica'),
+            ('DO', 'Dominican Republic'),
+            ('DZ', 'Algeria'),
+            ('EC', 'Ecuador'),
+            ('EE', 'Estonia'),
+            ('EG', 'Egypt'),
+            ('EH', 'Western Sahara'),
+            ('ER', 'Eritrea'),
+            ('ES', 'Spain'),
+            ('ET', 'Ethiopia'),
+            ('FI', 'Finland'),
+            ('FJ', 'Fiji Islands'),
+            ('FK', 'Falkland Islands (Malvinas)'),
+            ('FM', 'Micronesia, Federated States of'),
+            ('FO', 'Faroe Islands'),
+            ('FR', 'France'),
+            ('FX', 'France, Metropolitan'),
+            ('GA', 'Gabon'),
+            ('GB', 'United Kingdom'),
+            ('GD', 'Grenada'),
+            ('GE', 'Georgia'),
+            ('GF', 'French Guiana'),
+            ('GH', 'Ghana'),
+            ('GI', 'Gibraltar'),
+            ('GL', 'Greenland'),
+            ('GM', 'Gambia'),
+            ('GN', 'Guinea'),
+            ('GP', 'Guadeloupe'),
+            ('GQ', 'Equatorial Guinea'),
+            ('GR', 'Greece'),
+            ('GS', 'South Georgia and the South Sandwich Islands'),
+            ('GT', 'Guatemala'),
+            ('GU', 'Guam'),
+            ('GW', 'Guinea-Bissau'),
+            ('GY', 'Guyana'),
+            ('HK', 'Hong Kong'),
+            ('HM', 'Heard and McDonald Islands'),
+            ('HN', 'Honduras'),
+            ('HR', 'Croatia (local name: Hrvatska)'),
+            ('HT', 'Haiti'),
+            ('HU', 'Hungary'),
+            ('ID', 'Indonesia'),
+            ('IE', 'Ireland'),
+            ('IL', 'Israel'),
+            ('IN', 'India'),
+            ('IO', 'British Indian Ocean Territory'),
+            ('IQ', 'Iraq'),
+            ('IR', 'Iran, Islamic Republic of'),
+            ('IS', 'Iceland'),
+            ('IT', 'Italy'),
+            ('JM', 'Jamaica'),
+            ('JO', 'Jordan'),
+            ('JP', 'Japan'),
+            ('KE', 'Kenya'),
+            ('KG', 'Kyrgyzstan'),
+            ('KH', 'Cambodia (formerly Kampuchea)'),
+            ('KI', 'Kiribati'),
+            ('KM', 'Comoros'),
+            ('KN', 'Saint Kitts (Christopher) and Nevis'),
+            ('KP', 'Korea, Democratic People''s Republic of (North Korea)'),
+            ('KR', 'Korea, Republic of (South Korea)'),
+            ('KW', 'Kuwait'),
+            ('KY', 'Cayman Islands'),
+            ('KZ', 'Kazakhstan'),
+            ('LA', 'Lao People''s Democratic Republic (formerly Laos)'),
+            ('LB', 'Lebanon'),
+            ('LC', 'Saint Lucia'),
+            ('LI', 'Liechtenstein'),
+            ('LK', 'Sri Lanka'),
+            ('LR', 'Liberia'),
+            ('LS', 'Lesotho'),
+            ('LT', 'Lithuania'),
+            ('LU', 'Luxembourg'),
+            ('LV', 'Latvia'),
+            ('LY', 'Libyan Arab Jamahiriya'),
+            ('MA', 'Morocco'),
+            ('MC', 'Monaco'),
+            ('MD', 'Moldova, Republic of'),
+            ('MG', 'Madagascar'),
+            ('MH', 'Marshall Islands'),
+            ('MK', 'Macedonia, the Former Yugoslav Republic of'),
+            ('ML', 'Mali'),
+            ('MM', 'Myanmar (formerly Burma)'),
+            ('MN', 'Mongolia'),
+            ('MO', 'Macao (also spelled Macau)'),
+            ('MP', 'Northern Mariana Islands'),
+            ('MQ', 'Martinique'),
+            ('MR', 'Mauritania'),
+            ('MS', 'Montserrat'),
+            ('MT', 'Malta'),
+            ('MU', 'Mauritius'),
+            ('MV', 'Maldives'),
+            ('MW', 'Malawi'),
+            ('MX', 'Mexico'),
+            ('MY', 'Malaysia'),
+            ('MZ', 'Mozambique'),
+            ('NA', 'Namibia'),
+            ('NC', 'New Caledonia'),
+            ('NE', 'Niger'),
+            ('NF', 'Norfolk Island'),
+            ('NG', 'Nigeria'),
+            ('NI', 'Nicaragua'),
+            ('NL', 'Netherlands'),
+            ('NO', 'Norway'),
+            ('NP', 'Nepal'),
+            ('NR', 'Nauru'),
+            ('NU', 'Niue'),
+            ('NZ', 'New Zealand'),
+            ('OM', 'Oman'),
+            ('PA', 'Panama'),
+            ('PE', 'Peru'),
+            ('PF', 'French Polynesia'),
+            ('PG', 'Papua New Guinea'),
+            ('PH', 'Philippines'),
+            ('PK', 'Pakistan'),
+            ('PL', 'Poland'),
+            ('PM', 'St Pierre and Miquelon'),
+            ('PN', 'Pitcairn Island'),
+            ('PR', 'Puerto Rico'),
+            ('PT', 'Portugal'),
+            ('PW', 'Palau'),
+            ('PY', 'Paraguay'),
+            ('QA', 'Qatar'),
+            ('RE', 'Reunion'),
+            ('RO', 'Romania'),
+            ('RU', 'Russian Federation'),
+            ('RW', 'Rwanda'),
+            ('SA', 'Saudi Arabia'),
+            ('SB', 'Solomon Islands'),
+            ('SC', 'Seychelles'),
+            ('SD', 'Sudan'),
+            ('SE', 'Sweden'),
+            ('SG', 'Singapore'),
+            ('SH', 'St Helena'),
+            ('SI', 'Slovenia'),
+            ('SJ', 'Svalbard and Jan Mayen Islands'),
+            ('SK', 'Slovakia'),
+            ('SL', 'Sierra Leone'),
+            ('SM', 'San Marino'),
+            ('SN', 'Senegal'),
+            ('SO', 'Somalia'),
+            ('SR', 'Suriname'),
+            ('ST', 'Sco Tom'),
+            ('SU', 'Union of Soviet Socialist Republics'),
+            ('SV', 'El Salvador'),
+            ('SY', 'Syrian Arab Republic'),
+            ('SZ', 'Swaziland'),
+            ('TC', 'Turks and Caicos Islands'),
+            ('TD', 'Chad'),
+            ('TF', 'French Southern and Antarctic Territories'),
+            ('TG', 'Togo'),
+            ('TH', 'Thailand'),
+            ('TJ', 'Tajikistan'),
+            ('TK', 'Tokelau'),
+            ('TM', 'Turkmenistan'),
+            ('TN', 'Tunisia'),
+            ('TO', 'Tonga'),
+            ('TP', 'East Timor'),
+            ('TR', 'Turkey'),
+            ('TT', 'Trinidad and Tobago'),
+            ('TV', 'Tuvalu'),
+            ('TW', 'Taiwan, Province of China'),
+            ('TZ', 'Tanzania, United Republic of'),
+            ('UA', 'Ukraine'),
+            ('UG', 'Uganda'),
+            ('UM', 'United States Minor Outlying Islands'),
+            ('US', 'United States of America'),
+            ('UY', 'Uruguay'),
+            ('UZ', 'Uzbekistan'),
+            ('VA', 'Holy See (Vatican City State)'),
+            ('VC', 'Saint Vincent and the Grenadines'),
+            ('VE', 'Venezuela'),
+            ('VG', 'Virgin Islands (British)'),
+            ('VI', 'Virgin Islands (US)'),
+            ('VN', 'Viet Nam'),
+            ('VU', 'Vanautu'),
+            ('WF', 'Wallis and Futuna Islands'),
+            ('WS', 'Samoa'),
+            ('XO', 'West Africa'),
+            ('YE', 'Yemen'),
+            ('YT', 'Mayotte'),
+            ('ZA', 'South Africa'),
+            ('ZM', 'Zambia'),
+            ('ZW', 'Zimbabwe'),
+            ('PS', 'Palestinian Territory'),
+            ('ME', 'Montenegro'),
+            ('RS', 'Serbia');" ) )
         {
             $this->uninstallDatabase();
             return false;
@@ -4456,677 +4754,13 @@ class Smart2pay extends PaymentModule
         if( !Db::getInstance()->Execute("
             CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_country_method` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
+                `environment` varchar(50) default NULL,
                 `country_id` int(11) DEFAULT '0',
                 `method_id` int(11) DEFAULT '0',
                 `priority` int(2) DEFAULT '99',
                 `enabled` tinyint(2) DEFAULT '1' COMMENT 'Tells if country is active for method',
-                PRIMARY KEY (`id`), KEY `country_id` (`country_id`), KEY `method_id` (`method_id`), KEY `enabled` (`enabled`)
+                PRIMARY KEY (`id`), KEY `environment` (`environment`), KEY `country_id` (`country_id`), KEY `method_id` (`method_id`), KEY `enabled` (`enabled`)
             ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
-        ") )
-        {
-            $this->uninstallDatabase();
-            return false;
-        }
-
-
-        if( !Db::getInstance()->Execute("
-            INSERT INTO `" . _DB_PREFIX_ . "smart2pay_country_method` (`country_id`, `method_id`, `priority`) VALUES
-                (1,76,99),
-                (2,13,1),
-                (2,14,2),
-                (2,76,99),
-                (2,81,99),
-                (3,76,99),
-                (4,76,99),
-                (5,76,99),
-                (6,76,99),
-                (7,76,99),
-                (7,22,99),
-                (7,74,99),
-                (7,81,99),
-                (7,1003,99),
-                (8,76,99),
-                (9,76,99),
-                (10,76,99),
-                (11,76,99),
-                (11,40,99),
-                (11,69,99),
-                (12,76,99),
-                (13,5,1),
-                (13,40,2),
-                (13,9,3),
-                (13,28,4),
-                (13,1,5),
-                (13,23,6),
-                (13,69,7),
-                (13,76,99),
-                (13,75,99),
-                (13,78,99),
-                (13,1052,99),
-                (14,18,1),
-                (14,28,2),
-                (14,69,3),
-                (14,76,99),
-                (14,40,99),
-                (14,78,99),
-                (15,76,99),
-                (16,76,99),
-                (16,74,99),
-                (16,81,99),
-                (16,1003,99),
-                (17,69,2),
-                (17,76,99),
-                (17,78,99),
-                (18,76,99),
-                (19,76,99),
-                (20,3,1),
-                (20,40,2),
-                (20,1,3),
-                (20,9,4),
-                (20,28,5),
-                (20,69,6),
-                (20,76,99),
-                (20,73,99),
-                (20,78,99),
-                (21,76,99),
-                (22,1,1),
-                (22,63,2),
-                (22,69,3),
-                (22,76,99),
-                (22,40,99),
-                (22,78,99),
-                (22,81,99),
-                (23,13,1),
-                (23,14,2),
-                (23,76,99),
-                (24,76,99),
-                (25,76,99),
-                (26,76,99),
-                (27,76,99),
-                (28,76,99),
-                (29,46,1),
-                (29,32,2),
-                (29,34,2),
-                (29,1000,3),
-                (29,1002,4),
-                (29,28,6),
-                (29,19,8),
-                (29,76,99),
-                (30,76,99),
-                (31,76,99),
-                (32,76,99),
-                (33,76,99),
-                (34,76,99),
-                (34,74,1),
-                (34,22,2),
-                (34,1003,3),
-                (34,23,5),
-                (34,81,99),
-                (35,76,99),
-                (36,8,1),
-                (36,71,2),
-                (36,28,3),
-                (36,69,4),
-                (36,76,99),
-                (36,40,99),
-                (36,78,99),
-                (37,76,99),
-                (38,76,99),
-                (39,76,99),
-                (40,76,99),
-                (41,1,1),
-                (41,40,2),
-                (41,9,3),
-                (41,69,4),
-                (41,76,99),
-                (41,78,99),
-                (42,76,99),
-                (43,76,99),
-                (44,19,1),
-                (44,76,99),
-                (44,46,99),
-                (44,1039,99),
-                (45,76,99),
-                (46,24,1),
-                (46,62,2),
-                (46,28,3),
-                (46,76,99),
-                (46,81,99),
-                (47,1019,2),
-                (47,1020,3),
-                (47,1021,4),
-                (47,1022,5),
-                (47,1023,6),
-                (47,76,99),
-                (47,46,99),
-                (48,76,99),
-                (50,76,99),
-                (51,76,99),
-                (52,76,99),
-                (53,40,1),
-                (53,28,2),
-                (53,69,3),
-                (53,13,4),
-                (53,14,5),
-                (53,76,99),
-                (53,78,99),
-                (54,27,1),
-                (54,63,2),
-                (54,1,3),
-                (54,40,4),
-                (54,28,5),
-                (54,69,7),
-                (54,76,99),
-                (54,78,99),
-                (54,81,99),
-                (55,4,1),
-                (55,9,2),
-                (55,40,3),
-                (55,28,4),
-                (55,23,5),
-                (55,1,6),
-                (55,14,6),
-                (55,76,99),
-                (55,69,7),
-                (55,75,99),
-                (55,78,99),
-                (55,79,99),
-                (55,1052,99),
-                (56,76,99),
-                (57,29,1),
-                (57,1,2),
-                (57,40,3),
-                (57,28,4),
-                (57,69,5),
-                (57,76,99),
-                (57,75,99),
-                (57,78,99),
-                (57,1052,99),
-                (58,76,99),
-                (59,76,99),
-                (60,14,1),
-                (60,76,99),
-                (61,76,99),
-                (62,23,1),
-                (62,29,2),
-                (62,63,3),
-                (62,28,4),
-                (62,1,5),
-                (62,69,6),
-                (62,76,99),
-                (62,78,99),
-                (62,1003,99),
-                (62,81,99),
-                (63,13,1),
-                (63,14,2),
-                (63,76,99),
-                (64,76,99),
-                (65,76,99),
-                (66,29,1),
-                (66,1,2),
-                (66,28,3),
-                (66,40,3),
-                (66,14,4),
-                (66,9,5),
-                (66,69,7),
-                (66,76,99),
-                (66,78,99),
-                (67,76,99),
-                (68,65,1),
-                (68,40,2),
-                (68,69,3),
-                (68,29,4),
-                (68,28,5),
-                (68,1,6),
-                (68,1041,7),
-                (68,1042,8),
-                (68,1043,9),
-                (68,76,99),
-                (68,75,99),
-                (68,78,99),
-                (68,1052,99),
-                (69,76,99),
-                (70,76,99),
-                (71,76,99),
-                (72,76,99),
-                (73,1,1),
-                (73,40,2),
-                (73,14,3),
-                (73,28,4),
-                (73,73,5),
-                (73,9,6),
-                (73,69,7),
-                (73,76,99),
-                (73,78,99),
-                (74,76,99),
-                (75,76,99),
-                (76,9,1),
-                (76,1,2),
-                (76,40,3),
-                (76,28,4),
-                (76,23,5),
-                (76,14,6),
-                (76,69,8),
-                (76,76,99),
-                (76,78,99),
-                (76,1003,99),
-                (77,76,99),
-                (78,76,99),
-                (78,74,99),
-                (78,1003,99),
-                (79,76,99),
-                (80,14,1),
-                (80,76,99),
-                (81,76,99),
-                (82,76,99),
-                (83,76,99),
-                (84,76,99),
-                (85,76,99),
-                (86,76,99),
-                (87,40,1),
-                (87,28,2),
-                (87,69,3),
-                (87,76,99),
-                (87,78,99),
-                (88,76,99),
-                (89,76,99),
-                (90,76,99),
-                (91,76,99),
-                (92,76,99),
-                (93,76,99),
-                (94,76,99),
-                (95,76,99),
-                (96,63,1),
-                (96,69,2),
-                (96,76,99),
-                (96,40,99),
-                (96,78,99),
-                (97,76,99),
-                (98,25,1),
-                (98,28,2),
-                (98,63,3),
-                (98,1,4),
-                (98,9,4),
-                (98,40,5),
-                (98,69,6),
-                (98,76,99),
-                (98,78,99),
-                (99,1024,1),
-                (99,1025,2),
-                (99,76,99),
-                (99,1053,99),
-                (99,1054,99),
-                (99,1055,99),
-                (99,1056,99),
-                (99,1057,99),
-                (99,1058,99),
-                (99,1059,99),
-                (99,1060,99),
-                (99,1061,99),
-                (99,1062,99),
-                (99,1063,99),
-                (100,40,1),
-                (100,1,2),
-                (100,28,2),
-                (100,14,3),
-                (100,69,4),
-                (100,76,99),
-                (100,78,99),
-                (101,13,1),
-                (101,14,2),
-                (101,69,3),
-                (101,76,99),
-                (101,78,99),
-                (101,1003,99),
-                (101,81,99),
-                (102,76,99),
-                (102,1003,99),
-                (103,76,99),
-                (104,13,1),
-                (104,14,2),
-                (104,76,99),
-                (105,76,99),
-                (106,76,99),
-                (107,40,1),
-                (107,73,2),
-                (107,1,3),
-                (107,28,4),
-                (107,9,5),
-                (107,14,6),
-                (107,69,8),
-                (107,76,99),
-                (107,78,99),
-                (108,76,99),
-                (109,13,1),
-                (109,14,2),
-                (109,76,99),
-                (110,76,99),
-                (110,1048,99),
-                (110,1046,99),
-                (110,1047,99),
-                (110,1049,99),
-                (110,1050,99),
-                (110,1003,99),
-                (111,76,99),
-                (112,76,99),
-                (112,22,99),
-                (112,74,99),
-                (112,81,99),
-                (112,1003,99),
-                (113,76,99),
-                (114,76,99),
-                (115,76,99),
-                (116,76,99),
-                (117,76,99),
-                (118,76,99),
-                (118,1003,99),
-                (119,13,1),
-                (119,14,2),
-                (119,76,99),
-                (120,76,99),
-                (121,1003,1),
-                (121,76,99),
-                (121,22,99),
-                (121,74,99),
-                (121,81,99),
-                (122,76,99),
-                (123,13,1),
-                (123,14,2),
-                (123,76,99),
-                (124,76,99),
-                (125,76,99),
-                (126,76,99),
-                (127,76,99),
-                (128,76,99),
-                (129,23,1),
-                (129,1,3),
-                (129,69,4),
-                (129,76,99),
-                (129,40,99),
-                (129,78,99),
-                (129,1003,99),
-                (129,81,99),
-                (130,1,1),
-                (130,40,2),
-                (130,73,3),
-                (130,69,4),
-                (130,76,99),
-                (130,78,99),
-                (131,23,1),
-                (131,63,2),
-                (131,28,3),
-                (131,40,5),
-                (131,69,6),
-                (131,76,99),
-                (131,78,99),
-                (131,81,99),
-                (131,1003,99),
-                (132,76,99),
-                (133,76,99),
-                (134,76,99),
-                (135,76,99),
-                (135,22,99),
-                (135,74,99),
-                (135,81,99),
-                (135,1003,99),
-                (136,76,99),
-                (137,76,99),
-                (138,76,99),
-                (139,76,99),
-                (140,76,99),
-                (141,76,99),
-                (142,76,99),
-                (143,76,99),
-                (144,76,99),
-                (145,76,99),
-                (146,76,99),
-                (147,76,99),
-                (147,40,99),
-                (148,76,99),
-                (149,76,99),
-                (150,76,99),
-                (151,49,1),
-                (151,46,2),
-                (151,19,3),
-                (151,40,4),
-                (151,1026,5),
-                (151,1027,6),
-                (151,1028,7),
-                (151,1029,8),
-                (151,1030,9),
-                (151,28,10),
-                (151,1031,10),
-                (151,76,99),
-                (152,1010,2),
-                (152,1011,3),
-                (152,1012,4),
-                (152,1013,5),
-                (152,1014,6),
-                (152,1015,7),
-                (152,1016,8),
-                (152,1017,9),
-                (152,76,99),
-                (153,76,99),
-                (154,76,99),
-                (155,76,99),
-                (156,76,99),
-                (157,76,99),
-                (158,14,1),
-                (158,76,99),
-                (158,77,99),
-                (159,76,99),
-                (160,2,1),
-                (160,9,2),
-                (160,40,3),
-                (160,28,4),
-                (160,1,5),
-                (160,69,7),
-                (160,76,99),
-                (160,75,99),
-                (160,78,99),
-                (160,1052,99),
-                (161,1,1),
-                (161,40,3),
-                (161,28,4),
-                (161,69,5),
-                (161,76,99),
-                (161,75,99),
-                (161,78,99),
-                (161,1052,99),
-                (162,76,99),
-                (163,76,99),
-                (164,76,99),
-                (165,18,2),
-                (165,28,2),
-                (165,76,99),
-                (165,40,99),
-                (166,13,1),
-                (166,14,2),
-                (166,76,99),
-                (167,76,99),
-                (167,1003,99),
-                (168,40,1),
-                (168,76,99),
-                (168,72,99),
-                (169,76,99),
-                (170,76,99),
-                (171,44,1),
-                (171,67,2),
-                (171,76,99),
-                (171,1051,99),
-                (172,76,99),
-                (173,12,1),
-                (173,1,2),
-                (173,40,3),
-                (173,28,4),
-                (173,14,8),
-                (173,76,99),
-                (174,76,99),
-                (175,76,99),
-                (176,76,99),
-                (177,20,1),
-                (177,40,2),
-                (177,28,3),
-                (177,14,4),
-                (177,1,5),
-                (177,69,6),
-                (177,76,99),
-                (177,78,99),
-                (178,76,99),
-                (179,76,99),
-                (180,13,1),
-                (180,14,2),
-                (180,76,99),
-                (181,76,99),
-                (182,40,1),
-                (182,1,2),
-                (182,63,3),
-                (182,28,4),
-                (182,69,5),
-                (182,76,99),
-                (182,78,99),
-                (182,79,99),
-                (183,74,1),
-                (183,1003,2),
-                (183,22,3),
-                (183,1044,5),
-                (183,1045,6),
-                (183,1004,7),
-                (183,1005,8),
-                (183,1006,9),
-                (183,28,11),
-                (183,76,99),
-                (183,81,99),
-                (184,76,99),
-                (185,13,1),
-                (185,14,2),
-                (185,76,99),
-                (186,76,99),
-                (187,76,99),
-                (188,14,1),
-                (188,76,99),
-                (189,29,1),
-                (189,1,2),
-                (189,40,3),
-                (189,28,4),
-                (189,69,5),
-                (189,76,99),
-                (189,75,99),
-                (189,78,99),
-                (189,1052,99),
-                (190,37,1),
-                (190,76,99),
-                (191,76,99),
-                (192,63,1),
-                (192,40,2),
-                (192,28,3),
-                (192,14,4),
-                (192,69,5),
-                (192,76,99),
-                (192,78,99),
-                (193,76,99),
-                (194,1,1),
-                (194,63,2),
-                (194,40,3),
-                (194,69,6),
-                (194,76,99),
-                (194,78,99),
-                (195,76,99),
-                (196,76,99),
-                (197,76,99),
-                (198,76,99),
-                (199,76,99),
-                (200,76,99),
-                (201,76,99),
-                (202,76,99),
-                (203,76,99),
-                (204,76,99),
-                (205,76,99),
-                (206,76,99),
-                (207,76,99),
-                (208,76,99),
-                (209,35,1),
-                (209,1038,2),
-                (209,1036,3),
-                (209,1037,4),
-                (209,76,99),
-                (209,1003,99),
-                (210,76,99),
-                (210,22,99),
-                (210,74,99),
-                (210,81,99),
-                (210,1003,99),
-                (211,76,99),
-                (212,76,99),
-                (212,74,99),
-                (212,81,99),
-                (213,13,1),
-                (213,14,2),
-                (213,76,99),
-                (214,76,99),
-                (215,76,99),
-                (216,1,1),
-                (216,66,2),
-                (216,64,3),
-                (216,13,6),
-                (216,14,7),
-                (216,28,8),
-                (216,69,9),
-                (216,76,99),
-                (216,78,99),
-                (216,1003,99),
-                (216,81,99),
-                (217,76,99),
-                (218,76,99),
-                (219,76,99),
-                (220,76,99),
-                (221,74,1),
-                (221,22,2),
-                (221,1003,3),
-                (221,28,6),
-                (221,76,99),
-                (221,81,99),
-                (222,76,99),
-                (223,76,99),
-                (224,69,1),
-                (224,58,2),
-                (224,40,3),
-                (224,76,99),
-                (224,78,99),
-                (224,1003,99),
-                (225,76,99),
-                (225,40,99),
-                (226,76,99),
-                (226,74,99),
-                (226,1003,99),
-                (226,81,99),
-                (227,76,99),
-                (228,76,99),
-                (229,76,99),
-                (230,76,99),
-                (231,76,99),
-                (232,76,99),
-                (232,1003,99),
-                (232,81,99),
-                (233,76,99),
-                (234,76,99),
-                (235,76,99),
-                (236,76,99),
-                (237,76,99),
-                (238,76,99),
-                (239,28,1),
-                (239,76,99),
-                (240,76,99),
-                (241,76,99),
-                (242,13,1),
-                (242,14,1),
-                (242,76,99),
-                (243,69,2),
-                (243,76,99),
-                (243,78,99),
-                (244,69,2),
-                (244,76,99),
-                (244,78,99);
         ") )
         {
             $this->uninstallDatabase();

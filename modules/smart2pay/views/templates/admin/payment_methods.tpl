@@ -238,6 +238,7 @@ $(document).ready(function(){
 {/literal}
 </script>
 
+<a name="smart2pay_methods"></a>
 {if $smarty.const._PS_VERSION_ >= 1.6}
 <div class="panel">
     <div class="panel-heading">{l s='Payment Methods' mod='smart2pay'}</div>
@@ -249,13 +250,34 @@ $(document).ready(function(){
 {/if}
 
         {if empty( $payment_methods )}
-        <div style="text-align: center">{l s='No payment methods defined in database.' mod='smart2pay'}</div>
+        <div style="text-align: center">
+            {l s='No payment methods defined in database for %s environment.' sprintf=[$plugin_environment] mod='smart2pay'}
+            {l s='In order to update payment methods, please select desired environment from Environment drop-down option and then save settings.' mod='smart2pay'}<br/>
+            <br/>
+            {l s='Last syncronization' mod='smart2pay'}: {if empty( $last_sync_date )} {l s='Never' mod='smart2pay'} {else} {$last_sync_date} {/if}<br/>
+            <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_syncronization" name="s2p_payment_methods_syncronization">
+                <input type="submit" value="{l s='Syncronize Now' mod='smart2pay'}" name="submit_syncronize_methods" id="submit_syncronize_methods" class="button" />
+            </form>
+        </div>
+
         {else}
+        <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
+        <div style="text-align: center">
+            {l s='Displaying payment methods for %s environment.' sprintf=[$plugin_environment] mod='smart2pay'}
+            {l s='In order to update payment methods for other environments please select desired environment from Environment drop-down option and then save settings.' mod='smart2pay'}<br/>
+
+            {l s='Last syncronization' mod='smart2pay'}: {if empty( $last_sync_date )} {l s='Never' mod='smart2pay'} {else} {$last_sync_date} {/if}<br/>
+            {if empty( $time_to_launch_sync )}
+            <input type="submit" value="{l s='Syncronize Now' mod='smart2pay'}" name="submit_syncronize_methods" id="submit_syncronize_methods" class="button" />
+            {else}
+            {l s='Time untill syncronization is available' mod='smart2pay'}: {$time_to_launch_sync}
+            {/if}
+            <br/><br/>
+        </div>
         <small>
             {l s='If you want to prioritize payment methods when displaying them at checkout, use Priority column. Lower values will display payment method higher on the page.' mod='smart2pay'}<br/>
             {l s='NOTE: Payment method settings apply for all stores.' mod='smart2pay'}
         </small>
-        <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_configuration" name="s2p_payment_methods_configuration">
         <table class="table" style="width: 100%; margin: 0 auto;">
             <thead>
             <tr>
@@ -281,7 +303,7 @@ $(document).ready(function(){
                         <input type="hidden" name="enabled_method_countries[{$payment_method.method_id}]" id="enabled_method_countries_{$payment_method.method_id}" value="{if !empty( $comma_countries_methods[$payment_method.method_id] )}{$comma_countries_methods[$payment_method.method_id]}{/if}" />
                         <input type="checkbox" name="enabled_methods[]" id="enabled_methods_{$payment_method.method_id}" value="{$payment_method.method_id}" {if !empty( $payment_method_settings[$payment_method.method_id] )} checked="checked" {/if} />
                     </td>
-                    <td style="width: 150px; text-align: center;"><label for="enabled_methods_{$payment_method.method_id}" style="text-align:center !important;"><img src="{$logos_path}{$payment_method.logo_url}" style="max-width: 150px;" /></label></td>
+                    <td style="width: 150px; text-align: center;"><label for="enabled_methods_{$payment_method.method_id}" style="text-align:center !important;"><img src="{$payment_method.logo_url}" style="max-width: 150px;" /></label></td>
                     <td>
                         <strong id="method_anchor_{$payment_method.method_id}">{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong><br/>
                         <a href="javascript:void(0);" style="text-decoration: underline;" onclick="customize_method_countries( {$payment_method.method_id} )">{l s='Customize countries' mod='smart2pay'}</a>

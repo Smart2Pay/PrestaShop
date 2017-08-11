@@ -18,6 +18,196 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
 {
     class Smart2Pay_Helper
     {
+        /**
+         * Returns total amount for shipping
+         *
+         * @param Cart $cart_obj
+         *
+         * @return float Shipping total
+         */
+        public static function get_total_shipping_cost( $cart_obj )
+        {
+            if( version_compare( _PS_VERSION_, '1.5', '>=' ) )
+                return $cart_obj->getTotalShippingCost();
+
+            return $cart_obj->getOrderShippingCost();
+        }
+
+        public static function cart_products_to_string( $products_arr, $cart_original_amount, $params = false )
+        {
+            $return_arr = array();
+            $return_arr['total_check'] = 0;
+            $return_arr['total_to_pay'] = 0;
+            $return_arr['total_before_difference_amount'] = 0;
+            $return_arr['total_difference_amount'] = 0;
+            $return_arr['surcharge_difference_amount'] = 0;
+            $return_arr['surcharge_difference_index'] = 0;
+            $return_arr['buffer'] = '';
+            $return_arr['articles_arr'] = array();
+            $return_arr['articles_meta_arr'] = array();
+
+            $cart_original_amount = floatval( $cart_original_amount );
+
+            if( $cart_original_amount == 0
+             or empty( $products_arr ) or !is_array( $products_arr ) )
+                return $return_arr;
+
+            if( empty( $params ) or !is_array( $params ) )
+                $params = array();
+
+            if( empty( $params['transport_amount'] ) )
+                $params['transport_amount'] = 0;
+            if( empty( $params['total_surcharge'] ) )
+                $params['total_surcharge'] = 0;
+            if( empty( $params['amount_to_pay'] ) )
+                $params['amount_to_pay'] = $cart_original_amount;
+
+            $amount_to_pay = floatval( $params['amount_to_pay'] );
+
+            $return_arr['total_to_pay'] = $amount_to_pay;
+
+            $articles_arr = array();
+            $articles_meta_arr = array();
+            $articles_knti = 0;
+            $items_total_amount = 0;
+            $biggest_price = 0;
+            $biggest_price_knti = 0;
+            foreach( $products_arr as $product_arr )
+            {
+                if( empty( $product_arr ) or !is_array( $product_arr ) )
+                    continue;
+
+                // 1 => 'Product', 2 => 'Shipping', 3 => 'Handling',
+                $article_arr = array();
+                $article_arr['ID'] = $product_arr['id_product'];
+                $article_arr['Name'] = $product_arr['name'];
+                $article_arr['Quantity'] = $product_arr['quantity'];
+                $article_arr['Price'] = Tools::ps_round( $product_arr['price_wt'], 2 );
+                $article_arr['VAT'] = Tools::ps_round( $product_arr['rate'], 2 );
+                // $article_arr['Discount'] = 0;
+                $article_arr['Type'] = 1;
+
+                if( $article_arr['Price'] > $biggest_price )
+                    $biggest_price_knti = $articles_knti;
+
+                $articles_arr[$articles_knti] = $article_arr;
+
+                $article_meta_arr = array();
+                $article_meta_arr['total_price'] = $article_arr['Price'] * $article_arr['Quantity'];
+                $article_meta_arr['price_perc'] = ($article_meta_arr['total_price'] * 100) / $cart_original_amount;
+                $article_meta_arr['surcharge_amount'] = 0;
+
+                $articles_meta_arr[$articles_knti] = $article_meta_arr;
+
+                $items_total_amount += $article_meta_arr['total_price'];
+
+                $articles_knti++;
+            }
+
+            if( empty( $articles_arr ) )
+                return $return_arr;
+
+            if( $params['transport_amount'] != 0 )
+            {
+                // 1 => 'Product', 2 => 'Shipping', 3 => 'Handling',
+                $article_arr = array();
+                $article_arr['ID'] = 0;
+                $article_arr['Name'] = 'Transport';
+                $article_arr['Quantity'] = 1;
+                $article_arr['Price'] = Tools::ps_round( $params['transport_amount'], 2 );
+                $article_arr['VAT'] = 0;
+                //$article_arr['Discount'] = 0;
+                $article_arr['Type'] = 2;
+
+                $articles_arr[$articles_knti] = $article_arr;
+
+                $article_meta_arr = array();
+                $article_meta_arr['total_price'] = $article_arr['Price'] * $article_arr['Quantity'];
+                $article_meta_arr['price_perc'] = 0;
+                $article_meta_arr['surcharge_amount'] = 0;
+
+                $articles_meta_arr[$articles_knti] = $article_meta_arr;
+
+                $items_total_amount += $article_meta_arr['total_price'];
+
+                $articles_knti++;
+            }
+
+            // Apply surcharge (if required) depending on product price percentage of full amount
+            $total_surcharge = 0;
+            if( $params['total_surcharge'] != 0 )
+            {
+                $total_surcharge = $params['total_surcharge'];
+                foreach( $articles_arr as $knti => $article_arr )
+                {
+                    if( $articles_arr[$knti]['Type'] != 1 )
+                        continue;
+
+                    $total_article_surcharge = (($articles_meta_arr[$knti]['price_perc'] * $params['total_surcharge'])/100);
+
+                    $article_unit_surcharge = Tools::ps_round( $total_article_surcharge/$articles_arr[$knti]['Quantity'], 2 );
+
+                    $articles_arr[$knti]['Price'] += $article_unit_surcharge;
+                    $articles_meta_arr[$knti]['surcharge_amount'] = $article_unit_surcharge;
+
+                    $items_total_amount += ($article_unit_surcharge * $articles_arr[$knti]['Quantity']);
+                    $total_surcharge -= ($article_unit_surcharge * $articles_arr[$knti]['Quantity']);
+                }
+
+                // If after applying all surcharge amounts as percentage of each product price we still have a difference, apply difference on product with biggest price
+                if( $total_surcharge != 0 )
+                {
+                    $article_unit_surcharge = Tools::ps_round( $total_surcharge/$articles_arr[$biggest_price_knti]['Quantity'], 2 );
+
+                    $articles_arr[$biggest_price_knti]['Price'] += $article_unit_surcharge;
+                    $articles_meta_arr[$biggest_price_knti]['surcharge_amount'] += $article_unit_surcharge;
+                    $items_total_amount += ($article_unit_surcharge * $articles_arr[$biggest_price_knti]['Quantity']);
+
+                    $return_arr['surcharge_difference_amount'] = $total_surcharge;
+                    $return_arr['surcharge_difference_index'] = $biggest_price_knti;
+                }
+            }
+
+            $return_arr['total_before_difference_amount'] = $items_total_amount;
+
+            // If we still have a difference apply it on biggest price product
+            if( Tools::ps_round( $items_total_amount, 2 ) != Tools::ps_round( $amount_to_pay, 2 ) )
+            {
+                $amount_diff = Tools::ps_round( ($amount_to_pay - $items_total_amount)/$articles_arr[$biggest_price_knti]['Quantity'], 2 );
+
+                $articles_arr[$biggest_price_knti]['Price'] += $amount_diff;
+
+                $return_arr['total_difference_amount'] = Tools::ps_round( $amount_to_pay - $items_total_amount, 2 );
+            }
+
+            $total_check = 0;
+            foreach( $articles_arr as $knti => $article_arr )
+            {
+                $total_check += ($article_arr['Price'] * $article_arr['Quantity']);
+
+                $article_arr['Price'] = $article_arr['Price'] * 100;
+                $article_arr['VAT'] = $article_arr['VAT'] * 100;
+                //$article_arr['Discount'] = $article_arr['Discount'] * 100;
+
+                $article_buf = '';
+                foreach( $article_arr as $key => $val )
+                {
+                    $article_buf .= ($article_buf!=''?'&':'').$key.'='.str_replace( array( '&', ';', '=' ), ' ', $val );
+                }
+
+                $return_arr['buffer'] .= $article_buf.';';
+            }
+
+            $return_arr['buffer'] = substr( $return_arr['buffer'], 0, -1 );
+
+            // $return_arr['buffer'] = rawurlencode( $return_arr['buffer'] );
+
+            $return_arr['total_check'] = $total_check;
+            $return_arr['articles_arr'] = $articles_arr;
+            $return_arr['articles_meta_arr'] = $articles_meta_arr;
+
+            return $return_arr;
+        }
 
         /**
          * @param Order $order
@@ -47,6 +237,21 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
                 Mail::Send( $id_lang, $template, $subject, $templateVars, $to,
                     $toName, $from, $fromName, $fileAttachment, $modeSMTP,
                     $templatePath, $die );
+        }
+
+        public static function get_documentation_file_name()
+        {
+            return 'Smart2Pay_PrestaShop_Integration_Guide.pdf';
+        }
+
+        public static function get_documentation_url()
+        {
+            return Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/smart2pay/'.self::get_documentation_file_name();
+        }
+
+        public static function get_documentation_path()
+        {
+            return _PS_MODULE_DIR_.'smart2pay/'.self::get_documentation_file_name();
         }
 
         public static function get_return_url( $module_name )

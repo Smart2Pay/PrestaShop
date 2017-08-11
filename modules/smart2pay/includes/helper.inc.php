@@ -18,11 +18,15 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
 {
     class Smart2Pay_Helper
     {
+        const SQL_DATETIME = 'Y-m-d H:i:s', EMPTY_DATETIME = '0000-00-00 00:00:00';
+        const SQL_DATE = 'Y-m-d', EMPTY_DATE = '0000-00-00';
 
         /**
          * Returns total amount for shipping
          *
          * @param Cart $cart_obj
+         *
+         * @return float Shipping total
          */
         public static function get_total_shipping_cost( $cart_obj )
         {
@@ -65,7 +69,6 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
 
             $return_arr['total_to_pay'] = $amount_to_pay;
 
-            $return_str = '';
             $articles_arr = array();
             $articles_meta_arr = array();
             $articles_knti = 0;
@@ -747,6 +750,52 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
             return $recomposedHashString;
         }
 
+        public static function validate_db_date( $str )
+        {
+            return date( self::SQL_DATE, self::parse_db_date( $str ) );
+        }
+
+        public static function validate_db_datetime( $str )
+        {
+            return date( self::SQL_DATETIME, self::parse_db_date( $str ) );
+        }
+
+        static function parse_db_date( $str )
+        {
+            $str = trim( $str );
+            if( strstr( $str, ' ' ) )
+            {
+                $d = explode( ' ', $str );
+                $date_ = explode( '-', $d[0] );
+                $time_ = explode( ':', $d[1] );
+            } else
+                $date_ = explode( '-', $str );
+
+            for( $i = 0; $i < 3; $i++ )
+            {
+                if( !isset( $date_[$i] ) )
+                    $date_[$i] = 0;
+                if( isset( $time_ ) and !isset( $time_[$i] ) )
+                    $time_[$i] = 0;
+            }
+
+            if( !empty( $date_ ) and is_array( $date_ ) )
+                foreach( $date_ as $key => $val )
+                    $date_[$key] = intval( $val );
+            if( !empty( $time_ ) and is_array( $time_ ) )
+                foreach( $time_ as $key => $val )
+                    $time_[$key] = intval( $val );
+
+            if( isset( $time_ ) )
+                return mktime( $time_[0], $time_[1], $time_[2], $date_[1], $date_[2], $date_[0] );
+            else
+                return mktime( 0, 0, 0, $date_[1], $date_[2], $date_[0] );
+        }
+
+        static function seconds_passed( $str )
+        {
+            return time() - self::parse_db_date( $str );
+        }
 
     }
 }

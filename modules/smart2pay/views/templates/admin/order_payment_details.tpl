@@ -82,7 +82,7 @@
                 -->
         {/if}
 
-        {foreach from=$transaction_extra_titles key=key item=val name=transtitles}
+        {foreach from=$transaction_extra_titles_rest key=key item=val name=transtitles}
             {if empty( $transaction_extra_data[$key] )}
                 {continue}
             {/if}
