@@ -30,6 +30,11 @@ if( !class_exists( 'Smart2Pay_SDK_Interface', false ) )
 
         private static $_sdk_inited = false;
 
+        /**
+         * Smart2Pay_SDK_Interface constructor.
+         *
+         * @param Smart2pay $s2p_plugin
+         */
         public function __construct( $s2p_plugin )
         {
             parent::__construct();
@@ -549,7 +554,9 @@ if( !class_exists( 'Smart2Pay_SDK_Interface', false ) )
                 {
                     if( $this->update_method_countries( $saved_method, $method_arr['countries'] ) === false )
                     {
-                        $this->set_error( self::ERR_GENERIC, $s2p_plugin->l( 'Error updating method countries.' ) );
+                        if( !$this->has_error() )
+                            $this->set_error( self::ERR_GENERIC, $s2p_plugin->l( 'Error updating method countries.' ) );
+
                         return false;
                     }
                 }
@@ -639,7 +646,7 @@ if( !class_exists( 'Smart2Pay_SDK_Interface', false ) )
                      or !Db::getInstance()->execute( $sql ) )
                     {
                         if( !$this->has_error() )
-                            $this->set_error( self::ERR_GENERIC, $s2p_plugin->l( 'Error saving method countries.' ) );
+                            $this->set_error( self::ERR_GENERIC, $s2p_plugin->l( 'Error saving method countries ['.$sql.'].' ) );
                         return false;
                     }
 

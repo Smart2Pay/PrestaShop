@@ -82,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.0';
+        $this->version = '2.0.2';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -1755,8 +1755,6 @@ class Smart2pay extends PaymentModule
          * Set default module config
          *
          */
-        $this->createCustomOrderStatuses();
-
         foreach( $this->getConfigFormInputs() as $setting )
         {
             switch( $setting['name'] )
@@ -1774,6 +1772,8 @@ class Smart2pay extends PaymentModule
                 break;
             }
         }
+
+        $this->createCustomOrderStatuses();
 
         self::$maintenance_functionality = false;
 
@@ -4112,11 +4112,14 @@ class Smart2pay extends PaymentModule
             ),
             array(
                 'type' => 'text',
-                'label' => $this->l('Custom product description'),
+                'label' => $this->l('Custom payment description'),
                 'name' => self::CONFIG_PREFIX.'CUSTOM_PRODUCT_DESCRIPTION',
                 'required' => true,
                 'size' => '80',
-                '_default' => 'Custom product description',
+                'desc' => array(
+                    $this->l( 'eg. Payment on our web shop' ),
+                ),
+                '_default' => 'Custom payment description',
                 '_validate' => array( 'notempty' ),
             ),
             array(
@@ -4304,6 +4307,9 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'MESSAGE_SUCCESS',
                 'required' => true,
                 'size' => '80',
+                'desc' => array(
+                    $this->l( 'eg. The payment succeeded' ),
+                ),
                 '_default' => 'The payment succeeded',
                 '_validate' => array( 'notempty' ),
             ),
@@ -4313,6 +4319,9 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'MESSAGE_FAILED',
                 'required' => true,
                 'size' => '80',
+                'desc' => array(
+                    $this->l( 'eg. The payment process has failed' ),
+                ),
                 '_default' => 'The payment process has failed',
                 '_validate' => array( 'notempty' ),
             ),
@@ -4322,6 +4331,9 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'MESSAGE_CANCELED',
                 'required' => true,
                 'size' => '80',
+                'desc' => array(
+                    $this->l( 'eg. The payment was canceled' ),
+                ),
                 '_default' => 'The payment was canceled',
                 '_validate' => array( 'notempty' ),
             ),
@@ -4331,6 +4343,9 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'MESSAGE_PENDING',
                 'required' => true,
                 'size' => '80',
+                'desc' => array(
+                    $this->l( 'eg. The payment is pending' ),
+                ),
                 '_default' => 'The payment is pending',
                 '_validate' => array( 'notempty' ),
             ),
@@ -4820,6 +4835,8 @@ class Smart2pay extends PaymentModule
 
             if( !empty( $status['icon'] )
             and @file_exists( _PS_MODULE_DIR_.$this->name.'/views/img/statuses/'.$status['icon'] )
+            and @is_dir( _PS_IMG_DIR_.'os' )
+            and @is_writable( _PS_IMG_DIR_.'os' )
             and !@file_exists( _PS_IMG_DIR_.'os/'.$statusID.'.gif' ) )
                 @copy( _PS_MODULE_DIR_.$this->name.'/views/img/statuses/'.$status['icon'], _PS_IMG_DIR_.'os/'.$statusID.'.gif' );
 
