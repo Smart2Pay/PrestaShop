@@ -82,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.2';
+        $this->version = '2.0.3';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -99,6 +99,19 @@ class Smart2pay extends PaymentModule
         $this->create_context();
 
         $this->_init_sdk_instance();
+    }
+
+    public function foobar( $str )
+    {
+        // if( !($fil = @fopen( '/home/andy/prestashop.log', 'a' )) )
+        //     return false;
+        //
+        // @fputs( $fil, date( 'd-m-Y H:i:s' ).' - '.$str."\n" );
+        //
+        // @fflush( $fil );
+        // @fclose( $fil );
+        //
+        return true;
     }
 
     private function _init_sdk_instance()
@@ -529,7 +542,7 @@ class Smart2pay extends PaymentModule
 
         if( !($new_transaction = $this->save_transaction( $transaction_arr )) )
         {
-            $this->writeLog( 'Failed creating transaction for order ['.$orderID.'].', array( 'type' => 'error' ) );
+            $this->writeLog( 'Failed creating transaction for order ['.$orderID.'].', array( 'type' => 'error', 'order_id' => $orderID ) );
 
             $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Failed creating transaction for order. Please try again.' ) ) ) );
 
@@ -568,7 +581,7 @@ class Smart2pay extends PaymentModule
 
         $payment_arr = array();
         $payment_arr['merchanttransactionid'] = $merchant_transaction_id;
-        $payment_arr['amount'] = $amount_to_pay * 100;
+        $payment_arr['amount'] = number_format( $amount_to_pay, 2, '.', '' ) * 100;
         $payment_arr['currency'] = $cart_currency->iso_code;
         $payment_arr['methodid'] = $method_id;
         $payment_arr['description'] = $payment_description;
@@ -638,7 +651,7 @@ class Smart2pay extends PaymentModule
                 else
                     $error_msg = 'Call error: '.$sdk_obj->get_error_message();
 
-                $this->writeLog( $error_msg, array( 'type' => 'error' ) );
+                $this->writeLog( $error_msg, array( 'type' => 'error', 'order_id' => $orderID ) );
                 $this->redirect_to_step1( array( 'errors' => array( $error_msg ) ) );
 
                 exit;
@@ -652,7 +665,7 @@ class Smart2pay extends PaymentModule
                 else
                     $error_msg = 'Call error: '.$sdk_obj->get_error_message();
 
-                $this->writeLog( $error_msg, array( 'type' => 'error' ) );
+                $this->writeLog( $error_msg, array( 'type' => 'error', 'order_id' => $orderID ) );
                 $this->redirect_to_step1( array( 'errors' => array( $error_msg ) ) );
 
                 exit;
@@ -687,7 +700,7 @@ class Smart2pay extends PaymentModule
 
         if( !($new_transaction = $this->save_transaction( $transaction_arr )) )
         {
-            $this->writeLog( 'Failed saving transaction with payment id ['.$transaction_arr['payment_id'].'] for order ['.$orderID.'].', array( 'type' => 'error' ) );
+            $this->writeLog( 'Failed saving transaction with payment id ['.$transaction_arr['payment_id'].'] for order ['.$orderID.'].', array( 'type' => 'error', 'order_id' => $orderID ) );
 
             $this->redirect_to_step1( array( 'errors' => array( $this->l( 'Failed saving transaction for order. Please try again.' ) ) ) );
 
@@ -698,13 +711,13 @@ class Smart2pay extends PaymentModule
         if( empty( $payment_request['redirecturl'] ) )
         {
             $error_msg = 'Redirect URL not provided in API response. Please try again.';
-            $this->writeLog( $error_msg, array( 'type' => 'error' ) );
+            $this->writeLog( $error_msg, array( 'type' => 'error', 'order_id' => $orderID ) );
             $this->redirect_to_step1( array( 'errors' => array( $error_msg ) ) );
 
             exit;
         }
 
-        $this->writeLog( 'Redirecting to payment page for payment id ['.$transaction_arr['payment_id'].'], order ['.$orderID.'].', array( 'type' => 'error' ) );
+        $this->writeLog( 'Redirecting to payment page for payment id ['.$transaction_arr['payment_id'].'], order ['.$orderID.'].', array( 'order_id' => $orderID ) );
 
         Tools::redirect( $payment_request['redirecturl'] );
 
@@ -1328,7 +1341,8 @@ class Smart2pay extends PaymentModule
         /**
          * Check submit for payment method settings
          */
-        elseif( Tools::isSubmit( 'submit_payment_methods' ) )
+        elseif( Tools::isSubmit( 'submit_payment_methods' )
+             or Tools::isSubmit( 'submit_payment_methods_2' ) )
         {
             $post_data['submit'] = 'submit_payment_methods';
 
@@ -1598,10 +1612,7 @@ class Smart2pay extends PaymentModule
         $form_buffer = 'Plugin version: '.$this->version.'<br/>'.
                        'Smart2Pay SDK version: '.$sdk_version.'<br/>';
 
-        if( @file_exists( Smart2Pay_Helper::get_documentation_path() ) )
-        {
-            $form_buffer .= '<p><strong>NOTE</strong>: For a better understanding of our plugin, please check our integration guide: <a href="'.Smart2Pay_Helper::get_documentation_url().'" style="text-decoration: underline;">'.Smart2Pay_Helper::get_documentation_file_name().'</a></p>';
-        }
+        $form_buffer .= '<p><strong>NOTE</strong>: For a better understanding of our plugin, please check our integration guide: <a href="https://docs.smart2pay.com/category/smart2pay-plugins/smart2pay-prestashop-plugin/" style="text-decoration: underline;" target="_blank">Smart2Pay PrestaShop Integration Guide</a></p>';
 
         $form_data = array();
         $form_data['submit_action'] = 'submit_main_data';
@@ -3981,6 +3992,7 @@ class Smart2pay extends PaymentModule
                 '_transform' => array( 'intval' ),
                 '_validate' => array( 'notempty' ),
                 'required' => true,
+                '_default' => 0,
             ),
             array(
                 'type' => 'text',
@@ -3989,6 +4001,7 @@ class Smart2pay extends PaymentModule
                 'required' => true,
                 '_transform' => array( 'trim' ),
                 '_validate' => array( 'notempty' ),
+                '_default' => '',
             ),
             array(
                 'type' => 'text',
@@ -3997,6 +4010,7 @@ class Smart2pay extends PaymentModule
                 '_transform' => array( 'intval' ),
                 '_validate' => array( 'notempty' ),
                 'required' => true,
+                '_default' => 0,
             ),
             array(
                 'type' => 'text',
@@ -4005,6 +4019,7 @@ class Smart2pay extends PaymentModule
                 'required' => true,
                 '_transform' => array( 'trim' ),
                 '_validate' => array( 'notempty' ),
+                '_default' => '',
             ),
             array(
                 'type' => 'text',
@@ -4012,6 +4027,7 @@ class Smart2pay extends PaymentModule
                 'name' => self::CONFIG_PREFIX.'SKIN_ID',
                 '_transform' => array( 'intval' ),
                 'required' => true,
+                '_default' => 0,
             ),
             array(
                 'type' => 'text',
@@ -4226,6 +4242,7 @@ class Smart2pay extends PaymentModule
                 ),
                 '_default' => self::OPT_FEE_CURRENCY_FRONT,
             ),
+            /**
             array(
                 'type' => 'select',
                 'label' => $this->l('Show loading modal'),
@@ -4241,6 +4258,7 @@ class Smart2pay extends PaymentModule
                 ),
                 '_default' => 0,
             ),
+            /**/
             array(
                 'type' => 'select',
                 'label' => $this->l('New Order Status'),
@@ -4373,6 +4391,7 @@ class Smart2pay extends PaymentModule
                 ),
                 '_default' => 0,
             ),
+            /**
             array(
                 'type' => 'select',
                 'label' => $this->l('Debug Form'),
@@ -4385,6 +4404,7 @@ class Smart2pay extends PaymentModule
                 ),
                 '_default' => 0,
             ),
+            /**/
         );
     }
 
@@ -4422,32 +4442,14 @@ class Smart2pay extends PaymentModule
                 `surcharge_order_amount` decimal(6,2) NOT NULL,
                 `surcharge_order_percent` decimal(6,2) NOT NULL,
                 `surcharge_order_currency` varchar(3) DEFAULT NULL COMMENT 'Currency ISO 3',
-                `last_update` timestamp NOT NULL DEFAULT NULL,
-                `created` timestamp NOT NULL DEFAULT NULL,
+                `payment_status` TINYINT(2) NOT NULL DEFAULT '0' COMMENT 'Status received from server',
+                `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                  PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `payment_id` (`payment_id`), KEY `order_id` (`order_id`)
                 ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
 
         ") )
             return false;
-
-        // New columns starting with plugin version 1.0.6
-        $transactions_columns = array(
-            array( 'name' => 'payment_status', 'type' => 'TINYINT(2) NOT NULL DEFAULT \'0\' COMMENT \'Status received from server\' AFTER `surcharge_order_currency`' ),
-        );
-
-        foreach( $transactions_columns as $column )
-        {
-            $sql = 'SHOW COLUMNS FROM `' . _DB_PREFIX_ . 'smart2pay_transactions`
-					LIKE \'' . pSQL($column['name']) . '\'';
-
-            if( !Db::getInstance()->executeS( $sql ) )
-            {
-                $sql = 'ALTER TABLE `' . _DB_PREFIX_ . 'smart2pay_transactions`
-						ADD `' . pSQL( $column['name'] ) . '` ' . $column['type'];
-
-                Db::getInstance()->execute( $sql );
-            }
-        }
 
         if( !Db::getInstance()->execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method_settings` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -4458,8 +4460,8 @@ class Smart2pay extends PaymentModule
                 `surcharge_amount` decimal(6,2) NOT NULL DEFAULT '0.00' COMMENT 'Amount of surcharge',
                 `surcharge_currency` varchar(3) DEFAULT NULL COMMENT 'ISO 3 currency code of fixed surcharge amount',
                 `priority` tinyint(4) NOT NULL DEFAULT '10' COMMENT '1 means first',
-                `last_update` timestamp NOT NULL DEFAULT NULL,
-                `configured` timestamp NOT NULL DEFAULT NULL,
+                `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `configured` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `environment` (`environment`), KEY `enabled` (`enabled`)
                 ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Smart2Pay method configurations';
         ") )
@@ -4790,7 +4792,8 @@ class Smart2pay extends PaymentModule
      */
     private function createCustomOrderStatuses()
     {
-        if( !($all_languages = Language::getLanguages( false )) )
+        if( !($all_languages = Language::getLanguages( false ))
+         or !is_array( $all_languages ) )
             $all_languages = array();
 
         foreach( $this->getPaymentStatesOrderStatuses() as $status )

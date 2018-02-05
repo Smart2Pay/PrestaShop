@@ -293,7 +293,7 @@ if( !class_exists( 'Smart2Pay_SDK_Interface', false ) )
             if( empty( $plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX.'RETURN_URL'] )
              or !PHS_params::check_type( $plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX.'RETURN_URL'], PHS_params::T_URL ) )
             {
-                $this->set_error( self::ERR_GENERIC, $s2p_plugin->l( 'Return URL in plugin settings is invalid.' ).'['.$plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX.'RETURN_URL'].']' );
+                $this->set_error( self::ERR_GENERIC, $s2p_plugin->l( 'Return URL in plugin settings is invalid.' ) );
                 return false;
             }
 

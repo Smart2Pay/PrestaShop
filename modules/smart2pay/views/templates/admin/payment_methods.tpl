@@ -297,6 +297,13 @@ $(document).ready(function(){
             </tr>
             </thead>
             <tbody>
+            <tr>
+                <td colspan="5">
+                    <br/>
+                    <input type="submit" value="{l s='Update payment methods' mod='smart2pay'}" name="submit_payment_methods_2" id="submit_payment_methods_2" class="button" /><br/>
+                    <br/>
+                </td>
+            </tr>
             {foreach $payment_methods as $payment_method}
                 <tr>
                     <td style="width: 50px; text-align: center;">
