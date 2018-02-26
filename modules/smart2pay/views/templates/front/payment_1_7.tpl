@@ -1,5 +1,5 @@
 {*
-* 2017 Smart2Pay
+* 2018 Smart2Pay
 *
 * DISCLAIMER
 *
@@ -7,7 +7,7 @@
 * in the future.
 *
 *  @author Smart2Pay
-*  @copyright  2017 Smart2Pay
+*  @copyright  2018 Smart2Pay
 *}
 <div id="s2p_payment_methods_container">
 {if $moduleSettings["{$settings_prefix}LOADING_MODAL"]}

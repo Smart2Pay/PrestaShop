@@ -64,6 +64,23 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
                 $params['total_surcharge'] = 0;
             if( empty( $params['amount_to_pay'] ) )
                 $params['amount_to_pay'] = $cart_original_amount;
+            if( empty( $params['payment_method'] )
+             or !in_array( $params['payment_method'], array( \S2P_SDK\S2P_SDK_Meth_Methods::METHOD_KLARNA_INVOICE, \S2P_SDK\S2P_SDK_Meth_Methods::METHOD_KLARNA_PAYMENTS ) ) )
+                $params['payment_method'] = \S2P_SDK\S2P_SDK_Meth_Methods::METHOD_KLARNA_PAYMENTS;
+
+            // 1 - product, 2 - shipping, 3 - handling, 4 - discount, 5 - physical, 6 - shipping fee, 7 - sales tax, 9 - digital
+            // 9 - gift card, 10 - store credit, 11 - surcharge
+            if( $params['payment_method'] == \S2P_SDK\S2P_SDK_Meth_Methods::METHOD_KLARNA_INVOICE )
+            {
+                $art_product_type = 1;
+                $art_virt_product_type = 1;
+                $art_shipping_type = 2;
+            } else
+            {
+                $art_product_type = 5;
+                $art_virt_product_type = 9;
+                $art_shipping_type = 6;
+            }
 
             $amount_to_pay = floatval( $params['amount_to_pay'] );
 
@@ -80,23 +97,27 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
                 if( empty( $product_arr ) or !is_array( $product_arr ) )
                     continue;
 
-                // 1 => 'Product', 2 => 'Shipping', 3 => 'Handling',
+                // 1 - product, 2 - shipping, 3 - handling, 4 - discount, 5 - physical, 6 - shipping fee, 7 -sales tax, 9 - digital
+                // 9 - gift card, 10 - store credit, 11 - surcharge
                 $article_arr = array();
-                $article_arr['ID'] = $product_arr['id_product'];
-                $article_arr['Name'] = $product_arr['name'];
-                $article_arr['Quantity'] = $product_arr['quantity'];
-                $article_arr['Price'] = Tools::ps_round( $product_arr['price_wt'], 2 );
-                $article_arr['VAT'] = Tools::ps_round( $product_arr['rate'], 2 );
-                // $article_arr['Discount'] = 0;
-                $article_arr['Type'] = 1;
+                $article_arr['merchantarticleid'] = $product_arr['id_product'];
+                $article_arr['name'] = $product_arr['name'];
+                $article_arr['quantity'] = $product_arr['quantity'];
+                $article_arr['price'] = Tools::ps_round( $product_arr['price_wt'], 2 );
+                $article_arr['vat'] = Tools::ps_round( $product_arr['rate'], 2 );
+                // $article_arr['discount'] = 0;
+                if( !empty( $product_arr['is_virtual'] ) )
+                    $article_arr['type'] = $art_virt_product_type;
+                else
+                    $article_arr['type'] = $art_product_type;
 
-                if( $article_arr['Price'] > $biggest_price )
+                if( $article_arr['price'] > $biggest_price )
                     $biggest_price_knti = $articles_knti;
 
                 $articles_arr[$articles_knti] = $article_arr;
 
                 $article_meta_arr = array();
-                $article_meta_arr['total_price'] = $article_arr['Price'] * $article_arr['Quantity'];
+                $article_meta_arr['total_price'] = $article_arr['price'] * $article_arr['quantity'];
                 $article_meta_arr['price_perc'] = ($article_meta_arr['total_price'] * 100) / $cart_original_amount;
                 $article_meta_arr['surcharge_amount'] = 0;
 
@@ -112,20 +133,19 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
 
             if( $params['transport_amount'] != 0 )
             {
-                // 1 => 'Product', 2 => 'Shipping', 3 => 'Handling',
                 $article_arr = array();
-                $article_arr['ID'] = 0;
-                $article_arr['Name'] = 'Transport';
-                $article_arr['Quantity'] = 1;
-                $article_arr['Price'] = Tools::ps_round( $params['transport_amount'], 2 );
-                $article_arr['VAT'] = 0;
-                //$article_arr['Discount'] = 0;
-                $article_arr['Type'] = 2;
+                $article_arr['merchantarticleid'] = 0;
+                $article_arr['name'] = 'Transport';
+                $article_arr['quantity'] = 1;
+                $article_arr['price'] = Tools::ps_round( $params['transport_amount'], 2 );
+                $article_arr['vat'] = 0;
+                //$article_arr['discount'] = 0;
+                $article_arr['type'] = $art_shipping_type;
 
                 $articles_arr[$articles_knti] = $article_arr;
 
                 $article_meta_arr = array();
-                $article_meta_arr['total_price'] = $article_arr['Price'] * $article_arr['Quantity'];
+                $article_meta_arr['total_price'] = $article_arr['price'] * $article_arr['quantity'];
                 $article_meta_arr['price_perc'] = 0;
                 $article_meta_arr['surcharge_amount'] = 0;
 
@@ -143,28 +163,29 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
                 $total_surcharge = $params['total_surcharge'];
                 foreach( $articles_arr as $knti => $article_arr )
                 {
-                    if( $articles_arr[$knti]['Type'] != 1 )
+                    if( $articles_arr[$knti]['type'] != $art_virt_product_type
+                    and $articles_arr[$knti]['type'] != $art_product_type )
                         continue;
 
                     $total_article_surcharge = (($articles_meta_arr[$knti]['price_perc'] * $params['total_surcharge'])/100);
 
-                    $article_unit_surcharge = Tools::ps_round( $total_article_surcharge/$articles_arr[$knti]['Quantity'], 2 );
+                    $article_unit_surcharge = Tools::ps_round( $total_article_surcharge/$articles_arr[$knti]['quantity'], 2 );
 
-                    $articles_arr[$knti]['Price'] += $article_unit_surcharge;
+                    $articles_arr[$knti]['price'] += $article_unit_surcharge;
                     $articles_meta_arr[$knti]['surcharge_amount'] = $article_unit_surcharge;
 
-                    $items_total_amount += ($article_unit_surcharge * $articles_arr[$knti]['Quantity']);
-                    $total_surcharge -= ($article_unit_surcharge * $articles_arr[$knti]['Quantity']);
+                    $items_total_amount += ($article_unit_surcharge * $articles_arr[$knti]['quantity']);
+                    $total_surcharge -= ($article_unit_surcharge * $articles_arr[$knti]['quantity']);
                 }
 
                 // If after applying all surcharge amounts as percentage of each product price we still have a difference, apply difference on product with biggest price
                 if( $total_surcharge != 0 )
                 {
-                    $article_unit_surcharge = Tools::ps_round( $total_surcharge/$articles_arr[$biggest_price_knti]['Quantity'], 2 );
+                    $article_unit_surcharge = Tools::ps_round( $total_surcharge/$articles_arr[$biggest_price_knti]['quantity'], 2 );
 
-                    $articles_arr[$biggest_price_knti]['Price'] += $article_unit_surcharge;
+                    $articles_arr[$biggest_price_knti]['price'] += $article_unit_surcharge;
                     $articles_meta_arr[$biggest_price_knti]['surcharge_amount'] += $article_unit_surcharge;
-                    $items_total_amount += ($article_unit_surcharge * $articles_arr[$biggest_price_knti]['Quantity']);
+                    $items_total_amount += ($article_unit_surcharge * $articles_arr[$biggest_price_knti]['quantity']);
 
                     $return_arr['surcharge_difference_amount'] = $total_surcharge;
                     $return_arr['surcharge_difference_index'] = $biggest_price_knti;
@@ -176,9 +197,9 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
             // If we still have a difference apply it on biggest price product
             if( Tools::ps_round( $items_total_amount, 2 ) != Tools::ps_round( $amount_to_pay, 2 ) )
             {
-                $amount_diff = Tools::ps_round( ($amount_to_pay - $items_total_amount)/$articles_arr[$biggest_price_knti]['Quantity'], 2 );
+                $amount_diff = Tools::ps_round( ($amount_to_pay - $items_total_amount)/$articles_arr[$biggest_price_knti]['quantity'], 2 );
 
-                $articles_arr[$biggest_price_knti]['Price'] += $amount_diff;
+                $articles_arr[$biggest_price_knti]['price'] += $amount_diff;
 
                 $return_arr['total_difference_amount'] = Tools::ps_round( $amount_to_pay - $items_total_amount, 2 );
             }
@@ -186,17 +207,21 @@ if( !class_exists( 'Smart2Pay_Helper', false ) )
             $total_check = 0;
             foreach( $articles_arr as $knti => $article_arr )
             {
-                $total_check += ($article_arr['Price'] * $article_arr['Quantity']);
+                $total_check += ($article_arr['price'] * $article_arr['quantity']);
 
-                $article_arr['Price'] = $article_arr['Price'] * 100;
-                $article_arr['VAT'] = $article_arr['VAT'] * 100;
-                //$article_arr['Discount'] = $article_arr['Discount'] * 100;
+                $article_arr['price'] = $article_arr['price'] * 100;
+                $article_arr['vat'] = $article_arr['vat'] * 100;
+                //$article_arr['discount'] = $article_arr['discount'] * 100;
 
                 $article_buf = '';
                 foreach( $article_arr as $key => $val )
                 {
                     $article_buf .= ($article_buf!=''?'&':'').$key.'='.str_replace( array( '&', ';', '=' ), ' ', $val );
                 }
+
+                $articles_arr[$knti]['price'] = intval( $article_arr['price'] );
+                $articles_arr[$knti]['vat'] = intval( $article_arr['vat'] );
+                // $articles_arr[$knti]['discount'] = intval( $article_arr['discount'] );
 
                 $return_arr['buffer'] .= $article_buf.';';
             }

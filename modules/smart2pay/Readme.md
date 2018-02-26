@@ -6,6 +6,8 @@ Smart2Pay is a Payment Service Provider specializing in internet payments since 
 
 Smart2Pay is offering local payment services covering more than 70 countries worldwide! By adding local payment methods to your ecommerce site, you will boost your sales significantly, by offering the preferred local method of payment to your customers!
 
+Be sure to check our GitHub repository: https://github.com/smart2pay/PrestaShop
+
     iDEAL
     MrCash
     Giropay

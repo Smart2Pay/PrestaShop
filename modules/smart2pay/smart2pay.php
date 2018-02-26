@@ -1,6 +1,6 @@
 <?php
 /**
- * 2017 Smart2Pay
+ * 2018 Smart2Pay
  *
  * DISCLAIMER
  *
@@ -8,7 +8,7 @@
  * in the future.
  *
  * @author    Smart2Pay
- * @copyright 2017 Smart2Pay
+ * @copyright 2018 Smart2Pay
  * @license   http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
 **/
 /**
@@ -82,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.3';
+        $this->version = '2.0.4';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -458,12 +458,15 @@ class Smart2pay extends PaymentModule
         $articles_params['transport_amount'] = $shipping_price;
         $articles_params['total_surcharge'] = $total_surcharge;
         $articles_params['amount_to_pay'] = $amount_to_pay;
+        $articles_params['payment_method'] = $method_id;
 
         $articles_str = '';
+        $articles_sdk_arr = array();
         $articles_diff = 0;
         if( ($articles_check = Smart2Pay_Helper::cart_products_to_string( $cart_products, $cart_original_amount, $articles_params )) )
         {
             $articles_str = $articles_check['buffer'];
+            $articles_sdk_arr = $articles_check['articles_arr'];
 
             if( !empty( $articles_check['total_difference_amount'] )
             and $articles_check['total_difference_amount'] >= -0.01 and $articles_check['total_difference_amount'] <= 0.01 )
@@ -519,8 +522,13 @@ class Smart2pay extends PaymentModule
          */
 
         $delivery = false;
+        $billing = false;
         if( Validate::isLoadedObject( $order ) )
         {
+            $billing = new Address( (int)$order->id_address_invoice );
+            if( !Validate::isLoadedObject( $billing ) )
+                $billing = false;
+
             $delivery = new Address( (int)$order->id_address_delivery );
             if( !Validate::isLoadedObject( $delivery ) )
                 $delivery = false;
@@ -575,7 +583,7 @@ class Smart2pay extends PaymentModule
             $full_name = null;
 
         if( $moduleSettings['environment'] == 'demo' )
-            $merchant_transaction_id = 'PSDEMO_'.$orderID;
+            $merchant_transaction_id = 'PSDEMO_'.$orderID.'_'.microtime( true );
         else
             $merchant_transaction_id = $orderID;
 
@@ -599,13 +607,34 @@ class Smart2pay extends PaymentModule
         $delivery_city = false;
         $delivery_zipcode = false;
         $delivery_address = false;
+        $billing_country = false;
+        $billing_city = false;
+        $billing_zipcode = false;
+        $billing_address = false;
+        if( !empty( $billing ) )
+        {
+            $phone = $billing->phone ? $billing->phone : $billing->phone_mobile;
+
+            if( !empty( $billing->id_country ) )
+            {
+                $country_obj = new Country( $billing->id_country );
+                if( Validate::isLoadedObject( $country_obj ) )
+                    $billing_country = $country_obj->iso_code;
+            }
+
+            $billing_city = $billing->city;
+            $billing_zipcode = $billing->postcode;
+            $billing_address = trim( $billing->address1.' '.$billing->address2 );
+        }
+
         if( !empty( $delivery ) )
         {
-            $phone = $delivery->phone ? $delivery->phone : $delivery->phone_mobile;
+            if( empty( $phone ) )
+                $phone = $delivery->phone ? $delivery->phone : $delivery->phone_mobile;
 
-            if( !empty( $delivery->country ) )
+            if( !empty( $delivery->id_country ) )
             {
-                $country_obj = new Country( $delivery->country );
+                $country_obj = new Country( $delivery->id_country );
                 if( Validate::isLoadedObject( $country_obj ) )
                     $delivery_country = $country_obj->iso_code;
             }
@@ -616,25 +645,46 @@ class Smart2pay extends PaymentModule
         }
 
         $payment_arr['billingaddress'] = array();
+        $payment_arr['shippingaddress'] = array();
 
         if( !empty( $phone ) )
             $payment_arr['customer']['phone'] = $phone;
 
+        if( !empty( $billing_country ) )
+            $payment_arr['billingaddress']['country'] = $billing_country;
         if( !empty( $delivery_country ) )
-            $payment_arr['billingaddress']['country'] = $delivery_country;
+        {
+            if( empty( $payment_arr['billingaddress']['country'] ) )
+                $payment_arr['billingaddress']['country'] = $delivery_country;
+
+            $payment_arr['shippingaddress']['country'] = $delivery_country;
+        }
+
+        if( !empty( $billing_city ) )
+            $payment_arr['billingaddress']['city'] = $billing_city;
         if( !empty( $delivery_city ) )
-            $payment_arr['billingaddress']['city'] = $delivery_city;
+            $payment_arr['shippingaddress']['city'] = $delivery_city;
+
+        if( !empty( $billing_zipcode ) )
+            $payment_arr['billingaddress']['zipcode'] = $billing_zipcode;
         if( !empty( $delivery_zipcode ) )
-            $payment_arr['billingaddress']['zipcode'] = $delivery_zipcode;
+            $payment_arr['shippingaddress']['zipcode'] = $delivery_zipcode;
+
+        if( !empty( $billing_address )
+        and strlen( $billing_address ) > 100 )
+        {
+            $payment_arr['billingaddress']['street'] = Tools::substr( $billing_address, 0, 100 );
+            $payment_arr['billingaddress']['streetnumber'] = Tools::substr( $billing_address, 100, 100 );
+        }
 
         if( !empty( $delivery_address )
         and strlen( $delivery_address ) > 100 )
         {
-            $payment_arr['billingaddress']['street'] = Tools::substr( $delivery_address, 0, 100 );
-            $payment_arr['billingaddress']['streetnumber'] = Tools::substr( $delivery_address, 100, 100 );
+            $payment_arr['shippingaddress']['street'] = Tools::substr( $delivery_address, 0, 100 );
+            $payment_arr['shippingaddress']['streetnumber'] = Tools::substr( $delivery_address, 100, 100 );
         }
 
-        $payment_arr['articles'] = $articles_str;
+        $payment_arr['articles'] = $articles_sdk_arr;
 
         // ob_start();
         // var_dump( $payment_arr );
