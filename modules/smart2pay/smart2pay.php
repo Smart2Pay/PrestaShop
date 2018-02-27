@@ -82,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.4';
+        $this->version = '2.0.5';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -670,18 +670,24 @@ class Smart2pay extends PaymentModule
         if( !empty( $delivery_zipcode ) )
             $payment_arr['shippingaddress']['zipcode'] = $delivery_zipcode;
 
-        if( !empty( $billing_address )
-        and strlen( $billing_address ) > 100 )
+        if( !empty( $billing_address ) )
         {
-            $payment_arr['billingaddress']['street'] = Tools::substr( $billing_address, 0, 100 );
-            $payment_arr['billingaddress']['streetnumber'] = Tools::substr( $billing_address, 100, 100 );
+            if( strlen( $billing_address ) > 100 )
+            {
+                $payment_arr['billingaddress']['street'] = Tools::substr( $billing_address, 0, 100 );
+                $payment_arr['billingaddress']['streetnumber'] = Tools::substr( $billing_address, 100, 100 );
+            } else
+                $payment_arr['billingaddress']['street'] = $billing_address;
         }
 
-        if( !empty( $delivery_address )
-        and strlen( $delivery_address ) > 100 )
+        if( !empty( $delivery_address ) )
         {
-            $payment_arr['shippingaddress']['street'] = Tools::substr( $delivery_address, 0, 100 );
-            $payment_arr['shippingaddress']['streetnumber'] = Tools::substr( $delivery_address, 100, 100 );
+            if( strlen( $delivery_address ) > 100 )
+            {
+                $payment_arr['shippingaddress']['street'] = Tools::substr( $delivery_address, 0, 100 );
+                $payment_arr['shippingaddress']['streetnumber'] = Tools::substr( $delivery_address, 100, 100 );
+            } else
+                $payment_arr['shippingaddress']['street'] = $delivery_address;
         }
 
         $payment_arr['articles'] = $articles_sdk_arr;
