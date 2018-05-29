@@ -82,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.5';
+        $this->version = '2.0.6';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -784,9 +784,9 @@ class Smart2pay extends PaymentModule
     {
         $this->writeLog( '--- Notification START --------------------' );
 
-        include_once( S2P_SDK_DIR_CLASSES . 's2p_sdk_notification.inc.php' );
-        include_once( S2P_SDK_DIR_CLASSES . 's2p_sdk_helper.inc.php' );
-        include_once( S2P_SDK_DIR_METHODS . 's2p_sdk_meth_payments.inc.php' );
+        include_once( S2P_SDK_DIR_CLASSES . 'S2P_SDK_Notification.php' );
+        include_once( S2P_SDK_DIR_CLASSES . 'S2P_SDK_Helper.php' );
+        include_once( S2P_SDK_DIR_METHODS . 'S2P_SDK_Meth_Payments.php' );
 
         if( !defined( 'S2P_SDK_NOTIFICATION_IDENTIFIER' ) )
             define( 'S2P_SDK_NOTIFICATION_IDENTIFIER', microtime( true ) );
