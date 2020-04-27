@@ -82,7 +82,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.6';
+        $this->version = '2.0.7';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array( 'min' => '1.4', 'max' => _PS_VERSION_ );
@@ -328,7 +328,7 @@ class Smart2pay extends PaymentModule
              or ($path instanceof Undefined_Smarty_Variable ) )
                 $path = '';
 
-            $path .= '<a >' . $this->l( 'Transaction Completed' ) . '</a>';
+            $path .= Smart2Pay_Helper::generate_path_message( $this->l( 'Transaction Completed' ) );
 
             $this->context->smarty->assign( array( 'path' => $path ) );
         }
@@ -1665,10 +1665,7 @@ class Smart2pay extends PaymentModule
             )
         );
 
-        $form_buffer = 'Plugin version: '.$this->version.'<br/>'.
-                       'Smart2Pay SDK version: '.$sdk_version.'<br/>';
-
-        $form_buffer .= '<p><strong>NOTE</strong>: For a better understanding of our plugin, please check our integration guide: <a href="https://docs.smart2pay.com/category/smart2pay-plugins/smart2pay-prestashop-plugin/" style="text-decoration: underline;" target="_blank">Smart2Pay PrestaShop Integration Guide</a></p>';
+        $form_buffer = Smart2Pay_Helper::generate_versions_message( $this->version, $sdk_version );
 
         $form_data = array();
         $form_data['submit_action'] = 'submit_main_data';
@@ -2041,8 +2038,7 @@ class Smart2pay extends PaymentModule
             'order_logs' => $order_logs,
         ) );
 
-        return '<li><a href="#s2p-payment-details"><i class="icon-money"></i> '.$this->l( 'Payment Method' ).' <span class="badge">1</span></a></li>'.
-               '<li><a href="#s2p-payment-logs"><i class="icon-book"></i> '.$this->l( 'Payment Logs' ).' <span class="badge">'.count( $order_logs ).'</span></a></li>';
+        return Smart2Pay_Helper::generate_payment_details_and_logs( $this->l( 'Payment Method' ), $this->l( 'Payment Logs' ), $order_logs );
     }
 
     /**
