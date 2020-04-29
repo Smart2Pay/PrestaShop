@@ -11,16 +11,15 @@
  * @copyright 2018 Smart2Pay
  * @license   http://opensource.org/licenses/OSL-3.0 The Open Software License 3.0 (OSL-3.0)
  **/
-
 if (!defined('_PS_VERSION_')) {
     exit;
 }
 
-function upgrade_module_2_0_3( $module )
+function upgrade_module_2_0_3($module)
 {
-    /** @var Smart2pay $module */
+    /* @var Smart2pay $module */
 
-    if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_transactions` (
+    if (!Db::getInstance()->Execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . "smart2pay_transactions` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `method_id` int(11) NOT NULL DEFAULT '0',
                 `payment_id` int(11) NOT NULL DEFAULT '0',
@@ -38,17 +37,18 @@ function upgrade_module_2_0_3( $module )
                 `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                  PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `payment_id` (`payment_id`), KEY `order_id` (`order_id`)
-                ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
+                ) ENGINE=" . _MYSQL_ENGINE_ . " DEFAULT CHARSET=utf8 COMMENT='Transactions run trough Smart2Pay';
 
-        ") )
-    {
-        if( $module )
+        ")) {
+        if ($module) {
             $module->erros[] = 'Error updating transactions table.';
+        }
+
         return false;
     }
 
-    Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_logs`' );
-    if( !Db::getInstance()->Execute("CREATE TABLE `" . _DB_PREFIX_ . "smart2pay_logs` (
+    Db::getInstance()->Execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_logs`');
+    if (!Db::getInstance()->Execute('CREATE TABLE `' . _DB_PREFIX_ . "smart2pay_logs` (
                 `log_id` int(11) NOT NULL AUTO_INCREMENT,
                 `order_id` int(11) NOT NULL default '0',
                 `log_type` varchar(255) default NULL,
@@ -57,16 +57,17 @@ function upgrade_module_2_0_3( $module )
                 `log_source_file_line` varchar(255) default NULL,
                 `log_created` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (`log_id`), KEY `order_id` (`order_id`), KEY `log_type` (`log_type`)
-            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8;
-        ") )
-    {
-        if( $module )
+            ) ENGINE=" . _MYSQL_ENGINE_ . '  DEFAULT CHARSET=utf8;
+        ')) {
+        if ($module) {
             $module->erros[] = 'Error updating logs table.';
+        }
+
         return false;
     }
 
-    Db::getInstance()->Execute( 'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_method_settings`' );
-    if( !Db::getInstance()->Execute("CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "smart2pay_method_settings` (
+    Db::getInstance()->Execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_method_settings`');
+    if (!Db::getInstance()->Execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . "smart2pay_method_settings` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `environment` varchar(50) default NULL,
                 `method_id` int(11) NOT NULL DEFAULT '0',
@@ -78,16 +79,17 @@ function upgrade_module_2_0_3( $module )
                 `last_update` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 `configured` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `environment` (`environment`), KEY `enabled` (`enabled`)
-                ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8 COMMENT='Smart2Pay method configurations';
-        ") )
-    {
-        if( $module )
+                ) ENGINE=" . _MYSQL_ENGINE_ . " DEFAULT CHARSET=utf8 COMMENT='Smart2Pay method configurations';
+        ")) {
+        if ($module) {
             $module->erros[] = 'Error updating methods settings table.';
+        }
+
         return false;
     }
 
-    Db::getInstance()->execute( "DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_method`" );
-    if( !Db::getInstance()->execute("CREATE TABLE `" . _DB_PREFIX_ . "smart2pay_method` (
+    Db::getInstance()->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_method`');
+    if (!Db::getInstance()->execute('CREATE TABLE `' . _DB_PREFIX_ . 'smart2pay_method` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `method_id` int(11) NOT NULL DEFAULT 0,
                 `environment` varchar(50) default NULL,
@@ -97,17 +99,18 @@ function upgrade_module_2_0_3( $module )
                 `guaranteed` int(1) default 0,
                 `active` tinyint(2) default 0,
                 PRIMARY KEY (`id`), KEY `method_id` (`method_id`), KEY `environment` (`environment`), KEY `active` (`active`)
-            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
-        ") )
-    {
-        if( $module )
+            ) ENGINE=' . _MYSQL_ENGINE_ . '  DEFAULT CHARSET=utf8
+        ')) {
+        if ($module) {
             $module->erros[] = 'Error updating methods table.';
+        }
+
         return false;
     }
 
-    Db::getInstance()->execute( "DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country_method`" );
-    if( !Db::getInstance()->execute("
-            CREATE TABLE `" . _DB_PREFIX_ . "smart2pay_country_method` (
+    Db::getInstance()->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_country_method`');
+    if (!Db::getInstance()->execute('
+            CREATE TABLE `' . _DB_PREFIX_ . "smart2pay_country_method` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `environment` varchar(50) default NULL,
                 `country_id` int(11) DEFAULT '0',
@@ -115,31 +118,33 @@ function upgrade_module_2_0_3( $module )
                 `priority` int(2) DEFAULT '99',
                 `enabled` tinyint(2) DEFAULT '1' COMMENT 'Tells if country is active for method',
                 PRIMARY KEY (`id`), KEY `environment` (`environment`), KEY `country_id` (`country_id`), KEY `method_id` (`method_id`), KEY `enabled` (`enabled`)
-            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
-        ") )
-    {
-        if( $module )
+            ) ENGINE=" . _MYSQL_ENGINE_ . '  DEFAULT CHARSET=utf8
+        ')) {
+        if ($module) {
             $module->erros[] = 'Error updating country methods table.';
+        }
+
         return false;
     }
 
-    Db::getInstance()->Execute( "DROP TABLE IF EXISTS `" . _DB_PREFIX_ . "smart2pay_country`" );
-    if( !Db::getInstance()->Execute("
-            CREATE TABLE `" . _DB_PREFIX_ . "smart2pay_country` (
+    Db::getInstance()->Execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'smart2pay_country`');
+    if (!Db::getInstance()->Execute('
+            CREATE TABLE `' . _DB_PREFIX_ . 'smart2pay_country` (
                 `country_id` int(11) NOT NULL AUTO_INCREMENT,
                 `code` varchar(3) default NULL,
                 `name` varchar(100) default NULL,
                 PRIMARY KEY (`country_id`)
-            ) ENGINE="._MYSQL_ENGINE_."  DEFAULT CHARSET=utf8
-        ") )
-    {
-        if( $module )
+            ) ENGINE=' . _MYSQL_ENGINE_ . '  DEFAULT CHARSET=utf8
+        ')) {
+        if ($module) {
             $module->erros[] = 'Error updating countries table.';
+        }
+
         return false;
     }
 
-    if( !Db::getInstance()->Execute("
-            INSERT INTO `" . _DB_PREFIX_ . "smart2pay_country` (`code`, `name`) VALUES
+    if (!Db::getInstance()->Execute('
+            INSERT INTO `' . _DB_PREFIX_ . "smart2pay_country` (`code`, `name`) VALUES
             ('AD', 'Andorra'),
             ('AE', 'United Arab Emirates'),
             ('AF', 'Afghanistan'),
@@ -382,10 +387,11 @@ function upgrade_module_2_0_3( $module )
             ('ZW', 'Zimbabwe'),
             ('PS', 'Palestinian Territory'),
             ('ME', 'Montenegro'),
-            ('RS', 'Serbia');" ) )
-    {
-        if( $module )
+            ('RS', 'Serbia');")) {
+        if ($module) {
             $module->erros[] = 'Error populating countries table.';
+        }
+
         return false;
     }
 

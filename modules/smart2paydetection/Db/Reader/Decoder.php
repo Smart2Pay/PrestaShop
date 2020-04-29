@@ -2,19 +2,15 @@
 
 namespace MaxMind\Db\Reader;
 
-use MaxMind\Db\Reader\InvalidDatabaseException;
-use MaxMind\Db\Reader\Util;
-
 class Decoder
 {
-
     private $fileStream;
     private $pointerBase;
     // This is only used for unit testing
     private $pointerTestHack;
     private $switchByteOrder;
 
-    private $types = array(
+    private $types = [
         0 => 'extended',
         1 => 'pointer',
         2 => 'utf8_string',
@@ -31,7 +27,7 @@ class Decoder
         13 => 'end_marker',
         14 => 'boolean',
         15 => 'float',
-    );
+    ];
 
     public function __construct(
         $fileStream,
@@ -45,14 +41,13 @@ class Decoder
         $this->switchByteOrder = $this->isPlatformLittleEndian();
     }
 
-
     public function decode($offset)
     {
         list(, $ctrlByte) = unpack(
             'C',
             Util::read($this->fileStream, $offset, 1)
         );
-        $offset++;
+        ++$offset;
 
         $type = $this->types[$ctrlByte >> 5];
 
@@ -64,12 +59,12 @@ class Decoder
 
             // for unit testing
             if ($this->pointerTestHack) {
-                return array($pointer);
+                return [$pointer];
             }
 
             list($result) = $this->decode($pointer);
 
-            return array($result, $offset);
+            return [$result, $offset];
         }
 
         if ($type == 'extended') {
@@ -82,15 +77,15 @@ class Decoder
 
             if ($typeNum < 8) {
                 throw new InvalidDatabaseException(
-                    "Something went horribly wrong in the decoder. An extended type "
-                    . "resolved to a type number < 8 ("
+                    'Something went horribly wrong in the decoder. An extended type '
+                    . 'resolved to a type number < 8 ('
                     . $this->types[$typeNum]
-                    . ")"
+                    . ')'
                 );
             }
 
             $type = $this->types[$typeNum];
-            $offset++;
+            ++$offset;
         }
 
         list($size, $offset) = $this->sizeFromCtrlByte($ctrlByte, $offset);
@@ -106,33 +101,35 @@ class Decoder
             case 'array':
                 return $this->decodeArray($size, $offset);
             case 'boolean':
-                return array($this->decodeBoolean($size), $offset);
+                return [$this->decodeBoolean($size), $offset];
         }
 
         $newOffset = $offset + $size;
         $bytes = Util::read($this->fileStream, $offset, $size);
         switch ($type) {
             case 'utf8_string':
-                return array($this->decodeString($bytes), $newOffset);
+                return [$this->decodeString($bytes), $newOffset];
             case 'double':
                 $this->verifySize(8, $size);
-                return array($this->decodeDouble($bytes), $newOffset);
+
+                return [$this->decodeDouble($bytes), $newOffset];
             case 'float':
                 $this->verifySize(4, $size);
-                return array($this->decodeFloat($bytes), $newOffset);
+
+                return [$this->decodeFloat($bytes), $newOffset];
             case 'bytes':
-                return array($bytes, $newOffset);
+                return [$bytes, $newOffset];
             case 'uint16':
             case 'uint32':
-                return array($this->decodeUint($bytes), $newOffset);
+                return [$this->decodeUint($bytes), $newOffset];
             case 'int32':
-                return array($this->decodeInt32($bytes), $newOffset);
+                return [$this->decodeInt32($bytes), $newOffset];
             case 'uint64':
             case 'uint128':
-                return array($this->decodeBigUint($bytes, $size), $newOffset);
+                return [$this->decodeBigUint($bytes, $size), $newOffset];
             default:
                 throw new InvalidDatabaseException(
-                    "Unknown or unexpected type: " . $type
+                    'Unknown or unexpected type: ' . $type
                 );
         }
     }
@@ -148,14 +145,14 @@ class Decoder
 
     private function decodeArray($size, $offset)
     {
-        $array = array();
+        $array = [];
 
-        for ($i = 0; $i < $size; $i++) {
+        for ($i = 0; $i < $size; ++$i) {
             list($value, $offset) = $this->decode($offset);
             array_push($array, $value);
         }
 
-        return array($array, $offset);
+        return [$array, $offset];
     }
 
     private function decodeBoolean($size)
@@ -167,6 +164,7 @@ class Decoder
     {
         // XXX - Assumes IEEE 754 double on platform
         list(, $double) = unpack('d', $this->maybeSwitchByteOrder($bits));
+
         return $double;
     }
 
@@ -174,6 +172,7 @@ class Decoder
     {
         // XXX - Assumes IEEE 754 floats on platform
         list(, $float) = unpack('f', $this->maybeSwitchByteOrder($bits));
+
         return $float;
     }
 
@@ -181,29 +180,29 @@ class Decoder
     {
         $bytes = $this->zeroPadLeft($bytes, 4);
         list(, $int) = unpack('l', $this->maybeSwitchByteOrder($bytes));
+
         return $int;
     }
 
     private function decodeMap($size, $offset)
     {
+        $map = [];
 
-        $map = array();
-
-        for ($i = 0; $i < $size; $i++) {
+        for ($i = 0; $i < $size; ++$i) {
             list($key, $offset) = $this->decode($offset);
             list($value, $offset) = $this->decode($offset);
             $map[$key] = $value;
         }
 
-        return array($map, $offset);
+        return [$map, $offset];
     }
 
-    private $pointerValueOffset = array(
+    private $pointerValueOffset = [
         1 => 0,
         2 => 2048,
         3 => 526336,
         4 => 0,
-    );
+    ];
 
     private function decodePointer($ctrlByte, $offset)
     {
@@ -220,12 +219,13 @@ class Decoder
         $pointer = $unpacked + $this->pointerBase
             + $this->pointerValueOffset[$pointerSize];
 
-        return array($pointer, $offset);
+        return [$pointer, $offset];
     }
 
     private function decodeUint($bytes)
     {
         list(, $int) = unpack('N', $this->zeroPadLeft($bytes, 4));
+
         return $int;
     }
 
@@ -261,6 +261,7 @@ class Decoder
                 );
             }
         }
+
         return $integer;
     }
 
@@ -287,7 +288,7 @@ class Decoder
                 + 65821;
         }
 
-        return array($size, $offset + $bytesToRead);
+        return [$size, $offset + $bytesToRead];
     }
 
     private function zeroPadLeft($content, $desiredLength)
@@ -304,6 +305,7 @@ class Decoder
     {
         $testint = 0x00FF;
         $packed = pack('S', $testint);
+
         return $testint === current(unpack('v', $packed));
     }
 }

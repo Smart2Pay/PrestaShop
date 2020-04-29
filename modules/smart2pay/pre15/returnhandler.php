@@ -14,37 +14,32 @@
 /**
  * PrestaShop 1.4 payment return script
  **/
-
 $useSSL = true;
 
-
-    if( @file_exists( dirname( __FILE__ ) . '/../../../config/config.inc.php' ) )
-        $root_path = dirname( __FILE__ ) . '/../../../';
-
-    elseif( !empty( $_SERVER['SCRIPT_FILENAME'] )
-        and @file_exists( realpath( dirname( dirname( dirname( dirname( $_SERVER['SCRIPT_FILENAME'] ) ) ) ) ). '/config/config.inc.php' ) )
-        $root_path = realpath( dirname( dirname( dirname( dirname( $_SERVER['SCRIPT_FILENAME'] ) ) ) ) ).'/';
-
-    else
-    {
+    if (@file_exists(dirname(__FILE__) . '/../../../config/config.inc.php')) {
+        $root_path = dirname(__FILE__) . '/../../../';
+    } elseif (!empty($_SERVER['SCRIPT_FILENAME'])
+        and @file_exists(realpath(dirname(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME']))))) . '/config/config.inc.php')) {
+        $root_path = realpath(dirname(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME']))))) . '/';
+    } else {
         echo 'Cannot find main configuration file...';
         exit;
     }
 
-include( $root_path . 'config/config.inc.php' );
-include( $root_path . 'header.php' );
-include( _PS_MODULE_DIR_ . 'smart2pay/smart2pay.php' );
+include $root_path . 'config/config.inc.php';
+include $root_path . 'header.php';
+include _PS_MODULE_DIR_ . 'smart2pay/smart2pay.php';
 
-if( !$cookie->isLogged( true ) )
-    Tools::redirect( 'authentication.php?back=order.php' );
-elseif( !Customer::getAddressesTotalById( (int)($cookie->id_customer ) ) )
-    Tools::redirect( 'address.php?back=order.php?step=1' );
+if (!$cookie->isLogged(true)) {
+    Tools::redirect('authentication.php?back=order.php');
+} elseif (!Customer::getAddressesTotalById((int) ($cookie->id_customer))) {
+    Tools::redirect('address.php?back=order.php?step=1');
+}
 
 $smart2pay = new Smart2pay();
 
 $smart2pay->prepare_return_page();
 
-echo $smart2pay->fetchTemplate( 'returnPage.tpl' );
+echo $smart2pay->fetchTemplate('returnPage.tpl');
 
-include_once( $root_path . 'footer.php' );
-
+include_once $root_path . 'footer.php';

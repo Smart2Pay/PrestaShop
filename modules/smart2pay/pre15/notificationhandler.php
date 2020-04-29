@@ -14,24 +14,20 @@
 /**
  * PrestaShop 1.4 payment notification script
  **/
-
 $useSSL = true;
 
-    if( @file_exists( dirname( __FILE__ ) . '/../../../config/config.inc.php' ) )
-        $root_path = dirname( __FILE__ ) . '/../../../';
-
-    elseif( !empty( $_SERVER['SCRIPT_FILENAME'] )
-        and @file_exists( realpath( dirname( dirname( dirname( dirname( $_SERVER['SCRIPT_FILENAME'] ) ) ) ) ). '/config/config.inc.php' ) )
-        $root_path = realpath( dirname( dirname( dirname( dirname( $_SERVER['SCRIPT_FILENAME'] ) ) ) ) ).'/';
-
-    else
-    {
+    if (@file_exists(dirname(__FILE__) . '/../../../config/config.inc.php')) {
+        $root_path = dirname(__FILE__) . '/../../../';
+    } elseif (!empty($_SERVER['SCRIPT_FILENAME'])
+        and @file_exists(realpath(dirname(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME']))))) . '/config/config.inc.php')) {
+        $root_path = realpath(dirname(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME']))))) . '/';
+    } else {
         echo 'Cannot find main configuration file...';
         exit;
     }
 
-include( $root_path . 'config/config.inc.php' );
-include( _PS_MODULE_DIR_ . 'smart2pay/smart2pay.php' );
+include $root_path . 'config/config.inc.php';
+include _PS_MODULE_DIR_ . 'smart2pay/smart2pay.php';
 
 $smart2pay = new Smart2pay();
 

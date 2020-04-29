@@ -28,11 +28,12 @@ class Reader
      * be a valid MaxMind DB file such as a GeoIp2 database file.
      *
      * @param string $database
-     *            the MaxMind DB file to use.
+     *                         the MaxMind DB file to use.
+     *
      * @throws \InvalidArgumentException for invalid database path or unknown arguments
      * @throws \MaxMind\Db\Reader\InvalidDatabaseException
-     *             if the database is invalid or there is an error reading
-     *             from it.
+     *                                                     if the database is invalid or there is an error reading
+     *                                                     from it.
      */
     public function __construct($database)
     {
@@ -74,13 +75,15 @@ class Reader
      * Looks up the <code>address</code> in the MaxMind DB.
      *
      * @param string $ipAddress
-     *            the IP address to look up.
+     *                          the IP address to look up.
+     *
      * @return array the record for the IP address.
+     *
      * @throws \BadMethodCallException if this method is called on a closed database.
      * @throws \InvalidArgumentException if something other than a single IP address is passed to the method.
      * @throws InvalidDatabaseException
-     *             if the database is invalid or there is an error reading
-     *             from it.
+     *                                  if the database is invalid or there is an error reading
+     *                                  from it.
      */
     public function get($ipAddress)
     {
@@ -105,13 +108,14 @@ class Reader
         if ($this->metadata->ipVersion == 4 && strrpos($ipAddress, ':')) {
             throw new \InvalidArgumentException(
                 "Error looking up $ipAddress. You attempted to look up an"
-                . " IPv6 address in an IPv4-only database."
+                . ' IPv6 address in an IPv4-only database.'
             );
         }
         $pointer = $this->findAddressInTree($ipAddress);
         if ($pointer == 0) {
             return null;
         }
+
         return $this->resolveDataPointer($pointer);
     }
 
@@ -126,7 +130,7 @@ class Reader
         // value
         $node = $this->startNode($bitCount);
 
-        for ($i = 0; $i < $bitCount; $i++) {
+        for ($i = 0; $i < $bitCount; ++$i) {
             if ($node >= $this->metadata->nodeCount) {
                 break;
             }
@@ -142,9 +146,8 @@ class Reader
             // Record is a data pointer
             return $node;
         }
-        throw new InvalidDatabaseException("Something bad happened");
+        throw new InvalidDatabaseException('Something bad happened');
     }
-
 
     private function startNode($length)
     {
@@ -171,10 +174,11 @@ class Reader
         }
         $node = 0;
 
-        for ($i = 0; $i < 96 && $node < $this->metadata->nodeCount; $i++) {
+        for ($i = 0; $i < 96 && $node < $this->metadata->nodeCount; ++$i) {
             $node = $this->readNode($node, 0);
         }
         $this->ipV4Start = $node;
+
         return $node;
     }
 
@@ -187,6 +191,7 @@ class Reader
             case 24:
                 $bytes = Util::read($this->fileHandle, $baseOffset + $index * 3, 3);
                 list(, $node) = unpack('N', "\x00" . $bytes);
+
                 return $node;
             case 28:
                 $middleByte = Util::read($this->fileHandle, $baseOffset + 3, 1);
@@ -198,10 +203,12 @@ class Reader
                 }
                 $bytes = Util::read($this->fileHandle, $baseOffset + $index * 4, 3);
                 list(, $node) = unpack('N', chr($middle) . $bytes);
+
                 return $node;
             case 32:
                 $bytes = Util::read($this->fileHandle, $baseOffset + $index * 4, 4);
                 list(, $node) = unpack('N', $bytes);
+
                 return $node;
             default:
                 throw new InvalidDatabaseException(
@@ -222,6 +229,7 @@ class Reader
         }
 
         list($data) = $this->decoder->decode($resolved);
+
         return $data;
     }
 
@@ -238,14 +246,15 @@ class Reader
         $marker = self::$METADATA_START_MARKER;
         $markerLength = self::$METADATA_START_MARKER_LENGTH;
 
-        for ($i = 0; $i < $fileSize - $markerLength + 1; $i++) {
-            for ($j = 0; $j < $markerLength; $j++) {
+        for ($i = 0; $i < $fileSize - $markerLength + 1; ++$i) {
+            for ($j = 0; $j < $markerLength; ++$j) {
                 fseek($handle, $fileSize - $i - $j - 1);
                 $matchBit = fgetc($handle);
                 if ($matchBit != $marker[$markerLength - $j - 1]) {
                     continue 2;
                 }
             }
+
             return $fileSize - $i;
         }
         throw new InvalidDatabaseException(
@@ -257,6 +266,7 @@ class Reader
     /**
      * @throws \InvalidArgumentException if arguments are passed to the method.
      * @throws \BadMethodCallException if the database has been closed.
+     *
      * @return Metadata object for the database.
      */
     public function metadata()
@@ -282,7 +292,7 @@ class Reader
      * Closes the MaxMind DB and returns resources to the system.
      *
      * @throws \Exception
-     *             if an I/O error occurs.
+     *                    if an I/O error occurs.
      */
     public function close()
     {

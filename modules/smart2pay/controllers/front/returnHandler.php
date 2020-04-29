@@ -13,12 +13,12 @@
 **/
 /**
  * Smart2Pay Payment return script
-**/
+ **/
 class Smart2payreturnHandlerModuleFrontController extends ModuleFrontController
 {
     public $ssl = true;
     public $display_column_left = false;
-    /** @var Smart2pay $module */
+    /** @var Smart2pay */
     public $module;
 
     /**
@@ -36,9 +36,10 @@ class Smart2payreturnHandlerModuleFrontController extends ModuleFrontController
 
         $s2p_module->prepare_return_page();
 
-        if( version_compare( _PS_VERSION_, '1.7', '<' ) )
-            $this->setTemplate( 'returnPage.tpl' );
-        else
-            $this->setTemplate( 'module:smart2pay/views/templates/front/returnPage_1_7.tpl' );
+        if (version_compare(_PS_VERSION_, '1.7', '<')) {
+            $this->setTemplate('returnPage.tpl');
+        } else {
+            $this->setTemplate('module:smart2pay/views/templates/front/returnPage_1_7.tpl');
+        }
     }
 }

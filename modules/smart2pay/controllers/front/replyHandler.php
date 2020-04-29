@@ -13,12 +13,12 @@
 **/
 /**
  * Smart2Pay Payment notification script
-**/
+ **/
 class Smart2payreplyHandlerModuleFrontController extends ModuleFrontController
 {
     public $ssl = true;
 
-    /** @var Smart2pay $module */
+    /** @var Smart2pay */
     public $module;
 
     /**

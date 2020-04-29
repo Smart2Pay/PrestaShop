@@ -1,7 +1,7 @@
 <?php
 
 global $_MODULE;
-$_MODULE = array();
+$_MODULE = [];
 $_MODULE['<{smart2paydetection}prestashop>smart2paydetection_4134cb96a9c4d77a9184e53795623b97'] = 'Are you sure you want to uninstall Smart2Pay Detection plugin?';
 $_MODULE['<{smart2paydetection}prestashop>smart2paydetection_00d23a76e43b46dae9ec7aa9dcbebb32'] = 'Enabled';
 $_MODULE['<{smart2paydetection}prestashop>ip_detection_abe08c4d7cd79b79748539b4b4fb18c4'] = 'IP Detection Demo';

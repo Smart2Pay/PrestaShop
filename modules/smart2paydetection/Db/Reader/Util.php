@@ -2,8 +2,6 @@
 
 namespace MaxMind\Db\Reader;
 
-use MaxMind\Db\Reader\InvalidDatabaseException;
-
 class Util
 {
     public static function read($stream, $offset, $numberOfBytes)
@@ -22,7 +20,7 @@ class Util
             }
         }
         throw new InvalidDatabaseException(
-            "The MaxMind DB file contains bad data"
+            'The MaxMind DB file contains bad data'
         );
     }
 }

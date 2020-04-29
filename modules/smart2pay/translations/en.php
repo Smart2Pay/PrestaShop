@@ -1,7 +1,7 @@
 <?php
 
 global $_MODULE;
-$_MODULE = array();
+$_MODULE = [];
 $_MODULE['<{smart2pay}prestashop>smart2pay_97d1bf08fa62db4062cc0387de68ffe2'] = 'Are you sure you want to uninstall Smart2Pay plugin?';
 $_MODULE['<{smart2pay}prestashop>smart2pay_00d23a76e43b46dae9ec7aa9dcbebb32'] = 'Enabled';
 $_MODULE['<{smart2pay}prestashop>smart2pay_0ba29c6a1afacf586b03a26162c72274'] = 'Environment';
