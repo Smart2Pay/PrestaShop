@@ -1,0 +1,35 @@
+{
+  "name": "smart2pay/sdk-php",
+  "type": "library",
+  "version": "2.1.32",
+  "description": "Smart2Pay SDK - enable payments on your site easily 200+ methods, 80+ countries",
+  "keywords": [
+    "Smart2Pay",
+    "payments",
+    "alternative payments",
+    "sdk"
+  ],
+  "homepage": "https://github.com/Smart2Pay/SDK-PHP",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Smart2Pay",
+      "email": "support@smart2pay.com",
+      "homepage": "http://www.smart2pay.com"
+    }
+  ],
+  "support": {
+    "email": "support@smart2pay.com",
+    "docs": "https://docs.smart2pay.com"
+  },
+  "require": {
+    "php": ">=5.3.3",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*"
+  },
+  "autoload": {
+    "psr-0": { "S2P_SDK\\" : [ "classes/", "structures/" ] },
+    "psr-4": { "S2P_SDK\\" : [ "classes/", "structures/" ] }
+  }
+}

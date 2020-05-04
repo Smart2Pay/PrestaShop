@@ -1,7 +1,4 @@
-/*
-!.gitignore
-!modules/
-
-modules/*
-!modules/smart2pay/
-!modules/smart2paydetection/
+.git
+.idea
+.php_cs.cache
+php_cs.dist
