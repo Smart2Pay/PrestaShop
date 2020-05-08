@@ -5227,6 +5227,7 @@ class Smart2pay extends PaymentModule
      * @param $params
      *
      * @return bool
+     */
     public function hookPayment($params)
     {
         $this->createContext();
@@ -5246,7 +5247,6 @@ class Smart2pay extends PaymentModule
 
         return $this->fetchTemplate('payment.tpl');
     }
-     */
 
     public function paymentModuleActive()
     {
