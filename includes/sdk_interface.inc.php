@@ -391,7 +391,7 @@ if (!class_exists('Smart2PaySDKInterface', false)) {
                 return false;
             }
 
-            if (empty($plugin_settings_arr['return_url'])) {
+            if (empty($plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX . 'RETURN_URL'])) {
                 $this->setError(self::ERR_GENERIC, $s2p_plugin->l('Return URL in plugin settings is invalid.'));
                 return false;
             }
@@ -424,7 +424,7 @@ if (!class_exists('Smart2PaySDKInterface', false)) {
                 $api_parameters['method_params']['payment']['generatecreditcardtoken'] = false;
             }
 
-            $api_parameters['method_params']['payment']['returnurl'] = $plugin_settings_arr['return_url'];
+            $api_parameters['method_params']['payment']['returnurl'] = $plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX . 'RETURN_URL'];
 
             $call_params = [];
 
