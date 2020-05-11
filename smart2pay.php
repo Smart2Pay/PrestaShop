@@ -1595,7 +1595,9 @@ class Smart2pay extends PaymentModule
         $transaction_arr['order_id'] = $orderID;
         $transaction_arr['payment_id'] = (!empty($payment_request['id']) ? $payment_request['id'] : 0);
         $transaction_arr['payment_status'] =
-            (!empty($payment_request['status']) and !empty($payment_request['status']['id']))
+            (!empty($payment_request['status'])
+                and !empty($payment_request['status']['id'])
+                and $payment_request['status']['id'] != self::S2P_STATUS_OPEN)
                 ? $payment_request['status']['id']
                 : 0;
 
@@ -2373,6 +2375,8 @@ class Smart2pay extends PaymentModule
                 switch ($payment_arr['status']['id']) {
                     case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_CUSTOMER:
                     case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_PROVIDER:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PROCESSING:
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_AUTHORIZED:
                         break;
 
                     case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_OPEN:
@@ -2667,9 +2671,6 @@ class Smart2pay extends PaymentModule
                         );
                         break;
 
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PROCESSING:
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_AUTHORIZED:
-                        break;
                 }
                 break;
 
