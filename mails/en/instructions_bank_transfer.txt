@@ -12,14 +12,14 @@ Order: {OrderReference} Placed on {OrderDate}
 Payment: {OrderPayment}
 
 PAYMENT INSTRUCTIONS:
-Reference Number: {ReferenceNumber}
-Amount To Pay: {AmountToPay}
-Account Holder: {AccountHolder}
-Bank Name: {BankName}
-Account Number: {AccountNumber}
-IBAN: {IBAN}
-SWIFT / BIC: {SWIFT_BIC}
-Account Currency: {AccountCurrency}
+Reference Number: {referencenumber}
+Amount To Pay: {amounttopay}
+Account Holder: {accountholder}
+Bank Name: {bankname}
+Account Number: {accountnumber}
+IBAN: {iban}
+SWIFT / BIC: {swift_bic}
+Account Currency: {accountcurrency}
 
 
 {shop_name} [{shop_url}] powered by
