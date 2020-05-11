@@ -10,9 +10,9 @@ Order: {OrderReference} Placed on {OrderDate}
 Payment: {OrderPayment}
 
 PAYMENT INSTRUCTIONS:
-Reference Number: {ReferenceNumber}
-Entity Number: {EntityNumber}
-Amount To Pay: {AmountToPay}
+Reference Number: {referencenumber}
+Entity Number: {entitynumber}
+Amount To Pay: {amounttopay}
 
 
 {shop_name} [{shop_url}] powered by
