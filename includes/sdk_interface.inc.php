@@ -424,7 +424,8 @@ if (!class_exists('Smart2PaySDKInterface', false)) {
                 $api_parameters['method_params']['payment']['generatecreditcardtoken'] = false;
             }
 
-            $api_parameters['method_params']['payment']['returnurl'] = $plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX . 'RETURN_URL'];
+            $api_parameters['method_params']['payment']['returnurl'] =
+                $plugin_settings_arr[$s2p_plugin::CONFIG_PREFIX . 'RETURN_URL'];
 
             $call_params = [];
 

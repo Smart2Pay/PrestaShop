@@ -2670,7 +2670,6 @@ class Smart2pay extends PaymentModule
                             $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_EXPIRE']
                         );
                         break;
-
                 }
                 break;
 
