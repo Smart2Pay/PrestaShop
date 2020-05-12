@@ -135,7 +135,7 @@ if (!class_exists('Smart2PayHelper', false)) {
                 $articles_arr[$articles_knti] = $article_arr;
 
                 $article_meta_arr = [];
-                $article_meta_arr['total_price'] = $article_arr['price'] * $article_arr['quantity'];
+                $article_meta_arr['total_price'] = $product_arr['total_wt'];
                 $article_meta_arr['price_perc'] = ($article_meta_arr['total_price'] * 100) / $cart_original_amount;
                 $article_meta_arr['surcharge_amount'] = 0;
 
