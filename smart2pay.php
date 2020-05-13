@@ -1437,7 +1437,7 @@ class Smart2pay extends PaymentModule
         }
 
         if ($moduleSettings['environment'] == 'demo') {
-            $merchant_transaction_id = 'PSDEMO_' . $orderID . '_' . microtime(true);
+            $merchant_transaction_id = 'PSDEMO_' . $orderID . '_' . time();
         } else {
             $merchant_transaction_id = $orderID;
         }
