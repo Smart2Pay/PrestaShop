@@ -40,11 +40,11 @@
 {if !empty( $s2p_data )}
 {if $s2p_data == $s2p_statuses.open}
     {include file="module:smart2pay/views/templates/front/payment_open.tpl"}
-{elseif $s2p_data == $s2p_statuses.success || $s2p_data == $s2p_statuses.authorized}
+{elseif $s2p_data == $s2p_statuses.success || $s2p_data == $s2p_statuses.authorized || $s2p_data == $s2p_statuses.captured}
     {include file="module:smart2pay/views/templates/front/payment_success.tpl"}
 {elseif $s2p_data == $s2p_statuses.cancelled}
     {include file="module:smart2pay/views/templates/front/payment_canceled.tpl"}
-{elseif $s2p_data == $s2p_statuses.failed}
+{elseif $s2p_data == $s2p_statuses.failed || $s2p_data == $s2p_statuses.rejected}
     {include file="module:smart2pay/views/templates/front/payment_failed.tpl"}
 {elseif $s2p_data == $s2p_statuses.expired}
     {include file="module:smart2pay/views/templates/front/payment_expired.tpl"}

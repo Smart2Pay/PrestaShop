@@ -45,7 +45,6 @@ class Smart2pay extends PaymentModule
     const S2P_STATUS_COMPLETED = 17;
     const S2P_STATUS_PROCESSING = 18;
     const S2P_STATUS_DISPUTED = 19;
-    const S2P_STATUS_CHARGEBACK = 20;
     const S2P_STATUS_PAID = 25;
     const S2P_STATUS_CHARGE_BACK = 26;
     const S2P_STATUS_PENDING_CHALLENGE_CONFIRMATION = 30;
@@ -322,6 +321,7 @@ class Smart2pay extends PaymentModule
             self::S2P_STATUS_SUCCESS => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_SUCCESS'],
             self::S2P_STATUS_CANCELLED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_CANCELED'],
             self::S2P_STATUS_FAILED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_FAILED'],
+            self::S2P_STATUS_REJECTED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_FAILED'],
             self::S2P_STATUS_PENDING_PROVIDER => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_PENDING'],
             self::S2P_STATUS_AUTHORIZED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_PENDING'],
             self::S2P_STATUS_CAPTURED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_SUCCESS'],
@@ -332,6 +332,7 @@ class Smart2pay extends PaymentModule
             'success' => self::S2P_STATUS_SUCCESS,
             'cancelled' => self::S2P_STATUS_CANCELLED,
             'failed' => self::S2P_STATUS_FAILED,
+            'rejected' => self::S2P_STATUS_REJECTED,
             'expired' => self::S2P_STATUS_EXPIRED,
             'processing' => self::S2P_STATUS_PENDING_PROVIDER,
             'authorized' => self::S2P_STATUS_AUTHORIZED,
@@ -365,7 +366,7 @@ class Smart2pay extends PaymentModule
         ]);
 
         if (!isset($returnMessages[$data])) {
-            $this->context->smarty->assign(['message' => $this->l('Unknown return status.')]);
+            $this->context->smarty->assign(['message' => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_PENDING']]);
         } else {
             $this->context->smarty->assign(['message' => $returnMessages[$data]]);
         }
