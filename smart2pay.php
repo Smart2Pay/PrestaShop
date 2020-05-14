@@ -46,6 +46,12 @@ class Smart2pay extends PaymentModule
     const S2P_STATUS_PROCESSING = 18;
     const S2P_STATUS_DISPUTED = 19;
     const S2P_STATUS_CHARGEBACK = 20;
+    const S2P_STATUS_PAID = 25;
+    const S2P_STATUS_CHARGE_BACK = 26;
+    const S2P_STATUS_PENDING_CHALLENGE_CONFIRMATION = 30;
+    const S2P_STATUS_QUEUED_FOR_CAPTURING = 33;
+    const S2P_STATUS_QUEUED_FOR_CANCELING = 34;
+    const S2P_STATUS_PARTIALLY_CAPTURED = 35;
     const CONFIG_PREFIX = 'S2P_';
     const S2PD_CONFIG_PREFIX = 'S2PD_';
     const S2P_DETECTOR_NAME = 'smart2paydetection';
@@ -318,6 +324,7 @@ class Smart2pay extends PaymentModule
             self::S2P_STATUS_FAILED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_FAILED'],
             self::S2P_STATUS_PENDING_PROVIDER => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_PENDING'],
             self::S2P_STATUS_AUTHORIZED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_PENDING'],
+            self::S2P_STATUS_CAPTURED => $moduleSettings[self::CONFIG_PREFIX . 'MESSAGE_SUCCESS'],
         ];
 
         $s2p_statuses = [
@@ -328,6 +335,7 @@ class Smart2pay extends PaymentModule
             'expired' => self::S2P_STATUS_EXPIRED,
             'processing' => self::S2P_STATUS_PENDING_PROVIDER,
             'authorized' => self::S2P_STATUS_AUTHORIZED,
+            'captured' => self::S2P_STATUS_CAPTURED,
         ];
 
         $data = (int) Tools::getValue('data', 0);
