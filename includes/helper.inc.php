@@ -246,8 +246,8 @@ if (!class_exists('Smart2PayHelper', false)) {
                         ($article_buf != '' ? '&' : '') . $key . '=' . str_replace(['&', ';', '='], ' ', $val);
                 }
 
-                $articles_arr[$knti]['price'] = (int) $article_arr['price'];
-                $articles_arr[$knti]['vat'] = (int) $article_arr['vat'];
+                $articles_arr[$knti]['price'] = (int) ($article_arr['price'] . '');
+                $articles_arr[$knti]['vat'] = (int) ($article_arr['vat'] . '');
                 // $articles_arr[$knti]['discount'] = (int)$article_arr['discount'];
 
                 $return_arr['buffer'] .= $article_buf . ';';
