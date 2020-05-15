@@ -2475,6 +2475,7 @@ class Smart2pay extends PaymentModule
                         }
                         break;
 
+                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_CAPTURED:
                     case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_SUCCESS:
                         /*
                          * Check amount  and currency
