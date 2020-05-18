@@ -518,30 +518,6 @@ if (!class_exists('Smart2PayHelper', false)) {
             return $form_buffer;
         }
 
-        public static function generatePathMessage($message)
-        {
-            return '<a >' . $message . '</a>';
-        }
-
-        public static function generateVersionsMessage($plugin_version, $sdk_version)
-        {
-            return 'Plugin version: ' . $plugin_version . '<br/>' .
-                'Smart2Pay SDK version: ' . $sdk_version . '<br/>' .
-                '<p><strong>NOTE</strong>:' .
-                'For a better understanding of our plugin, please check our integration guide:' .
-                ' <a href="https://docs.smart2pay.com/category/smart2pay-plugins/smart2pay-prestashop-plugin/" ' .
-                'style="text-decoration: underline;" target="_blank">Smart2Pay PrestaShop Integration Guide</a></p>';
-        }
-
-        public static function generatePaymentDetailsAndLogs($method_name, $logs_name, $logs)
-        {
-            return
-                '<li><a href="#s2p-payment-details"><i class="icon-money"></i> ' .
-                $method_name . ' <span class="badge">1</span></a></li>' .
-                '<li><a href="#s2p-payment-logs"><i class="icon-book"></i> ' .
-                $logs_name . ' <span class="badge">' . count($logs) . '</span></a></li>';
-        }
-
         public static function valueToString($val)
         {
             if (is_object($val) or is_resource($val)) {
