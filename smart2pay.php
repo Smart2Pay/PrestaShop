@@ -122,7 +122,8 @@ class Smart2pay extends PaymentModule
         parent::__construct();
 
         $this->displayName = $this->l('Smart2Pay');
-        $this->description = $this->l('Secure payments through 100+ alternative payment options.');
+        $this->description = $this->l('Smart2Pay is the one-stop-shop solution for your webshop.' .
+            ' We provide small and large merchants with one access point to more than 200 payment methods globally.');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
 
@@ -351,7 +352,7 @@ class Smart2pay extends PaymentModule
                 $path = '';
             }
 
-            $path .= Smart2PayHelper::generatePathMessage($this->l('Transaction Completed'));
+            $path .= $this->fetchPathMessage($this->l('Transaction Completed'));
 
             $this->context->smarty->assign(['path' => $path]);
         }
@@ -3638,7 +3639,7 @@ class Smart2pay extends PaymentModule
             ],
         ];
 
-        $form_buffer = Smart2PayHelper::generateVersionsMessage($this->version, $sdk_version);
+        $form_buffer = $this->fetchVersionsMessage($this->version, $sdk_version);
 
         $form_data = [];
         $form_data['submit_action'] = 'submit_main_data';
@@ -4758,11 +4759,7 @@ class Smart2pay extends PaymentModule
             'order_logs' => $order_logs,
         ]);
 
-        return Smart2PayHelper::generatePaymentDetailsAndLogs(
-            $this->l('Payment Method'),
-            $this->l('Payment Logs'),
-            $order_logs
-        );
+        return $this->fetchPaymentDetailsAndLogs($this->l('Payment Method'), $this->l('Payment Logs'), $order_logs);
     }
 
     /**
@@ -5457,5 +5454,52 @@ class Smart2pay extends PaymentModule
                 }
             }
         }
+    }
+
+    private function fetchPathMessage($message)
+    {
+        $this->context->smarty->assign(['message' => $message,]);
+        return $this->fetchTemplate('/views/templates/admin/settings/path_message.tpl');
+    }
+
+    private function fetchVersionsMessage($plugin_version, $sdk_version) {
+        $this->context->smarty->assign([
+            'plugin_version' => $plugin_version,
+            'sdk_version' => $sdk_version,
+        ]);
+        return $this->fetchTemplate('/views/templates/admin/settings/versions.tpl');
+    }
+
+    private function fetchPaymentDetailsAndLogs($method_name, $logs_name, $logs)
+    {
+        $this->context->smarty->assign([
+            'method_name' => $method_name,
+            'logs_name' => $logs_name,
+            'logs' => $logs,
+        ]);
+        return $this->fetchTemplate('/views/templates/admin/settings/payment_details_and_logs.tpl');
+    }
+
+    private function fetchCreateAccountUrl()
+    {
+        $params = [
+            'utm_source' => 'prestashop',
+            'utm_term' => 'ceva',
+            'utm_notification_url' => urlencode($this->getNotificationLink()),
+            'utm_return_url' => urlencode($this->getReturnLink())
+        ];
+        $url = implode('?', [
+            'https://127.0.0.1:8000/en/',
+            implode('&', array_map(
+                function ($v, $k) { return sprintf("%s=%s", $k, $v); },
+                $params,
+                array_keys($params)
+            ))
+        ]);
+
+        $this->context->smarty->assign([
+            'url' => $url
+        ]);
+        return $this->fetchTemplate('/views/templates/admin/create_account.tpl');
     }
 }

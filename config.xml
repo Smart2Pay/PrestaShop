@@ -3,7 +3,7 @@
     <name>smart2pay</name>
     <displayName><![CDATA[Smart2Pay]]></displayName>
     <version><![CDATA[2.0.7]]></version>
-    <description><![CDATA[Secure payments through 100+ alternative payment options.]]></description>
+    <description><![CDATA[Smart2Pay is the one-stop-shop solution for your webshop. We provide small and large merchants with one access point to more than 200 payment methods globally.]]></description>
     <author><![CDATA[Smart2Pay]]></author>
     <tab><![CDATA[payments_gateways]]></tab>
 	<confirmUninstall><![CDATA[Are you sure you want to uninstall Smart2Pay plugin?]]></confirmUninstall>
