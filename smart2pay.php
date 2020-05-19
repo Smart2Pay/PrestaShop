@@ -122,8 +122,10 @@ class Smart2pay extends PaymentModule
         parent::__construct();
 
         $this->displayName = $this->l('Smart2Pay');
-        $this->description = $this->l('Smart2Pay is the one-stop-shop solution for your webshop.
-         We provide small and large merchants with one access point to more than 200 payment methods globally.');
+        $this->description = $this->l(
+            'Smart2Pay is the one-stop-shop solution for your webshop.' .
+            ' We provide small and large merchants with one access point to more than 200 payment methods globally.'
+        );
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
 
