@@ -5498,11 +5498,8 @@ class Smart2pay extends PaymentModule
             'utm_medium' => 'affiliates',
             'utm_source' => 'prestashop',
             'utm_campaign' => 'premium_partnership',
-            //            'utm_content' => 'None',
-            //            'utm_term' => 'ceva',
-            'notification_url' => urlencode($this->getNotificationLink()),
-            'return_url' => urlencode($this->getReturnLink()),
-            'nonce' => md5(Tools::getShopDomainSsl(true, true)),
+            'notification_url' => urlencode($this->getNotificationLink() . '?nonce='. md5(Tools::getShopDomainSsl(true, true))),
+            'return_url' => urlencode($this->context->link->getAdminLink('AdminModules').'&configure='.$this->name),
         ];
         $url = implode('?', [
             'https://webtest.smart2pay.com/microsoft/signup/',
@@ -5526,11 +5523,17 @@ class Smart2pay extends PaymentModule
     private function parseCreateAccountNotification()
     {
         $this->writeLog('--- Create Account Notification START -------');
-        $site_id = Tools::getValue('site_id');
-        $apikey = Tools::getValue('apikey');
-        $this->writeLog('Received: side_id: \'' . $site_id . '\' apikey: \'' . $apikey . '\'');
-        Configuration::updateValue(self::CONFIG_PREFIX . 'SITE_ID_TEST', $site_id);
-        Configuration::updateValue(self::CONFIG_PREFIX . 'APIKEY_TEST', $apikey);
+        $nonce = Tools::getValue('nonce');
+        if ($nonce == md5(Tools::getShopDomainSsl(true, true))) {
+            $this->writeLog('--- Nonce is valid ----------');
+            $site_id = Tools::getValue('site_id');
+            $apikey = Tools::getValue('apikey');
+            $this->writeLog('Received: side_id: \'' . $site_id . '\' apikey: \'' . $apikey . '\'');
+            Configuration::updateValue(self::CONFIG_PREFIX . 'SITE_ID_TEST', $site_id);
+            Configuration::updateValue(self::CONFIG_PREFIX . 'APIKEY_TEST', $apikey);
+        } else {
+            $this->writeLog('--- Nonce invalid ----------');
+        }
         $this->writeLog('--- END Create Account Notification ----------');
 
         echo '{"ok":true}';
