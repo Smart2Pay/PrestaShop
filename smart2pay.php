@@ -5498,7 +5498,8 @@ class Smart2pay extends PaymentModule
             'utm_medium' => 'affiliates',
             'utm_source' => 'prestashop',
             'utm_campaign' => 'premium_partnership',
-            'notification_url' => urlencode($this->getNotificationLink() . '?nonce='. md5(Tools::getShopDomainSsl(true, true))),
+            'notification_url' =>
+                urlencode($this->getNotificationLink() . '?nonce='. md5(Tools::getShopDomainSsl(true, true))),
             'return_url' => urlencode($this->context->link->getAdminLink('AdminModules').'&configure='.$this->name),
         ];
         $url = implode('?', [
