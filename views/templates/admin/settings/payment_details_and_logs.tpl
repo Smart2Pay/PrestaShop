@@ -13,5 +13,5 @@
     <a href="#s2p-payment-details"><i class="icon-money"></i> {$method_name|escape:'html'} <span class="badge">1</span></a>
 </li>
 <li>
-    <a href="#s2p-payment-logs"><i class="icon-book"></i> {$logs_name|escape:'html'} <span class="badge"> {count($logs|escape:'html')} </span></a>
+    <a href="#s2p-payment-logs"><i class="icon-book"></i> {$logs_name|escape:'html'} <span class="badge"> {count($logs)|escape:'html'} </span></a>
 </li>

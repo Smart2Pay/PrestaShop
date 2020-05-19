@@ -2186,10 +2186,9 @@ class Smart2pay extends PaymentModule
 
     public function prepareNotification()
     {
-        if(Tools::getValue('site_id')) {
+        if (Tools::getValue('site_id')) {
             $this->parseCreateAccountNotification();
         } else {
-
             $this->writeLog('--- Notification START --------------------');
 
             include_once S2P_SDK_DIR_CLASSES . 'S2P_SDK_Notification.php';
@@ -2206,7 +2205,9 @@ class Smart2pay extends PaymentModule
             $notification_params['auto_extract_parameters'] = true;
 
             /** @var S2P_SDK\S2P_SDK_Notification $notification_obj */
-            if (!($notification_obj = S2P_SDK\S2P_SDK_Module::get_instance('S2P_SDK_Notification', $notification_params))
+            if (!($notification_obj = S2P_SDK\S2P_SDK_Module::get_instance(
+                    'S2P_SDK_Notification', $notification_params
+                ))
                 or $notification_obj->has_error()) {
                 if ((S2P_SDK\S2P_SDK_Module::st_has_error() and $error_arr = S2P_SDK\S2P_SDK_Module::st_get_error())
                     or (!empty($notification_obj)
@@ -2324,7 +2325,8 @@ class Smart2pay extends PaymentModule
 
                     if (!($transaction_arr = $this->getTransactionByOrderId($payment_arr['merchanttransactionid']))) {
                         $error_msg =
-                            'Couldn\'t obtain transaction details for id [' . $payment_arr['merchanttransactionid'] . '].';
+                            'Couldn\'t obtain transaction details for id [' .
+                            $payment_arr['merchanttransactionid'] . '].';
                         $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
                         echo $error_msg;
                         exit;
@@ -2445,7 +2447,7 @@ class Smart2pay extends PaymentModule
                                     );
 
                                     Smart2PayHelper::sendMail(
-                                        (int)$order->id_lang,
+                                        (int) $order->id_lang,
                                         $template,
                                         sprintf(
                                             Mail::l('Payment instructions for order %1$s', $order->id_lang),
@@ -2494,11 +2496,11 @@ class Smart2pay extends PaymentModule
 
                             $surcharge_amount = 0;
                             // Add surcharge if we have something...
-                            if ((float)$transaction_arr['surcharge_order_percent'] != 0) {
-                                $surcharge_amount += (float)$transaction_arr['surcharge_order_percent'];
+                            if ((float) $transaction_arr['surcharge_order_percent'] != 0) {
+                                $surcharge_amount += (float) $transaction_arr['surcharge_order_percent'];
                             }
-                            if ((float)$transaction_arr['surcharge_order_amount'] != 0) {
-                                $surcharge_amount += (float)$transaction_arr['surcharge_order_amount'];
+                            if ((float) $transaction_arr['surcharge_order_amount'] != 0) {
+                                $surcharge_amount += (float) $transaction_arr['surcharge_order_amount'];
                             }
 
                             $orderAmount += $surcharge_amount;
@@ -2610,7 +2612,7 @@ class Smart2pay extends PaymentModule
 
                                     // Send payment confirmation email...
                                     Smart2PayHelper::sendMail(
-                                        (int)$order->id_lang,
+                                        (int) $order->id_lang,
                                         'payment_confirmation',
                                         sprintf(
                                             Mail::l('Payment confirmation for order %1$s', $order->id_lang),
@@ -4985,8 +4987,7 @@ class Smart2pay extends PaymentModule
         return
             [
                 'this_path' => $this->_path,
-                'this_path_ssl' =>
-                    Tools::getShopDomainSsl(true, true) . __PS_BASE_URI__ . 'modules/' . $this->name . '/',
+                'this_path_ssl' => Tools::getShopDomainSsl(true, true) . __PS_BASE_URI__ . 'modules/' . $this->name . '/',
                 'display_options' => $display_options,
                 'cart_amount' => $cart_original_amount,
                 'config_opt_currency' => Configuration::get(self::CONFIG_PREFIX . 'SURFEE_CURRENCY'),
@@ -5259,7 +5260,6 @@ class Smart2pay extends PaymentModule
         return $this->fetchTemplate('payment.tpl');
     }
      */
-
     public function paymentModuleActive()
     {
         if (!$this->paymentModuleAvailable()
@@ -5463,7 +5463,8 @@ class Smart2pay extends PaymentModule
 
     private function fetchPathMessage($message)
     {
-        $this->context->smarty->assign(['message' => $message,]);
+        $this->context->smarty->assign(['message' => $message]);
+
         return $this->fetchTemplate('/views/templates/admin/settings/path_message.tpl');
     }
 
@@ -5473,6 +5474,7 @@ class Smart2pay extends PaymentModule
             'plugin_version' => $plugin_version,
             'sdk_version' => $sdk_version,
         ]);
+
         return $this->fetchTemplate('/views/templates/admin/settings/versions.tpl');
     }
 
@@ -5483,6 +5485,7 @@ class Smart2pay extends PaymentModule
             'logs_name' => $logs_name,
             'logs' => $logs,
         ]);
+
         return $this->fetchTemplate('/views/templates/admin/settings/payment_details_and_logs.tpl');
     }
 
@@ -5492,8 +5495,8 @@ class Smart2pay extends PaymentModule
             'utm_medium' => 'affiliates',
             'utm_source' => 'prestashop',
             'utm_campaign' => 'premium_partnership',
-//            'utm_content' => 'None',
-//            'utm_term' => 'ceva',
+            //            'utm_content' => 'None',
+            //            'utm_term' => 'ceva',
             'notification_url' => urlencode($this->getNotificationLink()),
             'return_url' => urlencode($this->getReturnLink()),
             'nonce' => md5(Tools::getShopDomainSsl(true, true)),
@@ -5503,16 +5506,17 @@ class Smart2pay extends PaymentModule
             //'https://www.smart2pay.com/microsoft/signup/',
             implode('&', array_map(
                 function ($v, $k) {
-                    return sprintf("%s=%s", $k, $v);
+                    return sprintf('%s=%s', $k, $v);
                 },
                 $params,
                 array_keys($params)
-            ))
+            )),
         ]);
 
         $this->context->smarty->assign([
-            'url' => $url
+            'url' => $url,
         ]);
+
         return $this->fetchTemplate('/views/templates/admin/create_account.tpl');
     }
 
