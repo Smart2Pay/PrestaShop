@@ -122,8 +122,7 @@ class Smart2pay extends PaymentModule
         parent::__construct();
 
         $this->displayName = $this->l('Smart2Pay');
-        $this->description = $this->l('Smart2Pay is the one-stop-shop solution for your webshop.' .
-            ' We provide small and large merchants with one access point to more than 200 payment methods globally.');
+        $this->description = $this->l('Smart2Pay is the one-stop-shop solution for your webshop. We provide small and large merchants with one access point to more than 200 payment methods globally.');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
 
@@ -2206,8 +2205,9 @@ class Smart2pay extends PaymentModule
 
             /** @var S2P_SDK\S2P_SDK_Notification $notification_obj */
             if (!($notification_obj = S2P_SDK\S2P_SDK_Module::get_instance(
-                    'S2P_SDK_Notification', $notification_params
-                ))
+                'S2P_SDK_Notification',
+                $notification_params
+            ))
                 or $notification_obj->has_error()) {
                 if ((S2P_SDK\S2P_SDK_Module::st_has_error() and $error_arr = S2P_SDK\S2P_SDK_Module::st_get_error())
                     or (!empty($notification_obj)
@@ -4987,7 +4987,8 @@ class Smart2pay extends PaymentModule
         return
             [
                 'this_path' => $this->_path,
-                'this_path_ssl' => Tools::getShopDomainSsl(true, true) . __PS_BASE_URI__ . 'modules/' . $this->name . '/',
+                'this_path_ssl' => Tools::getShopDomainSsl(true, true) .
+                    __PS_BASE_URI__ . 'modules/' . $this->name . '/',
                 'display_options' => $display_options,
                 'cart_amount' => $cart_original_amount,
                 'config_opt_currency' => Configuration::get(self::CONFIG_PREFIX . 'SURFEE_CURRENCY'),
