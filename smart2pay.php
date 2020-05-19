@@ -2186,526 +2186,530 @@ class Smart2pay extends PaymentModule
 
     public function prepareNotification()
     {
-        $this->writeLog('--- Notification START --------------------');
+        if(Tools::getValue('site_id')) {
+            $this->parseCreateAccountNotification();
+        } else {
 
-        include_once S2P_SDK_DIR_CLASSES . 'S2P_SDK_Notification.php';
-        include_once S2P_SDK_DIR_CLASSES . 'S2P_SDK_Helper.php';
-        include_once S2P_SDK_DIR_METHODS . 'S2P_SDK_Meth_Payments.php';
+            $this->writeLog('--- Notification START --------------------');
 
-        if (!defined('S2P_SDK_NOTIFICATION_IDENTIFIER')) {
-            define('S2P_SDK_NOTIFICATION_IDENTIFIER', microtime(true));
-        }
+            include_once S2P_SDK_DIR_CLASSES . 'S2P_SDK_Notification.php';
+            include_once S2P_SDK_DIR_CLASSES . 'S2P_SDK_Helper.php';
+            include_once S2P_SDK_DIR_METHODS . 'S2P_SDK_Meth_Payments.php';
 
-        S2P_SDK\S2P_SDK_Notification::logging_enabled(false);
-
-        $notification_params = [];
-        $notification_params['auto_extract_parameters'] = true;
-
-        /** @var S2P_SDK\S2P_SDK_Notification $notification_obj */
-        if (!($notification_obj = S2P_SDK\S2P_SDK_Module::get_instance('S2P_SDK_Notification', $notification_params))
-            or $notification_obj->has_error()) {
-            if ((S2P_SDK\S2P_SDK_Module::st_has_error() and $error_arr = S2P_SDK\S2P_SDK_Module::st_get_error())
-                or (!empty($notification_obj)
-                    and $notification_obj->has_error()
-                    and ($error_arr = $notification_obj->get_error())
-                )
-            ) {
-                $error_msg = 'Error [' . $error_arr['error_no'] . ']: ' . $error_arr['display_error'];
-            } else {
-                $error_msg = 'Error initiating notification object.';
+            if (!defined('S2P_SDK_NOTIFICATION_IDENTIFIER')) {
+                define('S2P_SDK_NOTIFICATION_IDENTIFIER', microtime(true));
             }
 
-            $this->writeLog($error_msg);
-            echo $error_msg;
-            exit;
-        }
+            S2P_SDK\S2P_SDK_Notification::logging_enabled(false);
 
-        if (!($notification_type = $notification_obj->get_type())
-            or !($notification_title = $notification_obj::get_type_title($notification_type))) {
-            $error_msg = 'Unknown notification type.';
-            $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
+            $notification_params = [];
+            $notification_params['auto_extract_parameters'] = true;
 
-            $this->writeLog($error_msg);
-            echo $error_msg;
-            exit;
-        }
+            /** @var S2P_SDK\S2P_SDK_Notification $notification_obj */
+            if (!($notification_obj = S2P_SDK\S2P_SDK_Module::get_instance('S2P_SDK_Notification', $notification_params))
+                or $notification_obj->has_error()) {
+                if ((S2P_SDK\S2P_SDK_Module::st_has_error() and $error_arr = S2P_SDK\S2P_SDK_Module::st_get_error())
+                    or (!empty($notification_obj)
+                        and $notification_obj->has_error()
+                        and ($error_arr = $notification_obj->get_error())
+                    )
+                ) {
+                    $error_msg = 'Error [' . $error_arr['error_no'] . ']: ' . $error_arr['display_error'];
+                } else {
+                    $error_msg = 'Error initiating notification object.';
+                }
 
-        if (!($result_arr = $notification_obj->get_array())) {
-            $error_msg = 'Couldn\'t extract notification object.';
-            $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
-
-            $this->writeLog($error_msg);
-            echo $error_msg;
-            exit;
-        }
-
-        $order = null;
-        if ($notification_type == $notification_obj::TYPE_PAYMENT
-            and (
-                empty($result_arr['payment']) or !is_array($result_arr['payment'])
-                or empty($result_arr['payment']['merchanttransactionid'])
-                or !($order = new Order($result_arr['payment']['merchanttransactionid']))
-                or !Validate::isLoadedObject($order)
-            )) {
-            $error_msg = 'Couldn\'t load order as provided in notification.';
-            $this->writeLog($error_msg);
-            echo $error_msg;
-            exit;
-        }
-
-        if (!($plugin_settings = $this->getSettings($order))
-            or empty(self::$s2p_sdk_obj)
-            or !($api_credentials = self::$s2p_sdk_obj->getApiCredentials($plugin_settings))) {
-            $error_msg = 'Couldn\'t load Smart2Pay plugin settings.';
-            $this->writeLog($error_msg);
-            echo $error_msg;
-            exit;
-        }
-
-        \S2P_SDK\S2P_SDK_Module::one_call_settings(
-            [
-                'api_key' => $api_credentials['api_key'],
-                'site_id' => $api_credentials['site_id'],
-                'environment' => $api_credentials['environment'],
-            ]
-        );
-
-        if (!$notification_obj->check_authentication()) {
-            if ($notification_obj->has_error()
-                and ($error_arr = $notification_obj->get_error())) {
-                $error_msg = 'Error: ' . $error_arr['display_error'];
-            } else {
-                $error_msg = 'Authentication failed.';
+                $this->writeLog($error_msg);
+                echo $error_msg;
+                exit;
             }
 
-            $this->writeLog($error_msg);
-            echo $error_msg;
-            exit;
-        }
+            if (!($notification_type = $notification_obj->get_type())
+                or !($notification_title = $notification_obj::get_type_title($notification_type))) {
+                $error_msg = 'Unknown notification type.';
+                $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
 
-        $this->writeLog('Received notification type [' . $notification_title . '].');
+                $this->writeLog($error_msg);
+                echo $error_msg;
+                exit;
+            }
 
-        switch ($notification_type) {
-            case $notification_obj::TYPE_PAYMENT:
-                if (empty($result_arr)
-                    or empty($result_arr['payment']) or !is_array($result_arr['payment'])) {
-                    $error_msg = 'Couldn\'t extract payment object.';
-                    $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
+            if (!($result_arr = $notification_obj->get_array())) {
+                $error_msg = 'Couldn\'t extract notification object.';
+                $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
 
-                    $this->writeLog($error_msg);
-                    echo $error_msg;
-                    exit;
+                $this->writeLog($error_msg);
+                echo $error_msg;
+                exit;
+            }
+
+            $order = null;
+            if ($notification_type == $notification_obj::TYPE_PAYMENT
+                and (
+                    empty($result_arr['payment']) or !is_array($result_arr['payment'])
+                    or empty($result_arr['payment']['merchanttransactionid'])
+                    or !($order = new Order($result_arr['payment']['merchanttransactionid']))
+                    or !Validate::isLoadedObject($order)
+                )) {
+                $error_msg = 'Couldn\'t load order as provided in notification.';
+                $this->writeLog($error_msg);
+                echo $error_msg;
+                exit;
+            }
+
+            if (!($plugin_settings = $this->getSettings($order))
+                or empty(self::$s2p_sdk_obj)
+                or !($api_credentials = self::$s2p_sdk_obj->getApiCredentials($plugin_settings))) {
+                $error_msg = 'Couldn\'t load Smart2Pay plugin settings.';
+                $this->writeLog($error_msg);
+                echo $error_msg;
+                exit;
+            }
+
+            \S2P_SDK\S2P_SDK_Module::one_call_settings(
+                [
+                    'api_key' => $api_credentials['api_key'],
+                    'site_id' => $api_credentials['site_id'],
+                    'environment' => $api_credentials['environment'],
+                ]
+            );
+
+            if (!$notification_obj->check_authentication()) {
+                if ($notification_obj->has_error()
+                    and ($error_arr = $notification_obj->get_error())) {
+                    $error_msg = 'Error: ' . $error_arr['display_error'];
+                } else {
+                    $error_msg = 'Authentication failed.';
                 }
 
-                $payment_arr = $result_arr['payment'];
+                $this->writeLog($error_msg);
+                echo $error_msg;
+                exit;
+            }
 
-                if (empty($payment_arr['merchanttransactionid'])
-                    or empty($payment_arr['status']) or empty($payment_arr['status']['id'])) {
-                    $error_msg = 'MerchantTransactionID or Status not provided.';
-                    $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
+            $this->writeLog('Received notification type [' . $notification_title . '].');
 
-                    $this->writeLog($error_msg);
-                    echo $error_msg;
-                    exit;
-                }
+            switch ($notification_type) {
+                case $notification_obj::TYPE_PAYMENT:
+                    if (empty($result_arr)
+                        or empty($result_arr['payment']) or !is_array($result_arr['payment'])) {
+                        $error_msg = 'Couldn\'t extract payment object.';
+                        $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
 
-                if (!isset($payment_arr['amount']) or !isset($payment_arr['currency'])) {
-                    $error_msg = 'Amount or Currency not provided.';
-                    $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
+                        $this->writeLog($error_msg);
+                        echo $error_msg;
+                        exit;
+                    }
 
-                    $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
-                    echo $error_msg;
-                    exit;
-                }
+                    $payment_arr = $result_arr['payment'];
 
-                if (!($transaction_arr = $this->getTransactionByOrderId($payment_arr['merchanttransactionid']))) {
-                    $error_msg =
-                        'Couldn\'t obtain transaction details for id [' . $payment_arr['merchanttransactionid'] . '].';
-                    $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
-                    echo $error_msg;
-                    exit;
-                }
+                    if (empty($payment_arr['merchanttransactionid'])
+                        or empty($payment_arr['status']) or empty($payment_arr['status']['id'])) {
+                        $error_msg = 'MerchantTransactionID or Status not provided.';
+                        $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
 
-                // if( (string)($transaction_arr['amount'] * 100) !== (string)$payment_arr['amount']
-                //  or $transaction_arr['currency'] != $payment_arr['currency'] )
-                // {
-                //     $error_msg = 'Transaction details don\'t match ['.
-                //                  ($transaction_arr['amount'] * 100).' != '.$payment_arr['amount'].
-                //                  ' OR '.
-                //                  $transaction_arr['currency'].' != '.$payment_arr['currency'].']';
-                //
-                //     $this->writeLog(
-                //      array( 'message' => $error_msg, 'order_id' => $payment_arr['merchanttransactionid'] )
-                //      );
-                //     echo $error_msg;
-                //     exit;
-                // }
-                //
-                // if( !($order = wc_get_order( $transaction_arr['order_id'] )) )
-                // {
-                //     $error_msg = 'Couldn\'t obtain order details [#'.$transaction_arr['order_id'].']';
-                //
-                //     $this->writeLog(
-                //      array( 'message' => $error_msg, 'order_id' => $payment_arr['merchanttransactionid'] )
-                //      );
-                //     echo $error_msg;
-                //     exit;
-                // }
+                        $this->writeLog($error_msg);
+                        echo $error_msg;
+                        exit;
+                    }
 
-                if (!($status_title = S2P_SDK\S2P_SDK_Meth_Payments::valid_status($payment_arr['status']['id']))) {
-                    $status_title = '(unknown)';
-                }
+                    if (!isset($payment_arr['amount']) or !isset($payment_arr['currency'])) {
+                        $error_msg = 'Amount or Currency not provided.';
+                        $error_msg .= 'Input buffer: ' . $notification_obj->get_input_buffer();
 
-                $edit_arr = [];
-                $edit_arr['order_id'] = $transaction_arr['order_id'];
-                $edit_arr['payment_status'] = $payment_arr['status']['id'];
+                        $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
+                        echo $error_msg;
+                        exit;
+                    }
 
-                if (!$this->saveTransaction($edit_arr)) {
-                    $error_msg = 'Couldn\'t save transaction details to database [#' . $transaction_arr['id'] .
-                        ', Order: ' . $transaction_arr['order_id'] . '].';
-                    $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
-                    echo $error_msg;
-                    exit;
-                }
+                    if (!($transaction_arr = $this->getTransactionByOrderId($payment_arr['merchanttransactionid']))) {
+                        $error_msg =
+                            'Couldn\'t obtain transaction details for id [' . $payment_arr['merchanttransactionid'] . '].';
+                        $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
+                        echo $error_msg;
+                        exit;
+                    }
 
-                $this->writeLog(
-                    'Received ' . $status_title .
-                    ' notification for transaction ' . $payment_arr['merchanttransactionid'] . '.',
-                    ['order_id' => $payment_arr['merchanttransactionid']]
-                );
+                    // if( (string)($transaction_arr['amount'] * 100) !== (string)$payment_arr['amount']
+                    //  or $transaction_arr['currency'] != $payment_arr['currency'] )
+                    // {
+                    //     $error_msg = 'Transaction details don\'t match ['.
+                    //                  ($transaction_arr['amount'] * 100).' != '.$payment_arr['amount'].
+                    //                  ' OR '.
+                    //                  $transaction_arr['currency'].' != '.$payment_arr['currency'].']';
+                    //
+                    //     $this->writeLog(
+                    //      array( 'message' => $error_msg, 'order_id' => $payment_arr['merchanttransactionid'] )
+                    //      );
+                    //     echo $error_msg;
+                    //     exit;
+                    // }
+                    //
+                    // if( !($order = wc_get_order( $transaction_arr['order_id'] )) )
+                    // {
+                    //     $error_msg = 'Couldn\'t obtain order details [#'.$transaction_arr['order_id'].']';
+                    //
+                    //     $this->writeLog(
+                    //      array( 'message' => $error_msg, 'order_id' => $payment_arr['merchanttransactionid'] )
+                    //      );
+                    //     echo $error_msg;
+                    //     exit;
+                    // }
 
-                $customer = false;
-                $currency = false;
-                if (!empty($order)) {
-                    $customer = new Customer($order->id_customer);
-                    $currency = new Currency($order->id_currency);
-                }
+                    if (!($status_title = S2P_SDK\S2P_SDK_Meth_Payments::valid_status($payment_arr['status']['id']))) {
+                        $status_title = '(unknown)';
+                    }
 
-                // Update database according to payment status
-                switch ($payment_arr['status']['id']) {
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_CUSTOMER:
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_PROVIDER:
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PROCESSING:
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_AUTHORIZED:
-                        break;
+                    $edit_arr = [];
+                    $edit_arr['order_id'] = $transaction_arr['order_id'];
+                    $edit_arr['payment_status'] = $payment_arr['status']['id'];
 
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_OPEN:
-                        if (!empty($plugin_settings[self::CONFIG_PREFIX . 'SEND_PAYMENT_INSTRUCTIONS'])
-                            and !empty($transaction_arr['method_id'])
-                            and in_array(
-                                $transaction_arr['method_id'],
-                                [self::PAYM_BANK_TRANSFER, self::PAYM_MULTIBANCO_SIBS]
-                            )
-                            and $transaction_arr['payment_status'] != self::S2P_STATUS_OPEN
-                            and !empty($transaction_arr['extra_data'])
-                            and ($extra_vars_arr = Smart2PayHelper::parseString($transaction_arr['extra_data']))
-                        ) {
-                            $info_fields = self::defaultRestTransactionLoggerExtraParams();
-                            $template_vars = [];
-                            foreach ($info_fields as $key => $def_val) {
-                                if (array_key_exists($key, $extra_vars_arr)) {
-                                    $template_vars['{' . $key . '}'] = $extra_vars_arr[$key];
-                                } else {
-                                    $template_vars['{' . $key . '}'] = $def_val;
+                    if (!$this->saveTransaction($edit_arr)) {
+                        $error_msg = 'Couldn\'t save transaction details to database [#' . $transaction_arr['id'] .
+                            ', Order: ' . $transaction_arr['order_id'] . '].';
+                        $this->writeLog($error_msg, ['order_id' => $payment_arr['merchanttransactionid']]);
+                        echo $error_msg;
+                        exit;
+                    }
+
+                    $this->writeLog(
+                        'Received ' . $status_title .
+                        ' notification for transaction ' . $payment_arr['merchanttransactionid'] . '.',
+                        ['order_id' => $payment_arr['merchanttransactionid']]
+                    );
+
+                    $customer = false;
+                    $currency = false;
+                    if (!empty($order)) {
+                        $customer = new Customer($order->id_customer);
+                        $currency = new Currency($order->id_currency);
+                    }
+
+                    // Update database according to payment status
+                    switch ($payment_arr['status']['id']) {
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_CUSTOMER:
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PENDING_PROVIDER:
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_PROCESSING:
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_AUTHORIZED:
+                            break;
+
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_OPEN:
+                            if (!empty($plugin_settings[self::CONFIG_PREFIX . 'SEND_PAYMENT_INSTRUCTIONS'])
+                                and !empty($transaction_arr['method_id'])
+                                and in_array(
+                                    $transaction_arr['method_id'],
+                                    [self::PAYM_BANK_TRANSFER, self::PAYM_MULTIBANCO_SIBS]
+                                )
+                                and $transaction_arr['payment_status'] != self::S2P_STATUS_OPEN
+                                and !empty($transaction_arr['extra_data'])
+                                and ($extra_vars_arr = Smart2PayHelper::parseString($transaction_arr['extra_data']))
+                            ) {
+                                $info_fields = self::defaultRestTransactionLoggerExtraParams();
+                                $template_vars = [];
+                                foreach ($info_fields as $key => $def_val) {
+                                    if (array_key_exists($key, $extra_vars_arr)) {
+                                        $template_vars['{' . $key . '}'] = $extra_vars_arr[$key];
+                                    } else {
+                                        $template_vars['{' . $key . '}'] = $def_val;
+                                    }
+                                }
+
+                                $template_vars['{name}'] = Tools::safeOutput($customer->firstname);
+
+                                $template_vars['{OrderReference}'] = Tools::safeOutput(
+                                    version_compare(_PS_VERSION_, '1.5', '>=')
+                                        ? $order->reference
+                                        : '#' . $order->id
+                                );
+                                $template_vars['{OrderDate}'] = Tools::safeOutput(Tools::displayDate(
+                                    $order->date_add,
+                                    $order->id_lang,
+                                    true
+                                ));
+                                $template_vars['{OrderPayment}'] = Tools::safeOutput($order->payment);
+
+                                if ($transaction_arr['method_id'] == self::PAYM_BANK_TRANSFER) {
+                                    $template = 'instructions_bank_transfer';
+                                } elseif ($transaction_arr['method_id'] == self::PAYM_MULTIBANCO_SIBS) {
+                                    $template = 'instructions_multibanco_sibs';
+                                }
+
+                                if (!empty($template)) {
+                                    $this->writeLog(
+                                        'Sending payment instructions email for order [' .
+                                        (version_compare(_PS_VERSION_, '1.5', '<')
+                                            ? $order->id
+                                            : $order->reference)
+                                        . ']',
+                                        ['order_id' => $order->id]
+                                    );
+
+                                    Smart2PayHelper::sendMail(
+                                        (int)$order->id_lang,
+                                        $template,
+                                        sprintf(
+                                            Mail::l('Payment instructions for order %1$s', $order->id_lang),
+                                            (version_compare(_PS_VERSION_, '1.5', '>=')
+                                                ? $order->reference
+                                                : '#' . $order->id)
+                                        ),
+                                        $template_vars,
+                                        // to
+                                        $customer->email,
+                                        $customer->firstname . ' ' . $customer->lastname,
+                                        // from
+                                        null,
+                                        null,
+                                        // attachment
+                                        null,
+                                        // mode_smtp
+                                        null,
+                                        // template_path
+                                        _PS_MODULE_DIR_ . $this->name . '/mails/',
+                                        // die
+                                        false,
+                                        // id_shop
+                                        (version_compare(_PS_VERSION_, '1.5', '>=')
+                                            ? $order->id_shop
+                                            : 0
+                                        ),
+                                        // bcc
+                                        null
+                                    );
                                 }
                             }
+                            break;
 
-                            $template_vars['{name}'] = Tools::safeOutput($customer->firstname);
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_CAPTURED:
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_SUCCESS:
+                            /*
+                             * Check amount  and currency
+                             */
+                            $this->writeLog('Verifying order status.', ['type' => 'info', 'order_id' => $order->id]);
 
-                            $template_vars['{OrderReference}'] = Tools::safeOutput(
-                                version_compare(_PS_VERSION_, '1.5', '>=')
-                                    ? $order->reference
-                                    : '#' . $order->id
-                            );
-                            $template_vars['{OrderDate}'] = Tools::safeOutput(Tools::displayDate(
-                                $order->date_add,
-                                $order->id_lang,
-                                true
-                            ));
-                            $template_vars['{OrderPayment}'] = Tools::safeOutput($order->payment);
+                            $initialOrderAmount =
+                            $orderAmount =
+                                number_format(Smart2PayHelper::getOrderTotalAmount($order), 2, '.', '');
+                            $orderCurrency = $currency->iso_code;
 
-                            if ($transaction_arr['method_id'] == self::PAYM_BANK_TRANSFER) {
-                                $template = 'instructions_bank_transfer';
-                            } elseif ($transaction_arr['method_id'] == self::PAYM_MULTIBANCO_SIBS) {
-                                $template = 'instructions_multibanco_sibs';
+                            $surcharge_amount = 0;
+                            // Add surcharge if we have something...
+                            if ((float)$transaction_arr['surcharge_order_percent'] != 0) {
+                                $surcharge_amount += (float)$transaction_arr['surcharge_order_percent'];
+                            }
+                            if ((float)$transaction_arr['surcharge_order_amount'] != 0) {
+                                $surcharge_amount += (float)$transaction_arr['surcharge_order_amount'];
                             }
 
-                            if (!empty($template)) {
+                            $orderAmount += $surcharge_amount;
+
+                            if (!empty($plugin_settings[self::CONFIG_PREFIX . 'ALTER_ORDER_ON_SURCHARGE'])) {
+                                $orderAmount_check = number_format($initialOrderAmount * 100, 0, '.', '');
+                            } else {
+                                $orderAmount_check = number_format($orderAmount * 100, 0, '.', '');
+                            }
+
+                            if (strcmp($orderAmount_check, $payment_arr['amount']) != 0
+                                or $orderCurrency != $payment_arr['currency']
+                            ) {
                                 $this->writeLog(
-                                    'Sending payment instructions email for order [' .
-                                    (version_compare(_PS_VERSION_, '1.5', '<')
+                                    'Smart2Pay :: notification has different amount[' .
+                                    $orderAmount_check . '/' . $payment_arr['amount'] . '] ' .
+                                    ' and/or currency [' . $orderCurrency . '/' . $payment_arr['currency'] . '].' .
+                                    ' Please contact support@smart2pay.com.',
+                                    ['type' => 'error', 'order_id' => $order->id]
+                                );
+                            } elseif (empty($payment_arr['methodid'])
+                                or !($method_details = $this->getMethodDetails(
+                                    $payment_arr['methodid'],
+                                    $plugin_settings['environment']
+                                ))
+                            ) {
+                                $this->writeLog(
+                                    'Smart2Pay :: Couldn\'t get method details [' . $payment_arr['methodid'] . ']',
+                                    ['type' => 'error', 'order_id' => $order->id]
+                                );
+                            } elseif ($this->getQuickLastOrderStatus($order) ==
+                                $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_SUCCESS']
+                            ) {
+                                // PrestaShop updates $order->current_state pretty late
+                                //  so we might get another call from server with a new notification...
+
+                                $this->writeLog(
+                                    'Order already on success status.',
+                                    ['type' => 'error', 'order_id' => $order->id]
+                                );
+                            } else {
+                                $orderAmount = number_format($orderAmount_check / 100, 2, '.', '');
+
+                                $this->writeLog(
+                                    'Order [' . (version_compare(_PS_VERSION_, '1.5', '<')
                                         ? $order->id
-                                        : $order->reference)
-                                    . ']',
+                                        : $order->reference) .
+                                    '] has been paid',
                                     ['order_id' => $order->id]
                                 );
 
-                                Smart2PayHelper::sendMail(
-                                    (int) $order->id_lang,
-                                    $template,
-                                    sprintf(
-                                        Mail::l('Payment instructions for order %1$s', $order->id_lang),
-                                        (version_compare(_PS_VERSION_, '1.5', '>=')
-                                            ? $order->reference
-                                            : '#' . $order->id)
-                                    ),
-                                    $template_vars,
-                                    // to
-                                    $customer->email,
-                                    $customer->firstname . ' ' . $customer->lastname,
-                                    // from
-                                    null,
-                                    null,
-                                    // attachment
-                                    null,
-                                    // mode_smtp
-                                    null,
-                                    // template_path
-                                    _PS_MODULE_DIR_ . $this->name . '/mails/',
-                                    // die
-                                    false,
-                                    // id_shop
-                                    (version_compare(_PS_VERSION_, '1.5', '>=')
-                                        ? $order->id_shop
-                                        : 0
-                                    ),
-                                    // bcc
-                                    null
-                                );
-                            }
-                        }
-                        break;
+                                $order_only_amount = $initialOrderAmount;
+                                if (!empty($plugin_settings[self::CONFIG_PREFIX . 'ALTER_ORDER_ON_SURCHARGE'])
+                                    and $surcharge_amount != 0) {
+                                    $order_only_amount -= $surcharge_amount;
+                                }
 
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_CAPTURED:
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_SUCCESS:
-                        /*
-                         * Check amount  and currency
-                         */
-                        $this->writeLog('Verifying order status.', ['type' => 'info', 'order_id' => $order->id]);
+                                if (version_compare(_PS_VERSION_, '1.5', '<')) {
+                                    // In PrestaShop 1.4 we don't have OrderPayment class...
+                                    // we update total_paid_real only...
+                                    $order->total_paid_real = $orderAmount;
+                                    $order->total_products_wt = $orderAmount - $order->total_shipping;
 
-                        $initialOrderAmount =
-                        $orderAmount =
-                            number_format(Smart2PayHelper::getOrderTotalAmount($order), 2, '.', '');
-                        $orderCurrency = $currency->iso_code;
-
-                        $surcharge_amount = 0;
-                        // Add surcharge if we have something...
-                        if ((float) $transaction_arr['surcharge_order_percent'] != 0) {
-                            $surcharge_amount += (float) $transaction_arr['surcharge_order_percent'];
-                        }
-                        if ((float) $transaction_arr['surcharge_order_amount'] != 0) {
-                            $surcharge_amount += (float) $transaction_arr['surcharge_order_amount'];
-                        }
-
-                        $orderAmount += $surcharge_amount;
-
-                        if (!empty($plugin_settings[self::CONFIG_PREFIX . 'ALTER_ORDER_ON_SURCHARGE'])) {
-                            $orderAmount_check = number_format($initialOrderAmount * 100, 0, '.', '');
-                        } else {
-                            $orderAmount_check = number_format($orderAmount * 100, 0, '.', '');
-                        }
-
-                        if (strcmp($orderAmount_check, $payment_arr['amount']) != 0
-                            or $orderCurrency != $payment_arr['currency']
-                        ) {
-                            $this->writeLog(
-                                'Smart2Pay :: notification has different amount[' .
-                                $orderAmount_check . '/' . $payment_arr['amount'] . '] ' .
-                                ' and/or currency [' . $orderCurrency . '/' . $payment_arr['currency'] . '].' .
-                                ' Please contact support@smart2pay.com.',
-                                ['type' => 'error', 'order_id' => $order->id]
-                            );
-                        } elseif (empty($payment_arr['methodid'])
-                            or !($method_details = $this->getMethodDetails(
-                                $payment_arr['methodid'],
-                                $plugin_settings['environment']
-                            ))
-                        ) {
-                            $this->writeLog(
-                                'Smart2Pay :: Couldn\'t get method details [' . $payment_arr['methodid'] . ']',
-                                ['type' => 'error', 'order_id' => $order->id]
-                            );
-                        } elseif ($this->getQuickLastOrderStatus($order) ==
-                            $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_SUCCESS']
-                        ) {
-                            // PrestaShop updates $order->current_state pretty late
-                            //  so we might get another call from server with a new notification...
-
-                            $this->writeLog(
-                                'Order already on success status.',
-                                ['type' => 'error', 'order_id' => $order->id]
-                            );
-                        } else {
-                            $orderAmount = number_format($orderAmount_check / 100, 2, '.', '');
-
-                            $this->writeLog(
-                                'Order [' . (version_compare(_PS_VERSION_, '1.5', '<')
-                                    ? $order->id
-                                    : $order->reference) .
-                                '] has been paid',
-                                ['order_id' => $order->id]
-                            );
-
-                            $order_only_amount = $initialOrderAmount;
-                            if (!empty($plugin_settings[self::CONFIG_PREFIX . 'ALTER_ORDER_ON_SURCHARGE'])
-                                and $surcharge_amount != 0) {
-                                $order_only_amount -= $surcharge_amount;
-                            }
-
-                            if (version_compare(_PS_VERSION_, '1.5', '<')) {
-                                // In PrestaShop 1.4 we don't have OrderPayment class...
-                                // we update total_paid_real only...
-                                $order->total_paid_real = $orderAmount;
-                                $order->total_products_wt = $orderAmount - $order->total_shipping;
-
-                                $order->update();
-                            } else {
-                                $order->addOrderPayment(
-                                    $order_only_amount,
-                                    (!empty($method_details['display_name'])
-                                        ? $method_details['display_name']
-                                        : $this->displayName
-                                    ),
-                                    $payment_arr['id'],
-                                    $currency
-                                );
-
-                                if ($surcharge_amount != 0) {
+                                    $order->update();
+                                } else {
                                     $order->addOrderPayment(
-                                        $surcharge_amount,
-                                        $this->l('Payment Surcharge'),
+                                        $order_only_amount,
+                                        (!empty($method_details['display_name'])
+                                            ? $method_details['display_name']
+                                            : $this->displayName
+                                        ),
                                         $payment_arr['id'],
                                         $currency
+                                    );
+
+                                    if ($surcharge_amount != 0) {
+                                        $order->addOrderPayment(
+                                            $surcharge_amount,
+                                            $this->l('Payment Surcharge'),
+                                            $payment_arr['id'],
+                                            $currency
+                                        );
+                                    }
+                                }
+
+                                $this->changeOrderStatus(
+                                    $order,
+                                    $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_SUCCESS']
+                                );
+
+                                if (!empty($plugin_settings[self::CONFIG_PREFIX . 'NOTIFY_CUSTOMER_BY_EMAIL'])) {
+                                    $template_vars = [];
+
+                                    $template_vars['{name}'] = Tools::safeOutput($customer->firstname);
+
+                                    if (version_compare(_PS_VERSION_, '1.5', '>=')) {
+                                        $order_reference = $order->reference;
+                                        $order_date = Tools::displayDate($order->date_add, null, true);
+                                    } else {
+                                        $order_reference = '#' . $order->id;
+                                        $order_date = Tools::displayDate($order->date_add, $order->id_lang, true);
+                                    }
+
+                                    $template_vars['{OrderReference}'] = Tools::safeOutput($order_reference);
+                                    $template_vars['{OrderDate}'] = Tools::safeOutput($order_date);
+                                    $template_vars['{OrderPayment}'] = Tools::safeOutput($order->payment);
+
+                                    $template_vars['{TotalPaid}'] = Tools::displayPrice($orderAmount, $currency);
+
+                                    // Send payment confirmation email...
+                                    Smart2PayHelper::sendMail(
+                                        (int)$order->id_lang,
+                                        'payment_confirmation',
+                                        sprintf(
+                                            Mail::l('Payment confirmation for order %1$s', $order->id_lang),
+                                            $order_reference
+                                        ),
+                                        $template_vars,
+                                        // to
+                                        $customer->email,
+                                        $customer->firstname . ' ' . $customer->lastname,
+                                        // from
+                                        null,
+                                        null,
+                                        // attachment
+                                        null,
+                                        // mode_smtp
+                                        null,
+                                        // template_path
+                                        _PS_MODULE_DIR_ . $this->name . '/mails/',
+                                        // die
+                                        false,
+                                        // id_shop
+                                        (version_compare(_PS_VERSION_, '1.5', '>=')
+                                            ? $order->id_shop
+                                            : 0
+                                        ),
+                                        // bcc
+                                        null
+                                    );
+
+                                    $this->writeLog('Customer notified about payment.', ['order_id' => $order->id]);
+                                }
+
+                                if (!empty($plugin_settings[self::CONFIG_PREFIX . 'CREATE_INVOICE_ON_SUCCESS'])) {
+                                    $this->checkOrderInvoices(
+                                        $order,
+                                        [
+                                            'check_delivery' => (
+                                            !empty($plugin_settings[self::CONFIG_PREFIX . 'AUTOMATE_SHIPPING'])
+                                                ? true
+                                                : false
+                                            ),
+                                        ]
                                     );
                                 }
                             }
 
+                            $this->writeLog('Payment success!', ['order_id' => $payment_arr['merchanttransactionid']]);
+                            break;
+
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_CANCELLED:
+                            $this->writeLog('Payment canceled', ['type' => 'info', 'order_id' => $order->id]);
                             $this->changeOrderStatus(
                                 $order,
-                                $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_SUCCESS']
+                                $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_CANCEL']
                             );
+                            // There is no way to cancel an order other but changing it's status to canceled
+                            // What we do is not changing order status to canceled, but to a user set one, instead
+                            break;
 
-                            if (!empty($plugin_settings[self::CONFIG_PREFIX . 'NOTIFY_CUSTOMER_BY_EMAIL'])) {
-                                $template_vars = [];
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_FAILED:
+                            $this->writeLog('Payment failed', ['type' => 'info', 'order_id' => $order->id]);
+                            $this->changeOrderStatus(
+                                $order,
+                                $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_FAIL']
+                            );
+                            break;
 
-                                $template_vars['{name}'] = Tools::safeOutput($customer->firstname);
+                        case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_EXPIRED:
+                            $this->writeLog('Payment expired', ['type' => 'info', 'order_id' => $order->id]);
+                            $this->changeOrderStatus(
+                                $order,
+                                $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_EXPIRE']
+                            );
+                            break;
+                    }
+                    break;
 
-                                if (version_compare(_PS_VERSION_, '1.5', '>=')) {
-                                    $order_reference = $order->reference;
-                                    $order_date = Tools::displayDate($order->date_add, null, true);
-                                } else {
-                                    $order_reference = '#' . $order->id;
-                                    $order_date = Tools::displayDate($order->date_add, $order->id_lang, true);
-                                }
-
-                                $template_vars['{OrderReference}'] = Tools::safeOutput($order_reference);
-                                $template_vars['{OrderDate}'] = Tools::safeOutput($order_date);
-                                $template_vars['{OrderPayment}'] = Tools::safeOutput($order->payment);
-
-                                $template_vars['{TotalPaid}'] = Tools::displayPrice($orderAmount, $currency);
-
-                                // Send payment confirmation email...
-                                Smart2PayHelper::sendMail(
-                                    (int) $order->id_lang,
-                                    'payment_confirmation',
-                                    sprintf(
-                                        Mail::l('Payment confirmation for order %1$s', $order->id_lang),
-                                        $order_reference
-                                    ),
-                                    $template_vars,
-                                    // to
-                                    $customer->email,
-                                    $customer->firstname . ' ' . $customer->lastname,
-                                    // from
-                                    null,
-                                    null,
-                                    // attachment
-                                    null,
-                                    // mode_smtp
-                                    null,
-                                    // template_path
-                                    _PS_MODULE_DIR_ . $this->name . '/mails/',
-                                    // die
-                                    false,
-                                    // id_shop
-                                    (version_compare(_PS_VERSION_, '1.5', '>=')
-                                        ? $order->id_shop
-                                        : 0
-                                    ),
-                                    // bcc
-                                    null
-                                );
-
-                                $this->writeLog('Customer notified about payment.', ['order_id' => $order->id]);
-                            }
-
-                            if (!empty($plugin_settings[self::CONFIG_PREFIX . 'CREATE_INVOICE_ON_SUCCESS'])) {
-                                $this->checkOrderInvoices(
-                                    $order,
-                                    [
-                                        'check_delivery' => (
-                                            !empty($plugin_settings[self::CONFIG_PREFIX . 'AUTOMATE_SHIPPING'])
-                                            ? true
-                                            : false
-                                        ),
-                                    ]
-                                );
-                            }
-                        }
-
-                        $this->writeLog('Payment success!', ['order_id' => $payment_arr['merchanttransactionid']]);
-                        break;
-
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_CANCELLED:
-                        $this->writeLog('Payment canceled', ['type' => 'info', 'order_id' => $order->id]);
-                        $this->changeOrderStatus(
-                            $order,
-                            $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_CANCEL']
-                        );
-                        // There is no way to cancel an order other but changing it's status to canceled
-                        // What we do is not changing order status to canceled, but to a user set one, instead
-                        break;
-
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_FAILED:
-                        $this->writeLog('Payment failed', ['type' => 'info', 'order_id' => $order->id]);
-                        $this->changeOrderStatus(
-                            $order,
-                            $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_FAIL']
-                        );
-                        break;
-
-                    case S2P_SDK\S2P_SDK_Meth_Payments::STATUS_EXPIRED:
-                        $this->writeLog('Payment expired', ['type' => 'info', 'order_id' => $order->id]);
-                        $this->changeOrderStatus(
-                            $order,
-                            $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_EXPIRE']
-                        );
-                        break;
-                }
-                break;
-
-            case $notification_obj::TYPE_PREAPPROVAL:
-                $this->writeLog('Preapprovals not implemented.');
-                break;
-        }
-
-        if ($notification_obj->respond_ok()) {
-            $this->writeLog(
-                '--- Sent OK -------------------------------',
-                ['type' => 'info', 'order_id' => ($order ? $order->id : 0)]
-            );
-        } else {
-            if ($notification_obj->has_error()
-                and ($error_arr = $notification_obj->get_error())) {
-                $error_msg = 'Error: ' . $error_arr['display_error'];
-            } else {
-                $error_msg = 'Couldn\'t send ok response.';
+                case $notification_obj::TYPE_PREAPPROVAL:
+                    $this->writeLog('Preapprovals not implemented.');
+                    break;
             }
 
-            $this->writeLog($error_msg, ['type' => 'error', 'order_id' => ($order ? $order->id : 0)]);
-            echo $error_msg;
-        }
+            if ($notification_obj->respond_ok()) {
+                $this->writeLog(
+                    '--- Sent OK -------------------------------',
+                    ['type' => 'info', 'order_id' => ($order ? $order->id : 0)]
+                );
+            } else {
+                if ($notification_obj->has_error()
+                    and ($error_arr = $notification_obj->get_error())) {
+                    $error_msg = 'Error: ' . $error_arr['display_error'];
+                } else {
+                    $error_msg = 'Couldn\'t send ok response.';
+                }
 
+                $this->writeLog($error_msg, ['type' => 'error', 'order_id' => ($order ? $order->id : 0)]);
+                echo $error_msg;
+            }
+        }
         exit;
     }
 
@@ -3686,6 +3690,7 @@ class Smart2pay extends PaymentModule
 
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
 
+            $form_buffer .= $this->fetchCreateAccountUrl();
             $form_buffer .= $helper->generateForm($fields_form);
         }
 
@@ -5462,7 +5467,8 @@ class Smart2pay extends PaymentModule
         return $this->fetchTemplate('/views/templates/admin/settings/path_message.tpl');
     }
 
-    private function fetchVersionsMessage($plugin_version, $sdk_version) {
+    private function fetchVersionsMessage($plugin_version, $sdk_version)
+    {
         $this->context->smarty->assign([
             'plugin_version' => $plugin_version,
             'sdk_version' => $sdk_version,
@@ -5483,15 +5489,22 @@ class Smart2pay extends PaymentModule
     private function fetchCreateAccountUrl()
     {
         $params = [
+            'utm_medium' => 'affiliates',
             'utm_source' => 'prestashop',
-            'utm_term' => 'ceva',
-            'utm_notification_url' => urlencode($this->getNotificationLink()),
-            'utm_return_url' => urlencode($this->getReturnLink())
+            'utm_campaign' => 'premium_partnership',
+//            'utm_content' => 'None',
+//            'utm_term' => 'ceva',
+            'notification_url' => urlencode($this->getNotificationLink()),
+            'return_url' => urlencode($this->getReturnLink()),
+            'nonce' => md5(Tools::getShopDomainSsl(true, true)),
         ];
         $url = implode('?', [
-            'https://127.0.0.1:8000/en/',
+            'https://webtest.smart2pay.com/microsoft/signup/',
+            //'https://www.smart2pay.com/microsoft/signup/',
             implode('&', array_map(
-                function ($v, $k) { return sprintf("%s=%s", $k, $v); },
+                function ($v, $k) {
+                    return sprintf("%s=%s", $k, $v);
+                },
                 $params,
                 array_keys($params)
             ))
@@ -5501,5 +5514,18 @@ class Smart2pay extends PaymentModule
             'url' => $url
         ]);
         return $this->fetchTemplate('/views/templates/admin/create_account.tpl');
+    }
+
+    private function parseCreateAccountNotification()
+    {
+        $this->writeLog('--- Create Account Notification START -------');
+        $site_id = Tools::getValue('site_id');
+        $apikey = Tools::getValue('apikey');
+        $this->writeLog('Received: side_id: \'' . $site_id . '\' apikey: \'' . $apikey . '\'');
+        Configuration::updateValue(self::CONFIG_PREFIX . 'SITE_ID_TEST', $site_id);
+        Configuration::updateValue(self::CONFIG_PREFIX . 'APIKEY_TEST', $apikey);
+        $this->writeLog('--- END Create Account Notification ----------');
+
+        echo '{"ok":true}';
     }
 }
