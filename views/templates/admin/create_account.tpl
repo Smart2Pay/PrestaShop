@@ -11,7 +11,7 @@
 *}
 <div>
     {l s='If you don\'t have an account click ' mod='smart2pay'}
-    <a href="{$url}"
+    <a href="{$url|escape:'html'}"
        title="{l s='Smart2Pay Register' mod='smart2pay'}"
     >{l s='here' mod='smart2pay'}</a>
 </div>

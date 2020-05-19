@@ -9,8 +9,8 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
-Plugin version: {$plugin_version}<br/>
-Smart2Pay SDK version: {$sdk_version}<br/>
+Plugin version: {$plugin_version|escape:'html'}<br/>
+Smart2Pay SDK version: {$sdk_version|escape:'html'}<br/>
 <p><strong>NOTE</strong>: For a better understanding of our plugin, please check our integration guide:
     <a href="https://docs.smart2pay.com/category/smart2pay-plugins/smart2pay-prestashop-plugin/"
        style="text-decoration: underline;"
