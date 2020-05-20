@@ -118,6 +118,7 @@ class Smart2pay extends PaymentModule
         $this->ps_versions_compliancy = ['min' => '1.4', 'max' => _PS_VERSION_];
         $this->bootstrap = true;
         $this->controllers = ['payment'];
+        $this->module_key = '4d2dcd51db4c99a16809f15d8afe639c';
 
         parent::__construct();
 
