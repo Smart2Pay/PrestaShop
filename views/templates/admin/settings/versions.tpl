@@ -9,11 +9,12 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
-Plugin version: {$plugin_version|escape:'html'}<br/>
-Smart2Pay SDK version: {$sdk_version|escape:'html'}<br/>
-<p><strong>NOTE</strong>: For a better understanding of our plugin, please check our integration guide:
+{l s='Plugin version' mod='smart2pay'}: {$plugin_version|escape:'html'}<br/>
+{l s='Smart2Pay SDK version' mod='smart2pay'}: {$sdk_version|escape:'html'}<br/>
+{l s='Support contact details' mod='smart2pay'} <a href="mailto:support@smart2pay.com">support@smart2pay.com</a>
+<p><strong>{l s='NOTE' mod='smart2pay'}</strong>: {l s='For a better understanding of our plugin, please check our integration guide' mod='smart2pay'}:
     <a href="https://docs.smart2pay.com/category/smart2pay-plugins/smart2pay-prestashop-plugin/"
        style="text-decoration: underline;"
        target="_blank"
-    > Smart2Pay PrestaShop Integration Guide </a>
+    > {l s='Smart2Pay PrestaShop Integration Guide' mod='smart2pay'} </a>
 </p>
