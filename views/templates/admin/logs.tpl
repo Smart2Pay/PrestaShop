@@ -11,15 +11,15 @@
 *}
 {if $smarty.const._PS_VERSION_ >= 1.6}
 <div class="panel">
-    <div class="panel-heading">{l s='Logs' mod='smart2pay'}</div>
+    <div class="panel-heading">{l s='Troubleshooting' mod='smart2pay'}</div>
     <div class="smart2pay-admin-logs-container">
 {else}
 <br/>
 <fieldset>
-    <legend>{l s='Logs' mod='smart2pay'}</legend>
+    <legend>{l s='Troubleshooting' mod='smart2pay'}</legend>
 {/if}
         {if empty( $logs )}
-        <div style="text-align: center">{l s='No logs available at the moment' mod='smart2pay'}</div>
+        <div style="text-align: center">{l s='No data available at the moment' mod='smart2pay'}</div>
         {else}
         <table class="table" style="{if $smarty.const._PS_VERSION_ >= 1.5}width: 80%;{else}width: 100%;{/if} margin: 0 auto;">
             <thead>

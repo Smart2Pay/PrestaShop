@@ -1,0 +1,56 @@
+.bootstrap button {
+  float: right;
+}
+
+.div-inline-flex {
+  display: inline-flex;
+  align-self: flex-start;
+  overflow: hidden;
+}
+
+.smart2pay_radio {
+  padding-top: 0 !important;
+}
+
+.has-toggle-input label, .has-toggle-input.radio label {
+  display: block;
+  float: left;
+  padding: 5px 10px;
+  margin: auto auto auto -1px;
+  background: #f4f4f4;
+  color: #444;
+  border: 1px #d0d0d0 solid;
+  line-height: normal;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.has-toggle-input label.active {
+  background: #00aff0;
+  border-color: #00aff0;
+  color: white;
+}
+
+.has-toggle-input label:first-of-type { margin-left: auto; }
+
+.has-toggle-input label:last-of-type { }
+
+.create-account-notification, .kyc-notification, .change-env-notification {
+  margin-top: 6px;
+}
+
+.create-account-notification, .env-test, .env-live, .kyc-notification, .change-env-notification {
+  display: none;
+}
+
+#fieldset_0_1 {
+  border-style: hidden !important;
+  padding: 0 !important;
+}
+
+.section {
+  padding: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #dddddd;
+  border-radius: 5px;
+}

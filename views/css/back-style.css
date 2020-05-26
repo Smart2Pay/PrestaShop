@@ -1,4 +1,4 @@
-.smart2pay-admin-logs-container { max-height: 300px; overflow: auto; }
+.smart2pay-admin-logs-container { overflow: auto; }
 .smart2pay-admin-payment-method-container {}
 
 .smart2pay-admin-logs-item-type, .smart2pay--admin-logs-item-date { color: black !important; }
