@@ -1014,18 +1014,18 @@ class Smart2pay extends PaymentModule
         }
 
         return [
-            [
-                'type' => 'select',
-                'label' => $this->l('Enabled'),
-                'name' => self::CONFIG_PREFIX . 'ENABLED',
-                'required' => true,
-                'options' => [
-                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
-                    'id' => 'id',
-                    'name' => 'name',
-                ],
-                '_default' => 1,
-            ],
+//            [
+//                'type' => 'select',
+//                'label' => $this->l('Enabled'),
+//                'name' => self::CONFIG_PREFIX . 'ENABLED',
+//                'required' => true,
+//                'options' => [
+//                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+//                    'id' => 'id',
+//                    'name' => 'name',
+//                ],
+//                '_default' => 1,
+//            ],
             [
                 'type' => 'radio',
                 'class' => 'smart2pay_radio',
@@ -2071,6 +2071,12 @@ class Smart2pay extends PaymentModule
                 } else {
                     $error_msg = 'Call error: ' . $sdk_obj->getErrorMessage();
                 }
+
+                $plugin_settings = $this->getSettings($order);
+                $this->changeOrderStatus(
+                    new Order($orderID),
+                    $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_FAIL']
+                );
 
                 $this->writeLog($error_msg, ['type' => 'error', 'order_id' => $orderID]);
                 $this->redirectToStep1(['errors' => [$error_msg]]);
@@ -3676,7 +3682,7 @@ class Smart2pay extends PaymentModule
         } /*
          * Check submit of main form
          */
-        elseif (Tools::isSubmit('submit_main_data') and Tools::getValue(self::CONFIG_PREFIX . 'ENABLED')) {
+        elseif (Tools::isSubmit('submit_main_data')) {
             $post_data['submit'] = 'submit_main_data';
 
             $formValues = [];
