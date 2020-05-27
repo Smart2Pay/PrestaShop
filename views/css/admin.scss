@@ -31,7 +31,9 @@
   color: white;
 }
 
-.has-toggle-input label:first-of-type { margin-left: auto; }
+.has-toggle-input label:first-of-type {
+  margin-left: auto;
+}
 
 .has-toggle-input label:last-of-type { }
 
@@ -51,6 +53,6 @@
 .section {
   padding: 8px;
   margin-bottom: 16px;
-  border: 1px solid #dddddd;
+  border: 1px solid #ddd;
   border-radius: 5px;
 }
