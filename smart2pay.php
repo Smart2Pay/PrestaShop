@@ -1056,10 +1056,6 @@ class Smart2pay extends PaymentModule
                 '_transform' => ['trim'],
                 '_validate' => ['notempty'],
                 '_default' => '',
-                //                'desc' => [
-                //                    $this->l('Notification URL for this store configuration is: '),
-                //                    $this->getNotificationLink(),
-                //                ],
                 's2p_end_env_test' => true,
             ],
             [
@@ -1080,10 +1076,6 @@ class Smart2pay extends PaymentModule
                 '_transform' => ['trim'],
                 '_validate' => ['notempty'],
                 '_default' => '',
-                //                'desc' => [
-                //                    $this->l('Notification URL for this store configuration is: '),
-                //                    $this->getNotificationLink(),
-                //                ],
                 's2p_end_env_live' => true,
             ],
             [
@@ -1157,7 +1149,7 @@ class Smart2pay extends PaymentModule
                 'label' => $this->l('Notify customer by email'),
                 'name' => self::CONFIG_PREFIX . 'NOTIFY_CUSTOMER_BY_EMAIL',
                 'required' => false,
-                'desc' => [
+                'hint' => [
                     $this->l('When payment is completed with success should system send an email to the customer?'),
                 ],
                 'options' => [
@@ -1172,7 +1164,7 @@ class Smart2pay extends PaymentModule
                 'label' => $this->l('Send payment instructions on order creation'),
                 'name' => self::CONFIG_PREFIX . 'SEND_PAYMENT_INSTRUCTIONS',
                 'required' => false,
-                'desc' => [
+                'hint' => [
                     $this->l(
                         'Some payment methods (like Bank Transfer and Multibanco SIBS)' .
                         ' generate information required by costomer to complete the payment.'
@@ -1320,11 +1312,11 @@ class Smart2pay extends PaymentModule
                 'type' => 'select',
                 'label' => $this->l('Force country'),
                 'name' => self::CONFIG_PREFIX . 'FORCED_COUNTRY',
-                'desc' => [
+                'hint' => [
+                    $this->l('Always use this country for payment module.'),
                     $this->l('If this option is selected Country detection will be disregarded.'),
                     $this->l('NOTE: Please be sure all your clients can make payments in selected country.'),
                 ],
-                'hint' => $this->l('Always use this country for payment module.'),
                 'required' => true,
                 'options' => [
                     'query' => $this->getConfigFormSelectInputOptions(
@@ -1344,7 +1336,7 @@ class Smart2pay extends PaymentModule
                 'type' => 'select',
                 'label' => $this->l('Country detection'),
                 'name' => self::CONFIG_PREFIX . 'COUNTRY_DETECTION',
-                'desc' => [
+                'hint' => [
                     $this->l(
                         'Plugin will try detecting visitor\'s country by IP.' .
                         ' Country is important for plugin as payment methods are displayed depending on country.'
@@ -1370,7 +1362,7 @@ class Smart2pay extends PaymentModule
                 'type' => 'select',
                 'label' => $this->l('Use IP sent by proxy'),
                 'name' => self::CONFIG_PREFIX . 'PROXY_IP',
-                'desc' => [
+                'hint' => [
                     $this->l(
                         'If your site is behind a firewall IP' .
                         ' in headers might be set for every request to firewall IP.'
@@ -1414,7 +1406,7 @@ class Smart2pay extends PaymentModule
                 'label' => $this->l('Alter order total based on surcharge'),
                 'name' => self::CONFIG_PREFIX . 'ALTER_ORDER_ON_SURCHARGE',
                 'required' => false,
-                'desc' => [
+                'hint' => [
                     $this->l(
                         'When using a payment method which has a surcharge amount or percent set,' .
                         ' order total will be incremented with resulting surcharge amount.'
