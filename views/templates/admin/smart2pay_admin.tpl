@@ -9,7 +9,7 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
-<link href="{$module_dir|escape:'htmlall'}views/css/admin.scss" rel="stylesheet" type="text/css" media="all"/>
+<link href="{$module_dir|escape:'htmlall'}views/css/admin.css" rel="stylesheet" type="text/css" media="all"/>
 <script type="text/javascript" src="{$module_dir|escape:'htmlall'}views/js/admin.js"></script>
 <script type="text/javascript" src="{$module_dir|escape:'htmlall'}views/js/jquery.toggleinput.js"></script>
 
