@@ -1,8 +1,19 @@
+{*
+* 2015 Smart2Pay
+*
+* DISCLAIMER
+*
+* Do not edit or add to this file if you wish to upgrade this plugin
+* in the future.
+*
+*  @author Smart2Pay
+*  @copyright  2015 Smart2Pay
+*}
 <link href="{$module_dir|escape:'htmlall'}views/css/admin.scss" rel="stylesheet" type="text/css" media="all"/>
 <script type="text/javascript" src="{$module_dir|escape:'htmlall'}views/js/admin.js"></script>
 <script type="text/javascript" src="{$module_dir|escape:'htmlall'}views/js/jquery.toggleinput.js"></script>
 
-{$output nofilter}
+{$output}{* HTML, cannot escape*}
 
 <div class="tabbable">
     <ul id="navigation" class="nav nav-tabs">
@@ -23,22 +34,22 @@
     <div class="panel">
         <div class="tab-content">
             <div id="tab-general" {if $submit != 'submit_main_data'}style="display: none;"{/if}>
-                {$generalForm nofilter}
+                {$generalForm}{* HTML, cannot escape*}
             </div>
 
             <div id="tab-advanced" {if $submit != 'submit_advanced_data'}style="display: none;"{/if}>
-                {$advancedForm nofilter}
+                {$advancedForm}{* HTML, cannot escape*}
             </div>
 
             <div id="tab-methods" {if ($submit != 'submit_payment_methods' && $submit != 'submit_syncronize_methods')}style="display: none;"{/if}>
-                {$roundingWarning nofilter}
-                {$decimalWarning nofilter}
-                {$methods nofilter}
+                {$roundingWarning}{* HTML, cannot escape*}
+                {$decimalWarning}{* HTML, cannot escape*}
+                {$methods}{* HTML, cannot escape*}
             </div>
 
             <div id="tab-troubleshooting" style="display: none;">
-                {$versions_message}
-                {$logs nofilter}
+                {$versions_message}{* HTML, cannot escape*}
+                {$logs}{* HTML, cannot escape*}
             </div>
         </div>
     </div>

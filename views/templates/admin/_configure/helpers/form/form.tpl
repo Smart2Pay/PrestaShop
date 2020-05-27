@@ -40,8 +40,8 @@
 
     {if $input.s2p_radio_to_switch}
         </div>
-        {$input.create_account_message nofilter}
-        {$input.change_env_message nofilter}
-        {$input.kyc_info_message nofilter}
+        {$input.create_account_message}{* HTML, cannot escape*}
+        {$input.change_env_message}{* HTML, cannot escape*}
+        {$input.kyc_info_message}{* HTML, cannot escape*}
     {/if}
 {/block}

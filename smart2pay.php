@@ -4185,95 +4185,6 @@ class Smart2pay extends PaymentModule
         return $check_result;
     }
 
-//    /**
-//     * Display Config Form
-//     *
-//     * @return mixed
-//     */
-//    public function displayForm()
-//    {
-//        // Get default language
-//        $default_lang = (int) Configuration::get('PS_LANG_DEFAULT');
-//
-//        if (!$this->initSdkInstance()) {
-//            return 'Cannot initiate Smart2Pay SDK.' .
-//                ' Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
-//        }
-//
-//        $sdk_obj = self::$s2p_sdk_obj;
-//        if (!($sdk_version = $sdk_obj::getSdkVersion())) {
-//            return 'Cannot get Smart2Pay SDK version.' .
-//                ' Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
-//        }
-//
-//        $fields_form = [];
-//
-//        // Init Fields form array
-//        $fields_form[0]['form'] = [
-//            'legend' => [
-//                'title' => $this->l('Settings'),
-//            ],
-//            'input' => $this->getConfigFormInputs(),
-//            'submit' => [
-//                'title' => $this->l('Save'),
-//                'class' => 'button',
-//            ],
-//        ];
-//
-//        $form_buffer = '';
-//
-//        $form_data = [];
-//        $form_data['submit_action'] = 'submit_main_data';
-//
-//        $form_values = [];
-//        // Load current value
-//        foreach ($this->getConfigFormInputNames() as $name) {
-//            $form_values[$name] = Configuration::get($name);
-//        }
-//
-//        if (version_compare(_PS_VERSION_, '1.5', '<')) {
-//            $form_buffer .= Smart2PayHelper::generateAncientForm($fields_form, $form_data, $form_values);
-//        } else {
-//            $helper = new HelperForm();
-//
-//            // Module, token and currentIndex
-//            $helper->module = $this;
-//            $helper->name_controller = $this->name;
-//            $helper->token = Tools::getAdminTokenLite('AdminModules');
-//            $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-//
-//            // Language
-//            $helper->default_form_language = $default_lang;
-//            $helper->allow_employee_form_lang = $default_lang;
-//
-//            // Title and toolbar
-//            $helper->title = $this->displayName;
-//            $helper->show_toolbar = true;        // false -> remove toolbar
-//            $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
-//            $helper->submit_action = $form_data['submit_action'];
-//            $helper->toolbar_btn = [
-//                'save' => [
-//                    'desc' => $this->l('Save'),
-//                    'href' => AdminController::$currentIndex . '&configure=' . $this->name . '&save' . $this->name .
-//                        '&token=' . Tools::getAdminTokenLite('AdminModules'),
-//                ],
-//                'back' => [
-//                    'href' => AdminController::$currentIndex . '&token=' . Tools::getAdminTokenLite('AdminModules'),
-//                    'desc' => $this->l('Back to list'),
-//                ],
-//            ];
-//
-//            $helper->fields_value = $form_values;
-//
-//            $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
-//
-//            $form_buffer .= $this->getCreateAccountMessage();
-//            $form_buffer .= $helper->generateForm($fields_form);
-//        }
-//
-//        return $form_buffer;
-//    }
-
     public function s2pAddCss($file, $file_name = '')
     {
         if ($file_name == '') {
@@ -6282,9 +6193,9 @@ class Smart2pay extends PaymentModule
 
         $decimalWarning = '';
         if (0 === (int) Configuration::get('PS_PRICE_DISPLAY_PRECISION')) {
-            $decimalWarning = $this->displayWarning(
-                $this->l('You have turned off decimals in your shop. You may experience rounding issues and payment errors.')
-            );
+            $decimalWarning = $this->displayWarning($this->l(
+                'You have turned off decimals in your shop. You may experience rounding issues and payment errors.'
+            ));
         }
 
         $this->smarty->assign([
