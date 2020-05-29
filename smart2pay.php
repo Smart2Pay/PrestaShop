@@ -5368,6 +5368,7 @@ class Smart2pay extends PaymentModule
         } else {
             // include all...
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/style.css');
+            $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/payment-options.css');
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
 
             return;
@@ -5375,6 +5376,7 @@ class Smart2pay extends PaymentModule
 
         if ($is_front) {
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/style.css');
+            $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/payment-options.css');
         } else {
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
         }
@@ -5406,6 +5408,7 @@ class Smart2pay extends PaymentModule
 
         // $this->context->smarty->assign( $template_data );
         $this->s2pAddCss($this->_path . '/views/css/style.css');
+        $this->s2pAddCss($this->_path . '/views/css/payment-options.css');
 
         $payment_options = [];
         foreach ($template_data['payment_methods'] as $method_arr) {

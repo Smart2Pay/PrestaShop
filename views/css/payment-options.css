@@ -1,0 +1,14 @@
+.payment-options > div > div {
+    display: flex;
+    align-items: center;
+    height: 40px;
+}
+
+.payment-options > div > div img {
+    max-height: 23px;
+    max-width: 80px;
+}
+
+.payment-options > div > div > label {
+    margin-bottom: 0;
+}
