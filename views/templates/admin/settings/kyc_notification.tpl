@@ -10,6 +10,6 @@
 *  @copyright  2015 Smart2Pay
 *}
 <div class="kyc-notification alert alert-info">
-    {l s='In order to start accepting real payments from your customers, please complete our Onboarding process that is described ' mod='smart2pay'}
+    {l s='In order to start accepting real payments from your customers, please complete our Merchant Signup process that is described ' mod='smart2pay'}
     <a href="https://docs.smart2pay.com/category/online-boarding/company-details/" title="">{l s='here' mod='smart2pay'}</a>
 </div>

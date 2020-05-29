@@ -4,7 +4,7 @@
     height: 40px;
 }
 
-.payment-options > div > div img {
+.payment-options > div > div img[src*=smart2pay] {
     max-height: 23px;
     max-width: 80px;
 }
