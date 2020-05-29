@@ -112,7 +112,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.7';
+        $this->version = '2.0.8';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '1.4', 'max' => _PS_VERSION_];
@@ -6001,8 +6001,8 @@ class Smart2pay extends PaymentModule
             'return_url' => urlencode($this->context->link->getAdminLink('AdminModules') . '&configure=' . $this->name),
         ];
         $url = implode('?', [
-            'https://webtest.smart2pay.com/microsoft/signup/',
-            //'https://www.smart2pay.com/microsoft/signup/',
+//            'https://webtest.smart2pay.com/microsoft/signup/',
+            'https://www.smart2pay.com/microsoft/signup/',
             implode('&', array_map(
                 function ($v, $k) {
                     return sprintf('%s=%s', $k, $v);
