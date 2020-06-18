@@ -112,18 +112,19 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.7';
+        $this->version = '2.0.8';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '1.4', 'max' => _PS_VERSION_];
         $this->bootstrap = true;
         $this->controllers = ['payment'];
+        $this->module_key = '4d2dcd51db4c99a16809f15d8afe639c';
 
         parent::__construct();
 
         $this->displayName = $this->l('Smart2Pay');
         $this->description = $this->l(
-            'Smart2Pay is the one-stop-shop solution for your webshop. We provide small and large merchants with one access point to more than 200 payment methods globally.'
+            'Smart2Pay offers your webshop one access point to more than 200 payment methods globally.'
         );
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall Smart2Pay plugin?');
@@ -486,6 +487,28 @@ class Smart2pay extends PaymentModule
         return $names;
     }
 
+    private function getGeneralConfigFormInputNames()
+    {
+        $names = [];
+
+        foreach ($this->getGeneralConfigFormInputs() as $input) {
+            $names[] = $input['name'];
+        }
+
+        return $names;
+    }
+
+    private function getAdvancedConfigFormInputNames()
+    {
+        $names = [];
+
+        foreach ($this->getAdvancedConfigFormInputs() as $input) {
+            $names[] = $input['name'];
+        }
+
+        return $names;
+    }
+
     /**
      * Get Config Form Inputs
      *
@@ -494,19 +517,6 @@ class Smart2pay extends PaymentModule
     private function getConfigFormInputs()
     {
         $this->createContext();
-
-        /*
-        if( version_compare( _PS_VERSION_, '1.5', '<' ) )
-        {
-//            global $cookie;
-
-            if( $this->cookie )
-                $lang_id = (int) $this->cookie->id_lang;
-            else
-                $lang_id = 1;
-        } else
-            $lang_id = (int)$this->context->language->id;
-        */
 
         $lang_id = (int) $this->context->language->id;
 
@@ -992,6 +1002,479 @@ class Smart2pay extends PaymentModule
                 '_default' => 0,
             ),
             /**/
+        ];
+    }
+
+    private function getGeneralConfigFormInputs()
+    {
+        $envs = $this->getConfigFormSelectInputOptions('envs');
+        foreach ($envs as &$e) {
+            $e['value'] = $e['id'];
+            $e['label'] = $e['name'];
+        }
+
+        return [
+//            [
+//                'type' => 'select',
+//                'label' => $this->l('Enabled'),
+//                'name' => self::CONFIG_PREFIX . 'ENABLED',
+//                'required' => true,
+//                'options' => [
+//                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+//                    'id' => 'id',
+//                    'name' => 'name',
+//                ],
+//                '_default' => 1,
+//            ],
+            [
+                'type' => 'radio',
+                'class' => 'smart2pay_radio',
+                'label' => $this->l('Environment'),
+                'name' => self::CONFIG_PREFIX . 'ENV',
+                'values' => $envs,
+                'required' => true,
+                'create_account_message' => $this->getCreateAccountMessage(),
+                'kyc_info_message' => $this->getKycMessage(),
+                'change_env_message' => $this->getChangeEnvMessage(),
+                's2p_radio_to_switch' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Site ID Test'),
+                'name' => self::CONFIG_PREFIX . 'SITE_ID_TEST',
+                '_transform' => ['intval'],
+                '_validate' => ['notempty'],
+                'required' => true,
+                '_default' => 0,
+                's2p_start_env_test' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('APIKey Test'),
+                'name' => self::CONFIG_PREFIX . 'APIKEY_TEST',
+                'required' => true,
+                '_transform' => ['trim'],
+                '_validate' => ['notempty'],
+                '_default' => '',
+                's2p_end_env_test' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Site ID Live'),
+                'name' => self::CONFIG_PREFIX . 'SITE_ID_LIVE',
+                '_transform' => ['intval'],
+                '_validate' => ['notempty'],
+                'required' => true,
+                '_default' => 0,
+                's2p_start_env_live' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('APIKey Live'),
+                'name' => self::CONFIG_PREFIX . 'APIKEY_LIVE',
+                'required' => true,
+                '_transform' => ['trim'],
+                '_validate' => ['notempty'],
+                '_default' => '',
+                's2p_end_env_live' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Return URL'),
+                'name' => self::CONFIG_PREFIX . 'RETURN_URL',
+                'required' => true,
+                'size' => '80',
+                '_default' => Smart2PayHelper::getReturnUrl($this->name),
+                'desc' => [
+                    $this->l('Default Return URL for this store configuration is: '),
+                    $this->getReturnLink(),
+                    '',
+                    $this->l('Notification URL for this store configuration is: '),
+                    $this->getNotificationLink(),
+                ],
+                '_validate' => ['url', 'notempty'],
+                '_transform' => ['trim'],
+                's2p_return_url' => true,
+            ],
+        ];
+    }
+
+    private function getAdvancedConfigFormInputs()
+    {
+        $this->createContext();
+
+        $lang_id = (int) $this->context->language->id;
+
+        return [
+            [
+                'type' => 'select',
+                'label' => $this->l('Send order number as product description'),
+                'name' => self::CONFIG_PREFIX . 'SEND_ORDER_NUMBER',
+                'required' => false,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 1,
+                's2p_start_section' => true,
+                's2p_section_legend' => $this->l('Order settings'),
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Custom payment description'),
+                'name' => self::CONFIG_PREFIX . 'CUSTOM_PRODUCT_DESCRIPTION',
+                'required' => true,
+                'size' => '80',
+                'desc' => [
+                    $this->l('eg. Payment on our web shop'),
+                ],
+                '_default' => 'Custom payment description',
+                '_validate' => ['notempty'],
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Create invoice on success'),
+                'name' => self::CONFIG_PREFIX . 'CREATE_INVOICE_ON_SUCCESS',
+                'required' => false,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Notify customer by email'),
+                'name' => self::CONFIG_PREFIX . 'NOTIFY_CUSTOMER_BY_EMAIL',
+                'required' => false,
+                'hint' => [
+                    $this->l('When payment is completed with success should system send an email to the customer?'),
+                ],
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Send payment instructions on order creation'),
+                'name' => self::CONFIG_PREFIX . 'SEND_PAYMENT_INSTRUCTIONS',
+                'required' => false,
+                'hint' => [
+                    $this->l(
+                        'Some payment methods (like Bank Transfer and Multibanco SIBS)' .
+                        ' generate information required by costomer to complete the payment.'
+                    ),
+                    $this->l(
+                        'These informations are displayed to customer on return page,' .
+                        ' but plugin can also send an email to customer with these details.'
+                    ),
+                ],
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Skip payment page'),
+                'name' => self::CONFIG_PREFIX . 'SKIP_PAYMENT_PAGE',
+                'required' => false,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+                's2p_end_section' => true,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('New Order Status'),
+                'name' => self::CONFIG_PREFIX . 'NEW_ORDER_STATUS',
+                'required' => true,
+                'options' => [
+                    'query' => OrderState::getOrderStates($lang_id),
+                    'id' => 'id_order_state',
+                    'name' => 'name',
+                ],
+                '_default' => 3,
+                's2p_start_section' => true,
+                's2p_section_legend' => $this->l('Order statuses'),
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Order status on SUCCESS'),
+                'name' => self::CONFIG_PREFIX . 'ORDER_STATUS_ON_SUCCESS',
+                'required' => true,
+                'options' => [
+                    'query' => OrderState::getOrderStates($lang_id),
+                    'id' => 'id_order_state',
+                    'name' => 'name',
+                ],
+                '_default' => 2,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Order status on CANCEL'),
+                'name' => self::CONFIG_PREFIX . 'ORDER_STATUS_ON_CANCEL',
+                'required' => true,
+                'options' => [
+                    'query' => OrderState::getOrderStates($lang_id),
+                    'id' => 'id_order_state',
+                    'name' => 'name',
+                ],
+                '_default' => 6,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Order status on FAIL'),
+                'name' => self::CONFIG_PREFIX . 'ORDER_STATUS_ON_FAIL',
+                'required' => true,
+                'options' => [
+                    'query' => OrderState::getOrderStates($lang_id),
+                    'id' => 'id_order_state',
+                    'name' => 'name',
+                ],
+                '_default' => 8,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Order status on EXPIRED'),
+                'name' => self::CONFIG_PREFIX . 'ORDER_STATUS_ON_EXPIRE',
+                'required' => true,
+                'options' => [
+                    'query' => OrderState::getOrderStates($lang_id),
+                    'id' => 'id_order_state',
+                    'name' => 'name',
+                ],
+                '_default' => 8,
+                's2p_end_section' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Message SUCCESS'),
+                'name' => self::CONFIG_PREFIX . 'MESSAGE_SUCCESS',
+                'required' => true,
+                'size' => '80',
+                'desc' => [
+                    $this->l('eg. The payment succeeded'),
+                ],
+                '_default' => 'The payment succeeded',
+                '_validate' => ['notempty'],
+                's2p_start_section' => true,
+                's2p_section_legend' => $this->l('Order messages'),
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Message FAILED'),
+                'name' => self::CONFIG_PREFIX . 'MESSAGE_FAILED',
+                'required' => true,
+                'size' => '80',
+                'desc' => [
+                    $this->l('eg. The payment process has failed'),
+                ],
+                '_default' => 'The payment process has failed',
+                '_validate' => ['notempty'],
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Message CANCELED'),
+                'name' => self::CONFIG_PREFIX . 'MESSAGE_CANCELED',
+                'required' => true,
+                'size' => '80',
+                'desc' => [
+                    $this->l('eg. The payment was canceled'),
+                ],
+                '_default' => 'The payment was canceled',
+                '_validate' => ['notempty'],
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Message PENDING'),
+                'name' => self::CONFIG_PREFIX . 'MESSAGE_PENDING',
+                'required' => true,
+                'size' => '80',
+                'desc' => [
+                    $this->l('eg. The payment is pending'),
+                ],
+                '_default' => 'The payment is pending',
+                '_validate' => ['notempty'],
+                's2p_end_section' => true,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Force country'),
+                'name' => self::CONFIG_PREFIX . 'FORCED_COUNTRY',
+                'hint' => [
+                    $this->l('Always use this country for payment module.'),
+                    $this->l('If this option is selected Country detection will be disregarded.'),
+                    $this->l('NOTE: Please be sure all your clients can make payments in selected country.'),
+                ],
+                'required' => true,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions(
+                        'country_list',
+                        ['no_option_title' => $this->l('- Don\'t force country -')]
+                    ),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_transform' => ['trim', 'toupper'],
+                '_validate' => ['country_iso'],
+                '_default' => '',
+                's2p_start_section' => true,
+                's2p_section_legend' => $this->l('Country settings'),
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Country detection'),
+                'name' => self::CONFIG_PREFIX . 'COUNTRY_DETECTION',
+                'hint' => [
+                    $this->l(
+                        'Plugin will try detecting visitor\'s country by IP.' .
+                        ' Country is important for plugin as payment methods are displayed depending on country.'
+                    ),
+                    $this->l(
+                        'Country detection is available when you install' .
+                        ' and activate Smart2Pay Detection plugin.'
+                    ),
+                    $this->l(
+                        'If you select Yes and country detection plugin is not installed,' .
+                        ' plugin will use as fallback country set in customer\'s billing address.'
+                    ),
+                ],
+                'required' => false,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Use IP sent by proxy'),
+                'name' => self::CONFIG_PREFIX . 'PROXY_IP',
+                'hint' => [
+                    $this->l(
+                        'If your site is behind a firewall IP' .
+                        ' in headers might be set for every request to firewall IP.'
+                    ),
+                    $this->l(
+                        'If HTTP_CLIENT_IP or HTTP_X_FORWARDED_FOR header is set by firewall' .
+                        ' to the actual IP of customer, this option tells plugin to check first if' .
+                        ' such variables are set in headers and if set use that as customer IP.'
+                    ),
+                    $this->l('Plugin will check first if HTTP_CLIENT_IP is a valid IP, then HTTP_X_FORWARDED_FOR.'),
+                ],
+                'required' => false,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Fallback country'),
+                'name' => self::CONFIG_PREFIX . 'FALLBACK_COUNTRY',
+                'hint' => $this->l('If country detection fails, use this country as fallback.'),
+                'required' => true,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions(
+                        'country_list',
+                        ['no_option_title' => $this->l('- Country From Billing Address -')]
+                    ),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_transform' => ['trim', 'toupper'],
+                '_validate' => ['country_iso'],
+                '_default' => '',
+                's2p_end_section' => true,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Alter order total based on surcharge'),
+                'name' => self::CONFIG_PREFIX . 'ALTER_ORDER_ON_SURCHARGE',
+                'required' => false,
+                'hint' => [
+                    $this->l(
+                        'When using a payment method which has a surcharge amount or percent set,' .
+                        ' order total will be incremented with resulting surcharge amount.'
+                    ),
+                ],
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+                's2p_start_section' => true,
+                's2p_section_legend' => $this->l('Surcharge orders'),
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Surcharge will use currency (display only)'),
+                'name' => self::CONFIG_PREFIX . 'SURFEE_CURRENCY',
+                'required' => false,
+                'hint' => [
+                    $this->l('When displaying surcharge amount in checkout flow, what currency to use.'),
+                ],
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('fee_currency'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => self::OPT_FEE_CURRENCY_FRONT,
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Surcharge display amount'),
+                'name' => self::CONFIG_PREFIX . 'SURFEE_AMOUNT',
+                'required' => false,
+                'hint' => [
+                    $this->l('How to display surcharge amount in checkout flow.'),
+                ],
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('fee_display'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => self::OPT_FEE_CURRENCY_FRONT,
+                's2p_end_section' => true,
+            ],
+            [
+                'type' => 'text',
+                'label' => $this->l('Skin ID'),
+                'name' => self::CONFIG_PREFIX . 'SKIN_ID',
+                '_transform' => ['intval'],
+                'required' => true,
+                '_default' => 0,
+                's2p_start_section' => true,
+                's2p_section_legend' => $this->l('Other settings '),
+            ],
+            [
+                'type' => 'select',
+                'label' => $this->l('Redirect in iFrame'),
+                'name' => self::CONFIG_PREFIX . 'REDIRECT_IN_IFRAME',
+                'required' => false,
+                'options' => [
+                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+                    'id' => 'id',
+                    'name' => 'name',
+                ],
+                '_default' => 0,
+                's2p_end_section' => true,
+            ],
         ];
     }
 
@@ -1588,6 +2071,12 @@ class Smart2pay extends PaymentModule
                 } else {
                     $error_msg = 'Call error: ' . $sdk_obj->getErrorMessage();
                 }
+
+                $plugin_settings = $this->getSettings($order);
+                $this->changeOrderStatus(
+                    new Order($orderID),
+                    $plugin_settings[self::CONFIG_PREFIX . 'ORDER_STATUS_ON_FAIL']
+                );
 
                 $this->writeLog($error_msg, ['type' => 'error', 'order_id' => $orderID]);
                 $this->redirectToStep1(['errors' => [$error_msg]]);
@@ -2916,15 +3405,20 @@ class Smart2pay extends PaymentModule
             }
         }
 
-        switch ($post_result['submit']) {
-            case 'submit_main_data':
-                break;
-        }
+        $this->setVersionsMessage();
+//        $this->setCreateAccountMessage();
+        $this->setRoundingAndDecimalWarnings();
 
-        return $output .
-            $this->displayForm() .
-            $this->displayPaymentMethodsForm() .
-            $this->getLogsHTML();
+        $this->smarty->assign([
+            'output' => $output,
+            'submit' => $post_result['submit'],
+            'generalForm' => $this->createGeneralForm(),
+            'advancedForm' => $this->createAdvancedForm(),
+            'methods' => $this->displayPaymentMethodsForm(),
+            'logs' => $this->getLogsHTML(),
+        ]);
+
+        return $this->display(__FILE__, 'views/templates/admin/smart2pay_admin.tpl');
     }
 
     /**
@@ -3188,12 +3682,13 @@ class Smart2pay extends PaymentModule
         } /*
          * Check submit of main form
          */
-        elseif (Tools::isSubmit('submit_main_data') and Tools::getValue(self::CONFIG_PREFIX . 'ENABLED')) {
+        elseif (Tools::isSubmit('submit_main_data')) {
             $post_data['submit'] = 'submit_main_data';
 
             $formValues = [];
 
-            foreach ($this->getConfigFormInputNames() as $name) {
+//            foreach ($this->getConfigFormInputNames() as $name) {
+            foreach ($this->getGeneralConfigFormInputNames() as $name) {
                 $formValues[$name] = (string) Tools::getValue($name, '');
             }
 
@@ -3204,7 +3699,7 @@ class Smart2pay extends PaymentModule
              * Validate and update config values
              *
              */
-            foreach ($this->getConfigFormInputs() as $input) {
+            foreach ($this->getGeneralConfigFormInputs() as $input) {
                 $isValid = true;
                 $skipValidation = false;
                 $field_error = '';
@@ -3235,6 +3730,82 @@ class Smart2pay extends PaymentModule
 
                 if (!$skipValidation
                     and !empty($input['_validate']) and is_array($input['_validate'])
+                    and ($validation_result = self::validateValue($formValues[$input['name']], $input['_validate']))
+                    and empty($validation_result['<all_valid>'])) {
+                    $isValid = false;
+                    if (empty($validation_result['url'])) {
+                        $field_error .= $this->displayError(
+                            $this->l('Invalid value for input.') . ' ' .
+                            $this->l($input['label']) . ': ' .
+                            $this->l('Must be a valid URL')
+                        );
+                    }
+                    if (empty($validation_result['notempty'])) {
+                        $field_error .= $this->displayError(
+                            $this->l('Invalid value for input.') . ' ' .
+                            $this->l($input['label']) . ': ' .
+                            $this->l('Must NOT be empty')
+                        );
+                    }
+                    if (empty($validation_result['country_iso'])) {
+                        $field_error .= $this->displayError(
+                            $this->l('Invalid value for input.') . ' ' .
+                            $this->l($input['label']) . ': ' .
+                            $this->l('Should be a valid country.')
+                        );
+                    }
+
+                    if (empty($field_error)) {
+                        $field_error .= $this->displayError(
+                            $this->l('Value provided for input is invalid') .
+                            ' (' . $this->l($input['label']) . ')'
+                        );
+                    }
+                }
+
+                if ($isValid) {
+                    Configuration::updateValue($input['name'], $formValues[$input['name']]);
+                } else {
+                    $post_data['field_errors'][$input['name']] = true;
+                    $post_data['errors_buffer'] .= $field_error;
+                }
+            }
+
+            $this->getSettings(null, true);
+
+            $this->refreshMethodCountries();
+            $this->cleanMethodsCache();
+            $this->getAllMethods();
+            $this->getAllMethodSettings();
+
+            if (empty($post_data['errors_buffer'])) {
+                $post_data['success_buffer'] .= $this->displayConfirmation($this->l('Settings updated successfully'));
+            }
+        } elseif (Tools::isSubmit('submit_advanced_data')) {
+            $post_data['submit'] = 'submit_advanced_data';
+            $formValues = [];
+            foreach ($this->getAdvancedConfigFormInputNames() as $name) {
+                $formValues[$name] = (string) Tools::getValue($name, '');
+            }
+
+            $post_data['raw_fields'] = $formValues;
+
+            /*
+             *
+             * Validate and update config values
+             *
+             */
+            foreach ($this->getAdvancedConfigFormInputs() as $input) {
+                $isValid = true;
+                $field_error = '';
+
+                // Make necessary transformations before validation
+                if (!empty($input['_transform']) and is_array($input['_transform'])) {
+                    $formValues[$input['name']] =
+                        self::transformValue($formValues[$input['name']], $input['_transform']);
+                }
+
+                if (!empty($input['_validate']) and is_array($input['_validate'])
                     and ($validation_result = self::validateValue($formValues[$input['name']], $input['_validate']))
                     and empty($validation_result['<all_valid>'])) {
                     $isValid = false;
@@ -3612,95 +4183,6 @@ class Smart2pay extends PaymentModule
         return $check_result;
     }
 
-    /**
-     * Display Config Form
-     *
-     * @return mixed
-     */
-    public function displayForm()
-    {
-        // Get default language
-        $default_lang = (int) Configuration::get('PS_LANG_DEFAULT');
-
-        if (!$this->initSdkInstance()) {
-            return 'Cannot initiate Smart2Pay SDK.' .
-                ' Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
-        }
-
-        $sdk_obj = self::$s2p_sdk_obj;
-        if (!($sdk_version = $sdk_obj::getSdkVersion())) {
-            return 'Cannot get Smart2Pay SDK version.' .
-                ' Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
-        }
-
-        $fields_form = [];
-
-        // Init Fields form array
-        $fields_form[0]['form'] = [
-            'legend' => [
-                'title' => $this->l('Settings'),
-            ],
-            'input' => $this->getConfigFormInputs(),
-            'submit' => [
-                'title' => $this->l('Save'),
-                'class' => 'button',
-            ],
-        ];
-
-        $form_buffer = $this->fetchVersionsMessage($this->version, $sdk_version);
-
-        $form_data = [];
-        $form_data['submit_action'] = 'submit_main_data';
-
-        $form_values = [];
-        // Load current value
-        foreach ($this->getConfigFormInputNames() as $name) {
-            $form_values[$name] = Configuration::get($name);
-        }
-
-        if (version_compare(_PS_VERSION_, '1.5', '<')) {
-            $form_buffer .= Smart2PayHelper::generateAncientForm($fields_form, $form_data, $form_values);
-        } else {
-            $helper = new HelperForm();
-
-            // Module, token and currentIndex
-            $helper->module = $this;
-            $helper->name_controller = $this->name;
-            $helper->token = Tools::getAdminTokenLite('AdminModules');
-            $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
-
-            // Language
-            $helper->default_form_language = $default_lang;
-            $helper->allow_employee_form_lang = $default_lang;
-
-            // Title and toolbar
-            $helper->title = $this->displayName;
-            $helper->show_toolbar = true;        // false -> remove toolbar
-            $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
-            $helper->submit_action = $form_data['submit_action'];
-            $helper->toolbar_btn = [
-                'save' => [
-                    'desc' => $this->l('Save'),
-                    'href' => AdminController::$currentIndex . '&configure=' . $this->name . '&save' . $this->name .
-                        '&token=' . Tools::getAdminTokenLite('AdminModules'),
-                ],
-                'back' => [
-                    'href' => AdminController::$currentIndex . '&token=' . Tools::getAdminTokenLite('AdminModules'),
-                    'desc' => $this->l('Back to list'),
-                ],
-            ];
-
-            $helper->fields_value = $form_values;
-
-            $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
-
-            $form_buffer .= $this->fetchCreateAccountUrl();
-            $form_buffer .= $helper->generateForm($fields_form);
-        }
-
-        return $form_buffer;
-    }
-
     public function s2pAddCss($file, $file_name = '')
     {
         if ($file_name == '') {
@@ -3845,7 +4327,7 @@ class Smart2pay extends PaymentModule
         $this->createContext();
 
         $this->context->smarty->assign([
-            'logs' => $this->getLogs(['limit' => 10]),
+            'logs' => $this->getLogs(['limit' => 15]),
         ]);
 
         return $this->fetchTemplate('/views/templates/admin/logs.tpl');
@@ -4886,6 +5368,7 @@ class Smart2pay extends PaymentModule
         } else {
             // include all...
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/style.css');
+            $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/payment-options.css');
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
 
             return;
@@ -4893,6 +5376,7 @@ class Smart2pay extends PaymentModule
 
         if ($is_front) {
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/style.css');
+            $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/payment-options.css');
         } else {
             $this->s2pAddCss(_MODULE_DIR_ . $this->name . '/views/css/back-style.css');
         }
@@ -4924,6 +5408,7 @@ class Smart2pay extends PaymentModule
 
         // $this->context->smarty->assign( $template_data );
         $this->s2pAddCss($this->_path . '/views/css/style.css');
+        $this->s2pAddCss($this->_path . '/views/css/payment-options.css');
 
         $payment_options = [];
         foreach ($template_data['payment_methods'] as $method_arr) {
@@ -5472,14 +5957,27 @@ class Smart2pay extends PaymentModule
         return $this->fetchTemplate('/views/templates/admin/settings/path_message.tpl');
     }
 
-    private function fetchVersionsMessage($plugin_version, $sdk_version)
+    private function setVersionsMessage()
     {
+        if (!$this->initSdkInstance()) {
+            return 'Cannot initiate Smart2Pay SDK.' .
+                ' Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
+        }
+
+        $sdk_obj = self::$s2p_sdk_obj;
+        if (!($sdk_version = $sdk_obj::getSdkVersion())) {
+            return 'Cannot get Smart2Pay SDK version.' .
+                ' Please make sure you also installed Smart2Pay SDK in plugin directory under includes/sdk directory.';
+        }
+
         $this->context->smarty->assign([
-            'plugin_version' => $plugin_version,
+            'plugin_version' => $this->version,
             'sdk_version' => $sdk_version,
         ]);
 
-        return $this->fetchTemplate('/views/templates/admin/settings/versions.tpl');
+        $this->smarty->assign([
+            'versions_message' => $this->fetchTemplate('/views/templates/admin/settings/versions.tpl'),
+        ]);
     }
 
     private function fetchPaymentDetailsAndLogs($method_name, $logs_name, $logs)
@@ -5493,19 +5991,19 @@ class Smart2pay extends PaymentModule
         return $this->fetchTemplate('/views/templates/admin/settings/payment_details_and_logs.tpl');
     }
 
-    private function fetchCreateAccountUrl()
+    private function getCreateAccountMessage()
     {
         $params = [
             'utm_medium' => 'affiliates',
-            'utm_source' => 'prestashop',
+            'utm_source' => 'prestashop' . _PS_VERSION_,
             'utm_campaign' => 'premium_partnership',
-            'notification_url' =>
-                urlencode($this->getNotificationLink() . '?nonce='. md5(Tools::getShopDomainSsl(true, true))),
-            'return_url' => urlencode($this->context->link->getAdminLink('AdminModules').'&configure='.$this->name),
+            'notification_url' => urlencode($this->getNotificationLink() . '?nonce=' .
+                md5(Tools::getShopDomainSsl(true, true))),
+            'return_url' => urlencode($this->context->link->getAdminLink('AdminModules') . '&configure=' . $this->name),
         ];
         $url = implode('?', [
-            'https://webtest.smart2pay.com/microsoft/signup/',
-            //'https://www.smart2pay.com/microsoft/signup/',
+//            'https://webtest.smart2pay.com/microsoft/signup/',
+            'https://www.smart2pay.com/microsoft/signup/',
             implode('&', array_map(
                 function ($v, $k) {
                     return sprintf('%s=%s', $k, $v);
@@ -5519,7 +6017,17 @@ class Smart2pay extends PaymentModule
             'url' => $url,
         ]);
 
-        return $this->fetchTemplate('/views/templates/admin/create_account.tpl');
+        return $this->fetchTemplate('/views/templates/admin/settings/create_account.tpl');
+    }
+
+    private function getKycMessage()
+    {
+        return $this->fetchTemplate('/views/templates/admin/settings/kyc_notification.tpl');
+    }
+
+    private function getChangeEnvMessage()
+    {
+        return $this->fetchTemplate('/views/templates/admin/settings/change_env_notification.tpl');
     }
 
     private function parseCreateAccountNotification()
@@ -5531,13 +6039,170 @@ class Smart2pay extends PaymentModule
             $site_id = Tools::getValue('site_id');
             $apikey = Tools::getValue('apikey');
             $this->writeLog('Received: side_id: \'' . $site_id . '\' apikey: \'' . $apikey . '\'');
-            Configuration::updateValue(self::CONFIG_PREFIX . 'SITE_ID_TEST', $site_id);
-            Configuration::updateValue(self::CONFIG_PREFIX . 'APIKEY_TEST', $apikey);
+
+            if (!empty($site_id) && !empty($apikey)) {
+                $existing_site_id = Configuration::get(self::CONFIG_PREFIX . 'SITE_ID_TEST');
+                $existing_apikey = Configuration::get(self::CONFIG_PREFIX . 'APIKEY_TEST');
+
+                if ($site_id != $existing_site_id || $apikey != $existing_apikey) {
+                    Configuration::updateValue(self::CONFIG_PREFIX . 'SITE_ID_TEST', $site_id);
+                    Configuration::updateValue(self::CONFIG_PREFIX . 'APIKEY_TEST', $apikey);
+                } else {
+                    $this->writeLog('--- Credentials have already been received and processed! ----------');
+                }
+            } else {
+                $this->writeLog('--- Empty credentials! ----------');
+            }
         } else {
             $this->writeLog('--- Nonce invalid ----------');
         }
         $this->writeLog('--- END Create Account Notification ----------');
 
-        echo '{"ok":true}';
+        $response = [
+            'ok' => true,
+            'notification_url' => $this->getNotificationLink() . '?nonce=' . md5(Tools::getShopDomainSsl(true, true)),
+        ];
+        echo json_encode($response);
+    }
+
+    private function createGeneralForm()
+    {
+        // Get default language
+        $default_lang = (int) Configuration::get('PS_LANG_DEFAULT');
+
+        $fields_form = [];
+
+        // Init Fields form array
+        $fields_form[0]['form'] = [
+            'input' => $this->getGeneralConfigFormInputs(),
+            'submit' => [
+                'title' => $this->l('Save'),
+                'class' => 'button',
+            ],
+        ];
+
+        $form_data = [];
+        $form_data['submit_action'] = 'submit_main_data';
+
+        $form_values = [];
+        // Load current value
+        foreach ($this->getGeneralConfigFormInputNames() as $name) {
+            $form_values[$name] = Configuration::get($name);
+        }
+
+        $helper = new HelperForm();
+
+        // Module, token and currentIndex
+        $helper->module = $this;
+        $helper->name_controller = $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+
+        // Language
+        $helper->default_form_language = $default_lang;
+        $helper->allow_employee_form_lang = $default_lang;
+
+        // Title and toolbar
+//        $helper->title = $this->displayName;
+        $helper->show_toolbar = false;        // false -> remove toolbar
+        $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
+        $helper->submit_action = $form_data['submit_action'];
+        $helper->toolbar_btn = [
+            'save' => [
+                'desc' => $this->l('Save'),
+                'href' => AdminController::$currentIndex . '&configure=' . $this->name . '&save' . $this->name .
+                    '&token=' . Tools::getAdminTokenLite('AdminModules'),
+            ],
+            'back' => [
+                'href' => AdminController::$currentIndex . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+                'desc' => $this->l('Back to list'),
+            ],
+        ];
+
+        $helper->fields_value = $form_values;
+
+        return $helper->generateForm($fields_form);
+    }
+
+    private function createAdvancedForm()
+    {
+        // Get default language
+        $default_lang = (int) Configuration::get('PS_LANG_DEFAULT');
+
+        $fields_form = [];
+
+        // Init Fields form array
+        $fields_form[0]['form'] = [
+            'class' => 'advanced-form',
+            'input' => $this->getAdvancedConfigFormInputs(),
+            'submit' => [
+                'title' => $this->l('Save'),
+                'class' => 'button',
+            ],
+        ];
+
+        $form_data = [];
+        $form_data['submit_action'] = 'submit_advanced_data';
+
+        $form_values = [];
+        // Load current value
+        foreach ($this->getAdvancedConfigFormInputNames() as $name) {
+            $form_values[$name] = Configuration::get($name);
+        }
+
+        $helper = new HelperForm();
+
+        // Module, token and currentIndex
+        $helper->module = $this;
+        $helper->name_controller = $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+
+        // Language
+        $helper->default_form_language = $default_lang;
+        $helper->allow_employee_form_lang = $default_lang;
+
+        // Title and toolbar
+//        $helper->title = $this->displayName;
+        $helper->show_toolbar = false;        // false -> remove toolbar
+        $helper->toolbar_scroll = true;      // yes - > Toolbar is always visible on the top of the screen.
+        $helper->submit_action = $form_data['submit_action'];
+        $helper->toolbar_btn = [
+            'save' => [
+                'desc' => $this->l('Save'),
+                'href' => AdminController::$currentIndex . '&configure=' . $this->name . '&save' . $this->name .
+                    '&token=' . Tools::getAdminTokenLite('AdminModules'),
+            ],
+            'back' => [
+                'href' => AdminController::$currentIndex . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+                'desc' => $this->l('Back to list'),
+            ],
+        ];
+
+        $helper->fields_value = $form_values;
+
+        return $helper->generateForm($fields_form);
+    }
+
+    private function setRoundingAndDecimalWarnings()
+    {
+        $roundingWarning = '';
+        if (1 !== (int) Configuration::get('PS_ROUND_TYPE')) {
+            $roundingWarning = $this->displayWarning(
+                $this->l('For the best experience, you should set rounding to "on each article".')
+            );
+        }
+
+        $decimalWarning = '';
+        if (0 === (int) Configuration::get('PS_PRICE_DISPLAY_PRECISION')) {
+            $decimalWarning = $this->displayWarning($this->l(
+                'You have turned off decimals in your shop. You may experience rounding issues and payment errors.'
+            ));
+        }
+
+        $this->smarty->assign([
+            'roundingWarning' => $roundingWarning,
+            'decimalWarning' => $decimalWarning,
+        ]);
     }
 }
