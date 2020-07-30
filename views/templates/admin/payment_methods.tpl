@@ -254,7 +254,7 @@ $(document).ready(function(){
             {l s='No payment methods defined in database for %s environment.' sprintf=[$plugin_environment] mod='smart2pay'}
             {l s='In order to update payment methods, please select desired environment from Environment drop-down option and then save settings.' mod='smart2pay'}<br/>
             <br/>
-            {l s='Last syncronization' mod='smart2pay'}: {if empty( $last_sync_date )} {l s='Never' mod='smart2pay'} {else} {$last_sync_date|escape:'html'} {/if}<br/>
+            {l s='Last syncronization' mod='smart2pay'}: {if empty( $last_sync_date )} {l s='Never' mod='smart2pay'} {else} {$last_sync_date} {/if}<br/>
             <form method="post" action="{$smarty.server.REQUEST_URI|escape:'htmlall':'UTF-8'}" id="s2p_payment_methods_syncronization" name="s2p_payment_methods_syncronization">
                 <input type="submit" value="{l s='Syncronize Now' mod='smart2pay'}" name="submit_syncronize_methods" id="submit_syncronize_methods" class="button" />
             </form>
@@ -266,11 +266,11 @@ $(document).ready(function(){
             {l s='Displaying payment methods for %s environment.' sprintf=[$plugin_environment] mod='smart2pay'}
             {l s='In order to update payment methods for other environments please select desired environment from Environment drop-down option and then save settings.' mod='smart2pay'}<br/>
 
-            {l s='Last syncronization' mod='smart2pay'}: {if empty( $last_sync_date )} {l s='Never' mod='smart2pay'} {else} {$last_sync_date|escape:'html'} {/if}<br/>
+            {l s='Last syncronization' mod='smart2pay'}: {if empty( $last_sync_date )} {l s='Never' mod='smart2pay'} {else} {$last_sync_date} {/if}<br/>
             {if empty( $time_to_launch_sync )}
             <input type="submit" value="{l s='Syncronize Now' mod='smart2pay'}" name="submit_syncronize_methods" id="submit_syncronize_methods" class="button" />
             {else}
-            {l s='Time untill syncronization is available' mod='smart2pay'}: {$time_to_launch_sync|escape:'html'}
+            {l s='Time untill syncronization is available' mod='smart2pay'}: {$time_to_launch_sync}
             {/if}
             <br/><br/>
         </div>
@@ -307,36 +307,36 @@ $(document).ready(function(){
             {foreach $payment_methods as $payment_method}
                 <tr>
                     <td style="width: 50px; text-align: center;">
-                        <input type="hidden" name="enabled_method_countries[{$payment_method.method_id|escape:'html'}]" id="enabled_method_countries_{$payment_method.method_id|escape:'html'}" value="{if !empty( $comma_countries_methods[$payment_method.method_id] )}{$comma_countries_methods[$payment_method.method_id]|escape:'html'}{/if}" />
-                        <input type="checkbox" name="enabled_methods[]" id="enabled_methods_{$payment_method.method_id|escape:'html'}" value="{$payment_method.method_id|escape:'html'}" {if !empty( $payment_method_settings[$payment_method.method_id] )} checked="checked" {/if} />
+                        <input type="hidden" name="enabled_method_countries[{$payment_method.method_id}]" id="enabled_method_countries_{$payment_method.method_id}" value="{if !empty( $comma_countries_methods[$payment_method.method_id] )}{$comma_countries_methods[$payment_method.method_id]}{/if}" />
+                        <input type="checkbox" name="enabled_methods[]" id="enabled_methods_{$payment_method.method_id}" value="{$payment_method.method_id}" {if !empty( $payment_method_settings[$payment_method.method_id] )} checked="checked" {/if} />
                     </td>
-                    <td style="width: 150px; text-align: center;"><label for="enabled_methods_{$payment_method.method_id|escape:'html'}" style="text-align:center !important;"><img src="{$payment_method.logo_url|escape:'html'}" style="max-width: 150px;" /></label></td>
+                    <td style="width: 150px; text-align: center;"><label for="enabled_methods_{$payment_method.method_id}" style="text-align:center !important;"><img src="{$payment_method.logo_url}" style="max-width: 150px;" /></label></td>
                     <td>
-                        <strong id="method_anchor_{$payment_method.method_id|escape:'html'}">{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong><br/>
-                        <a href="javascript:void(0);" style="text-decoration: underline;" onclick="customize_method_countries( {$payment_method.method_id|escape:'html'} )">{l s='Customize countries' mod='smart2pay'}</a>
-                        <div id="s2p_meth_custom_countries_{$payment_method.method_id|escape:'html'}" style="display:none;">
+                        <strong id="method_anchor_{$payment_method.method_id}">{$payment_method.display_name|escape:'htmlall':'UTF-8'}</strong><br/>
+                        <a href="javascript:void(0);" style="text-decoration: underline;" onclick="customize_method_countries( {$payment_method.method_id} )">{l s='Customize countries' mod='smart2pay'}</a>
+                        <div id="s2p_meth_custom_countries_{$payment_method.method_id}" style="display:none;">
                             {l s='Method active for following countries' mod='smart2pay'}:<br/>
                             {if !empty( $method_countries[$payment_method.method_id] )}
                             <table style="width:100%;">
                             {assign var=knti value=0}
                             {assign var=per_line value=3}
                             <tr>
-                                <td colspan="{$per_line*2|escape:'html'}" style="text-align: left;">
-                                    <a href="javascript:void(0);" onclick="s2p_config_js_select_all_countries( '{$payment_method.method_id|escape:'html'}' )">{l s='Select all' mod='smart2pay'}</a>
+                                <td colspan="{$per_line*2}" style="text-align: left;">
+                                    <a href="javascript:void(0);" onclick="s2p_config_js_select_all_countries( '{$payment_method.method_id}' )">{l s='Select all' mod='smart2pay'}</a>
                                     |
-                                    <a href="javascript:void(0);" onclick="s2p_config_js_invert_countries( '{$payment_method.method_id|escape:'html'}' )">{l s='Invert' mod='smart2pay'}</a>
+                                    <a href="javascript:void(0);" onclick="s2p_config_js_invert_countries( '{$payment_method.method_id}' )">{l s='Invert' mod='smart2pay'}</a>
                                     |
-                                    <a href="javascript:void(0);" onclick="s2p_config_js_deselect_all_countries( '{$payment_method.method_id|escape:'html'}' )">{l s='Select none' mod='smart2pay'}</a>
+                                    <a href="javascript:void(0);" onclick="s2p_config_js_deselect_all_countries( '{$payment_method.method_id}' )">{l s='Select none' mod='smart2pay'}</a>
                                 </td>
                             </tr>
                             {foreach $method_countries[$payment_method.method_id] as $ccountry}
                                 {if !empty( $countries_by_id[$ccountry.country_id] )}
                                     {if !$knti}<tr>{/if}
-                                        <td style="width:3%;"><input type="checkbox" id="checked_method_countries_{$payment_method.method_id|escape:'html'}_{$ccountry.country_id|escape:'html'}" value="{$ccountry.country_id|escape:'html'}" /></td>
+                                        <td style="width:3%;"><input type="checkbox" id="checked_method_countries_{$payment_method.method_id}_{$ccountry.country_id}" value="{$ccountry.country_id}" /></td>
                                     <td style="width:33%;">
                                         <label style="font-weight: normal;text-align:left !important;"
-                                               for="checked_method_countries_{$payment_method.method_id|escape:'html'}_{$ccountry.country_id|escape:'html'}">
-                                            {$countries_by_id[$ccountry.country_id].name|escape:'html'}
+                                               for="checked_method_countries_{$payment_method.method_id}_{$ccountry.country_id}">
+                                            {$countries_by_id[$ccountry.country_id].name}
                                         </label>
                                     </td>
                                     {if $knti == $per_line-1}</tr>{$knti=-1}{/if}
@@ -345,28 +345,28 @@ $(document).ready(function(){
                             {/foreach}
                             {if $knti && $knti <= $per_line-1}{for $i=$knti to $per_line-1}<td colspan="2">&nbsp;</td>{/for}{/if}
                             <tr>
-                                <td colspan="{$per_line*2|escape:'html'}" style="text-align: center;">
+                                <td colspan="{$per_line*2}" style="text-align: center;">
                                     <input type="button" value="{l s='Update method' mod='smart2pay'}"
-                                           onclick="customize_method_countries( '{$payment_method.method_id|escape:'html'}' )"/><br/>
+                                           onclick="customize_method_countries( '{$payment_method.method_id}' )"/><br/>
                                     <strong>{l s='NOTE: Changes are saved when you submit the form using button under table of methods' mod='smart2pay'} (<em>{l s='Update payment methods' mod='smart2pay'}</em>).</strong>
                                 </td>
                             </tr>
                             </table>
                             {/if}
                         </div>
-                        <div id="s2p_meth_countries_{$payment_method.method_id|escape:'html'}" style="height: 30px; overflow: hidden;text-overflow: ellipsis;display:block;">
+                        <div id="s2p_meth_countries_{$payment_method.method_id}" style="height: 30px; overflow: hidden;text-overflow: ellipsis;display:block;">
                             <strong>{l s='Available in following countries' mod='smart2pay'}</strong>
                             (<a href="javascript:void(0);" style="text-decoration: underline;"
-                                onclick="show_all_countries_for_method( '{$payment_method.method_id|escape:'html'}' )">toggle</a>):
+                                onclick="show_all_countries_for_method( '{$payment_method.method_id}' )">toggle</a>):
                             {if !empty( $method_countries[$payment_method.method_id] )}
                                 {$already_displayed = false}
                                 {foreach $method_countries[$payment_method.method_id] as $ccountry}
                                     {if !empty( $countries_by_id[$ccountry.country_id] )}
                                         {if $already_displayed}, {/if}
                                         <span class="s2p_method_country">
-                                            <i id="pmc_check_{$payment_method.method_id|escape:'html'}_{$ccountry.country_id|escape:'html'}"
+                                            <i id="pmc_check_{$payment_method.method_id}_{$ccountry.country_id}"
                                                style="color:green; padding: 0 3px 0 0;"></i>
-                                            {$countries_by_id[$ccountry.country_id].name|escape:'html'}
+                                            {$countries_by_id[$ccountry.country_id].name}
                                         </span>
                                         {$already_displayed = true}
                                     {/if}
@@ -380,19 +380,19 @@ $(document).ready(function(){
                     </td>
                     <td style="white-space: nowrap;">
                         <input type="number" size="8" step="0.01" style="width: 100px; text-align: right;"
-                               name="surcharge_percent[{$payment_method.method_id|escape:'html'}]"
-                               value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_percent|escape:'html'}{else}0{/if}"/>
+                               name="surcharge_percent[{$payment_method.method_id}]"
+                               value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_percent}{else}0{/if}"/>
                         %
                         <br/>
                         <input type="number" size="8" step="0.01" style="width: 100px; text-align: right;"
-                               name="surcharge_amount[{$payment_method.method_id|escape:'html'}]"
-                               value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_amount|escape:'html'}{else}0{/if}"/>
+                               name="surcharge_amount[{$payment_method.method_id}]"
+                               value="{if !empty( $payment_method_settings[$payment_method.method_id] )}{$payment_method_settings[$payment_method.method_id].surcharge_amount}{else}0{/if}"/>
                         {if empty( $all_currencies )}
                             Please activate currencies first!
                         {else}
-                            <select name="surcharge_currency[{$payment_method.method_id|escape:'html'}]" style="margin: 0 5px; max-height: 30px; padding: 2px 4px; width: 80px; display: inherit;">
+                            <select name="surcharge_currency[{$payment_method.method_id}]" style="margin: 0 5px; max-height: 30px; padding: 2px 4px; width: 80px; display: inherit;">
                             {foreach $all_currencies as $ccurrency}
-                            <option value="{$ccurrency['iso_code']|escape:'html'}"
+                            <option value="{$ccurrency['iso_code']}"
                                     {if ((!empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['iso_code'] == $payment_method_settings[$payment_method.method_id]['surcharge_currency'])
                                          || (empty( $payment_method_settings[$payment_method.method_id] ) && $ccurrency['id_currency'] == $default_currency_id) )} selected="selected" {/if}>{$ccurrency['iso_code']}{if $ccurrency['id_currency'] == $default_currency_id} ({l s='default' mod='smart2pay'}){/if}</option>
                             {/foreach}
@@ -400,8 +400,8 @@ $(document).ready(function(){
                         {/if}
                     </td>
                     <td><input type="number" size="8" style="width: 100px; text-align: right;"
-                               name="method_priority[{$payment_method.method_id|escape:'html'}]"
-                               value="{if !empty($payment_method_settings[$payment_method.method_id]) } {$payment_method_settings[$payment_method.method_id].priority|escape:'html'}{else}0{/if}"/>
+                               name="method_priority[{$payment_method.method_id}]"
+                               value="{if !empty($payment_method_settings[$payment_method.method_id]) } {$payment_method_settings[$payment_method.method_id].priority}{else}0{/if}"/>
                     </td>
                 </tr>
             {/foreach}

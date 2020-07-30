@@ -34,11 +34,11 @@
         {foreach from=$order_logs key=key item=log_item name=s2p_order_logs}
         <tr>
             <td style="white-space: nowrap;">{if $smarty.const._PS_VERSION_ >= 1.5}
-                {Tools::displayDate( $log_item.log_created|escape:'html', null, true )}
+                {Tools::displayDate( $log_item.log_created, null, true )}
             {else}
-                {Tools::displayDate( $log_item.log_created|escape:'html', $language_id, true )}
+                {Tools::displayDate( $log_item.log_created, $language_id, true )}
             {/if}</td>
-            <td>[{$log_item.log_type|escape:'html'}] {$log_item.log_data|escape:'html'}</td>
+            <td>[{$log_item.log_type}] {$log_item.log_data}</td>
         </tr>
         {/foreach}
     {/if}

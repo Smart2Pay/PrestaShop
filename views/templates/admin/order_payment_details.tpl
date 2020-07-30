@@ -22,11 +22,11 @@
     <tbody>
         <tr>
             <td><strong>{l s='Environment' mod='smart2pay'}</strong></td>
-            <td>{$transaction_arr.environment|escape:'html'}</td>
+            <td>{$transaction_arr.environment}</td>
         </tr>
         <tr>
             <td><strong>{l s='Payment Method' mod='smart2pay'}</strong></td>
-            <td>{$method_details.display_name|escape:'html'}</td>
+            <td>{$method_details.display_name}</td>
         </tr>
         {if $transaction_arr.surcharge_amount != 0 || $transaction_arr.surcharge_percent != 0}
         <tr>
@@ -36,13 +36,13 @@
                     {if !empty( $surcharge_currency_id )}
                         {displayPrice price=$transaction_arr.surcharge_amount currency=$surcharge_currency_id}
                     {else}
-                        {$transaction_arr.surcharge_amount|escape:'html'} {$surcharge_currency_iso|escape:'html'}
+                        {$transaction_arr.surcharge_amount} {$surcharge_currency_iso}
                     {/if}
                     {if $surcharge_currency_id != $order_currency_id && $surcharge_currency_iso != $order_currency_iso}
                         ({if !empty( $order_currency_id )}
                             {displayPrice price=$transaction_arr.surcharge_order_amount currency=$order_currency_id}
                         {else}
-                            {$transaction_arr.surcharge_order_amount|escape:'html'} {$order_currency_iso|escape:'html'}
+                            {$transaction_arr.surcharge_order_amount} {$order_currency_iso}
                         {/if})
                     {/if}
                 {/if}
@@ -52,11 +52,11 @@
                 {/if}
 
                 {if $transaction_arr.surcharge_percent != 0}
-                    {$transaction_arr.surcharge_percent|escape:'html'}%
+                    {$transaction_arr.surcharge_percent}%
                     ({if !empty( $order_currency_id )}
                         {displayPrice price=$transaction_arr.surcharge_order_percent currency=$order_currency_id}
                     {else}
-                        {$transaction_arr.surcharge_order_percent|escape:'html'} {$order_currency_iso|escape:'html'}
+                        {$transaction_arr.surcharge_order_percent} {$order_currency_iso}
                     {/if})
                 {/if}
 
@@ -65,7 +65,7 @@
                     {if !empty( $order_currency_id )}
                         {displayPrice price=$transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent currency=$order_currency_id}
                     {else}
-                        {($transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent)|escape:'html'} {$order_currency_iso|escape:'html'}
+                        {($transaction_arr.surcharge_order_amount+$transaction_arr.surcharge_order_percent)} {$order_currency_iso}
                     {/if}
                 {/if}
             </td>
@@ -73,7 +73,7 @@
         {/if}
         <tr>
             <td><strong>{l s='Payment ID' mod='smart2pay'}</strong></td>
-            <td>{$transaction_arr.payment_id|escape:'html'}</td>
+            <td>{$transaction_arr.payment_id}</td>
         </tr>
 
         {if false}
@@ -96,7 +96,7 @@
             {/if}
         <tr>
             <td><strong>{l s=$val mod='smart2pay'}</strong></td>
-            <td>{$transaction_extra_data[$key]|escape:'html'}</td>
+            <td>{$transaction_extra_data[$key]}</td>
         </tr>
         {/foreach}
     </tbody>

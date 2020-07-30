@@ -14,24 +14,24 @@
 
 {block name="content"}
 <div style="{if $moduleSettings["{$settings_prefix}DEBUG_FORM"] == 1} display: table; {else} display: none; {/if}">
-    <p><b>Message to hash</b>: {$messageToHash|escape:'html'}</p>
-    <p><b>Hash</b>: {$paymentData['Hash']|escape:'html'}</p>
+    <p><b>Message to hash</b>: {$messageToHash}</p>
+    <p><b>Hash</b>: {$paymentData['Hash']}</p>
 
     <table>
         {foreach from=$notSetPaymentData key=k item=v}
         <tr>
-            <td>{$k|escape:'html'}</td>
-            <td><input type="text" name="{$k|escape:'html'}" value="{$v|escape:'html'}" /></td>
+            <td>{$k}</td>
+            <td><input type="text" name="{$k}" value="{$v}" /></td>
         </tr>
         {/foreach}
     </table>
 
-    <form action="{$moduleSettings['posturl']|escape:'html'}" id="s2pform" method="post" {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"]} target="merchantIframe" {/if}>
+    <form action="{$moduleSettings['posturl']}" id="s2pform" method="post" {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"]} target="merchantIframe" {/if}>
     <table>
         {foreach from=$paymentData key=k item=v}
         <tr>
-            <td>{$k|escape:'html'}</td>
-            <td><input type="text" name="{$k|escape:'html'}" value="{$v|escape:'html'}"/></td>
+            <td>{$k}</td>
+            <td><input type="text" name="{$k}" value="{$v}"/></td>
         </tr>
         {/foreach}
     </table>
@@ -47,7 +47,7 @@
                 <div style="margin: 0px auto; display: table;">
                 {if $moduleSettings["{$settings_prefix}REDIRECT_IN_IFRAME"] == 0 && $moduleSettings["{$settings_prefix}LOADING_MODAL"]} == 1}
                     <div id="s2p_loading_content" style="margin: 20% auto 0 auto; width:80%; background-color: white;border: 2px solid lightgrey; text-align: center; padding: 40px;">
-                        <img src="{$this_path|escape:'html'}views/img/ajax-loader.gif" alt="{l s='Loading...' mod='smart2pay'}" />
+                        <img src="{$this_path}views/img/ajax-loader.gif" alt="{l s='Loading...' mod='smart2pay'}" />
                         <p style="margin: 20px auto;">{l s='Redirecting. Please wait...' mod='smart2pay'}</p>
                     </div>
                 {/if}

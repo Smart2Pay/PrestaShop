@@ -9,4 +9,4 @@
 *  @author Smart2Pay
 *  @copyright  2015 Smart2Pay
 *}
-<a> {$message|escape:'html'} </a>
+<a> {$message} </a>

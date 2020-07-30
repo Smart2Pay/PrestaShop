@@ -20,7 +20,7 @@
         <div class="return-url">
     {elseif $input.s2p_start_section}
         <div class="section">
-            <legend>{$input.s2p_section_legend|escape:'html'}</legend>
+            <legend>{$input.s2p_section_legend}</legend>
     {/if}
 
     {$smarty.block.parent}

@@ -1484,7 +1484,7 @@ class Smart2pay extends PaymentModule
             's2p_start_section', 's2p_start_env_test', 's2p_start_env_live',
             's2p_end_env_test', 's2p_end_env_live', 's2p_return_url', 's2p_end_section',
             's2p_radio_to_switch',
-            's2p_section_legend'
+            's2p_section_legend',
         ];
         if (!empty($inputs_arr) && is_array($inputs_arr)) {
             foreach ($inputs_arr as $input) {
@@ -3571,10 +3571,10 @@ class Smart2pay extends PaymentModule
                 $this->getAllMethods($plugin_settings_arr['environment']);
                 $this->getAllMethodSettings($plugin_settings_arr['environment']);
             }
-        } /*
-         * Check submit for payment method settings
-         */
-        elseif (Tools::isSubmit('submit_payment_methods') || Tools::isSubmit('submit_payment_methods_2')) {
+        } elseif (Tools::isSubmit('submit_payment_methods') || Tools::isSubmit('submit_payment_methods_2')) {
+            /*
+             * Check submit for payment method settings
+             */
             $post_data['submit'] = 'submit_payment_methods';
 
             $all_methods_arr = $this->getAllMethods($plugin_settings_arr['environment']);
@@ -3698,10 +3698,10 @@ class Smart2pay extends PaymentModule
             if (empty($post_data['errors_buffer'])) {
                 $post_data['success_buffer'] .= $this->displayConfirmation($this->l('Payment method details saved.'));
             }
-        } /*
-         * Check submit of main form
-         */
-        elseif (Tools::isSubmit('submit_main_data')) {
+        } elseif (Tools::isSubmit('submit_main_data')) {
+            /*
+             * Check submit of main form
+             */
             $post_data['submit'] = 'submit_main_data';
 
             $formValues = [];
