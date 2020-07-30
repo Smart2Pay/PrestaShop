@@ -112,7 +112,7 @@ class Smart2pay extends PaymentModule
     {
         $this->name = 'smart2pay';
         $this->tab = 'payments_gateways';
-        $this->version = '2.0.8';
+        $this->version = '2.0.9';
         $this->author = 'Smart2Pay';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '1.4', 'max' => _PS_VERSION_];
@@ -1013,19 +1013,19 @@ class Smart2pay extends PaymentModule
             $e['label'] = $e['name'];
         }
 
-        return [
-//            [
-//                'type' => 'select',
-//                'label' => $this->l('Enabled'),
-//                'name' => self::CONFIG_PREFIX . 'ENABLED',
-//                'required' => true,
-//                'options' => [
-//                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
-//                    'id' => 'id',
-//                    'name' => 'name',
-//                ],
-//                '_default' => 1,
-//            ],
+        return $this->sanitizeInputs([
+            //            [
+            //                'type' => 'select',
+            //                'label' => $this->l('Enabled'),
+            //                'name' => self::CONFIG_PREFIX . 'ENABLED',
+            //                'required' => true,
+            //                'options' => [
+            //                    'query' => $this->getConfigFormSelectInputOptions('yesno'),
+            //                    'id' => 'id',
+            //                    'name' => 'name',
+            //                ],
+            //                '_default' => 1,
+            //            ],
             [
                 'type' => 'radio',
                 'class' => 'smart2pay_radio',
@@ -1096,7 +1096,7 @@ class Smart2pay extends PaymentModule
                 '_transform' => ['trim'],
                 's2p_return_url' => true,
             ],
-        ];
+        ]);
     }
 
     private function getAdvancedConfigFormInputs()
@@ -1105,7 +1105,7 @@ class Smart2pay extends PaymentModule
 
         $lang_id = (int) $this->context->language->id;
 
-        return [
+        return $this->sanitizeInputs([
             [
                 'type' => 'select',
                 'label' => $this->l('Send order number as product description'),
@@ -1475,7 +1475,26 @@ class Smart2pay extends PaymentModule
                 '_default' => 0,
                 's2p_end_section' => true,
             ],
+        ]);
+    }
+
+    private function sanitizeInputs($inputs_arr)
+    {
+        $array_keys = [
+            's2p_start_section', 's2p_start_env_test', 's2p_start_env_live',
+            's2p_end_env_test', 's2p_end_env_live', 's2p_return_url', 's2p_end_section',
+            's2p_radio_to_switch',
+            's2p_section_legend'
         ];
+        if (!empty($inputs_arr) && is_array($inputs_arr)) {
+            foreach ($inputs_arr as $input) {
+                foreach ($array_keys as $key) {
+                    $input[$key] = isset($input[$key]) ? $input[$key] : false;
+                }
+            }
+        }
+
+        return $inputs_arr;
     }
 
     /**
@@ -6001,7 +6020,7 @@ class Smart2pay extends PaymentModule
             'return_url' => urlencode($this->context->link->getAdminLink('AdminModules') . '&configure=' . $this->name),
         ];
         $url = implode('?', [
-//            'https://webtest.smart2pay.com/microsoft/signup/',
+            //            'https://webtest.smart2pay.com/microsoft/signup/',
             'https://www.smart2pay.com/microsoft/signup/',
             implode('&', array_map(
                 function ($v, $k) {

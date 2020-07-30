@@ -41,7 +41,7 @@
   margin-top: 6px;
 }
 
-.create-account-notification, .env-test, .env-live, .kyc-notification, .change-env-notification {
+.create-account-notification, .env-test, .env-live, .kyc-notification, .change-env-notification, .return-url {
   display: none;
 }
 

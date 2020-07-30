@@ -15,7 +15,6 @@ var initialEnvironment = null;
 function activateTabAndPanel(thisElem) {
     thisElem.parent().addClass('active').siblings().removeClass('active');
     var panel = thisElem.attr('data-panel');
-    console.log($('#' + panel));
     $('#' + panel).show().siblings().hide();
 }
 
